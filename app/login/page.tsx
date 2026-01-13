@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { ShoppingBag } from "lucide-react"
+import Link from "next/link"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -88,6 +89,15 @@ export default function LoginPage() {
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Entrando..." : "Entrar"}
                   </Button>
+                  <div className="text-center text-sm">
+                    <span className="text-muted-foreground">Não tem uma conta? </span>
+                    <Link
+                      href="/cadastrar"
+                      className="font-semibold text-orange-600 hover:text-orange-700 underline-offset-4 hover:underline"
+                    >
+                      Criar usuário
+                    </Link>
+                  </div>
                 </div>
               </form>
             </CardContent>
