@@ -15,6 +15,7 @@ import Link from "next/link"
 export default function SignUpPage() {
   const [username, setUsername] = useState("")
   const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [repeatPassword, setRepeatPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -39,9 +40,13 @@ export default function SignUpPage() {
       return
     }
 
-    try {
-      const email = `${username}@padaria.local`
+    if (!email || !email.includes("@")) {
+      setError("Digite um e-mail válido")
+      setIsLoading(false)
+      return
+    }
 
+    try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -105,6 +110,18 @@ export default function SignUpPage() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       autoComplete="name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
                     />
                   </div>
                   <div className="grid gap-2">

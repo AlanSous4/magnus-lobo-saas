@@ -2,10 +2,11 @@
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { ShoppingBag, LayoutDashboard, Package, ShoppingCart, LogOut } from "lucide-react"
+import { ShoppingBag, LayoutDashboard, Package, ShoppingCart, LogOut, User } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useEffect, useState } from "react"
 
 const navItems = [
   {
@@ -28,6 +29,26 @@ const navItems = [
 export function NavSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const [username, setUsername] = useState<string>("")
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single()
+
+        if (profile) {
+          setUsername(profile.username)
+        }
+      }
+    }
+
+    fetchUserProfile()
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -70,10 +91,16 @@ export function NavSidebar() {
         })}
       </nav>
 
-      <div className="border-t p-4">
+      <div className="border-t p-4 space-y-2">
+        {username && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50">
+            <User className="h-4 w-4 text-orange-600" />
+            <span className="text-sm font-medium text-orange-900">{username}</span>
+          </div>
+        )}
         <Button
           variant="ghost"
-          className="w-full justify-start text-destructive hover:text-destructive"
+          className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={handleLogout}
         >
           <LogOut className="mr-2 h-4 w-4" />

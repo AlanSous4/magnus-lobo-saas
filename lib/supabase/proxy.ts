@@ -29,6 +29,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const publicPaths = ["/login", "/cadastrar"]
+  const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
+
   // Proteger rotas do dashboard
   if (
     (request.nextUrl.pathname.startsWith("/dashboard") ||
@@ -41,8 +44,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirecionar usuários logados da página de login
-  if (request.nextUrl.pathname === "/login" && user) {
+  if (isPublicPath && user) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
     return NextResponse.redirect(url)

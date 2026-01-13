@@ -13,7 +13,7 @@ import { ShoppingBag } from "lucide-react"
 import Link from "next/link"
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -26,8 +26,6 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const email = `${username}@padaria.local`
-
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -57,21 +55,21 @@ export default function LoginPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">Login</CardTitle>
-              <CardDescription>Digite seu usuário e senha para acessar</CardDescription>
+              <CardDescription>Digite seu e-mail e senha para acessar</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin}>
                 <div className="flex flex-col gap-6">
                   <div className="grid gap-2">
-                    <Label htmlFor="username">Nome de usuário</Label>
+                    <Label htmlFor="email">E-mail</Label>
                     <Input
-                      id="username"
-                      type="text"
-                      placeholder="usuario"
+                      id="email"
+                      type="email"
+                      placeholder="seu@email.com"
                       required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      autoComplete="username"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
                     />
                   </div>
                   <div className="grid gap-2">
