@@ -1,5 +1,6 @@
 "use client"
 
+import { calculateSalesMetrics } from "@/lib/sales-metrics"
 import {
   LineChart,
   Line,
@@ -8,8 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { useState } from "react"
 
 type Sale = {
   created_at: string
@@ -27,37 +28,10 @@ type Props = {
 export function SalesChart({ sales, type }: Props) {
   const [groupBy, setGroupBy] = useState<GroupBy>("day")
 
-  const groupedData = sales.reduce<Record<string, number>>((acc, sale) => {
-    const date = new Date(sale.created_at)
-
-    const key =
-      groupBy === "day"
-        ? date.toLocaleDateString("pt-BR")
-        : `${date.getMonth() + 1}/${date.getFullYear()}`
-
-    if (type === "sales") {
-      acc[key] = (acc[key] || 0) + 1
-    } else if (type === "ticket") {
-      acc[key] = (acc[key] || 0) + Number(sale.total_amount)
-    } else {
-      acc[key] = (acc[key] || 0) + Number(sale.total_amount)
-    }
-
-    return acc
-  }, {})
-
-  const chartData = Object.entries(groupedData).map(
-    ([date, total]) => ({
-      date,
-      total:
-        type === "ticket"
-          ? total /
-            sales.filter(
-              (s) =>
-                new Date(s.created_at).toLocaleDateString("pt-BR") === date
-            ).length
-          : total,
-    })
+  const { chartData } = calculateSalesMetrics(
+    sales,
+    type,
+    groupBy
   )
 
   return (
@@ -88,7 +62,7 @@ export function SalesChart({ sales, type }: Props) {
             <Tooltip />
             <Line
               type="monotone"
-              dataKey="total"
+              dataKey="value"
               strokeWidth={2}
             />
           </LineChart>
