@@ -1,0 +1,87 @@
+import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Package, ShoppingCart, DollarSign, TrendingUp } from "lucide-react"
+
+interface DashboardCardsProps {
+  productsCount: number
+  salesCount: number
+  revenue: number
+  averageTicket: number
+}
+
+export function DashboardCards({
+  productsCount,
+  salesCount,
+  revenue,
+  averageTicket,
+}: DashboardCardsProps) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      
+      {/* Produtos */}
+      <Link href="/produtos" className="group">
+        <Card className="cursor-pointer transition hover:shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Produtos Cadastrados
+            </CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{productsCount}</div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      {/* Vendas */}
+      <Link href="/vendas/historico?type=sales" className="group">
+        <Card className="cursor-pointer transition hover:shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Vendas (30 dias)
+            </CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{salesCount}</div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      {/* Receita */}
+      <Link href="/vendas/historico?type=revenue" className="group">
+        <Card className="cursor-pointer transition hover:shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Receita (30 dias)
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              R$ {revenue.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      {/* Ticket Médio */}
+      <Link href="/vendas/historico?type=ticket" className="group">
+        <Card className="cursor-pointer transition hover:shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Ticket Médio
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              R$ {averageTicket.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
+    </div>
+  )
+}
