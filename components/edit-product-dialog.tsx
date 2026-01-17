@@ -78,7 +78,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Editar Produto</DialogTitle>
           <DialogDescription>Atualize os dados do produto</DialogDescription>
@@ -130,6 +130,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
               id="edit-expiration_date"
               type="date"
               value={formData.expiration_date}
+              className="cursor-pointer"
               onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
             />
           </div>
@@ -137,10 +138,10 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
           {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
+            <Button className="cursor-pointer" type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button className="cursor-pointer" type="submit" disabled={isLoading}>
               {isLoading ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </div>

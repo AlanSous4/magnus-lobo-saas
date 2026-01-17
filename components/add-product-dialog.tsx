@@ -75,7 +75,7 @@ export function AddProductDialog({ userId }: AddProductDialogProps) {
           Novo Produto
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Adicionar Produto</DialogTitle>
           <DialogDescription>Preencha os dados do novo produto</DialogDescription>

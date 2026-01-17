@@ -60,7 +60,7 @@ export function NavSidebar() {
     <div className="flex h-screen w-64 flex-col border-r bg-background">
       <div className="border-b p-6">
         <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-linear-to-br from-orange-500 to-amber-600">
             <ShoppingBag className="h-6 w-6 text-white" />
           </div>
           <div>

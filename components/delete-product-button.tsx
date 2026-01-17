@@ -57,11 +57,11 @@ export function DeleteProductButton({ productId }: DeleteProductButtonProps) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel className="cursor-pointer">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
             disabled={isLoading}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-destructive text-white hover:bg-destructive/90 cursor-pointer"
           >
             {isLoading ? "Excluindo..." : "Excluir"}
           </AlertDialogAction>
