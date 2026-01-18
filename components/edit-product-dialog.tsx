@@ -74,7 +74,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" className="cursor-pointer">
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
