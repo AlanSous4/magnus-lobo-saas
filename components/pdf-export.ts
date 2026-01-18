@@ -18,46 +18,56 @@ export function exportSalesPDF(
       ? "Relatório de Ticket Médio"
       : "Relatório de Receita"
 
+  // 🔹 Título
   pdf.setFontSize(16)
   pdf.text(title, 14, 20)
 
+  // 🔹 Subtítulo
   pdf.setFontSize(11)
-  pdf.text(`Agrupamento: ${groupBy === "day" ? "Diário" : "Mensal"}`, 14, 30)
-
-  // 🔹 Resumo
   pdf.text(
-    `Resumo: Total de Vendas = ${metrics.summary.totalSales}, ` +
-      `Receita = R$ ${metrics.summary.totalRevenue.toFixed(2)}, ` +
-      `Ticket Médio = R$ ${metrics.summary.averageTicket.toFixed(2)}`,
+    `Agrupamento: ${groupBy === "day" ? "Diário" : "Mensal"}`,
     14,
-    38
+    30
   )
 
-  let y = 50
+  // 🔹 Resumo
+  pdf.setFontSize(12)
+  pdf.text("Resumo Geral", 14, 40)
 
-  // 🔹 Detalhes por período
+  pdf.setFontSize(10)
+  pdf.text(
+    `Total de vendas: ${metrics.summary.totalSales}`,
+    14,
+    48
+  )
+  pdf.text(
+    `Receita total: R$ ${metrics.summary.totalRevenue.toFixed(2)}`,
+    14,
+    54
+  )
+  pdf.text(
+    `Ticket médio: R$ ${metrics.summary.averageTicket.toFixed(2)}`,
+    14,
+    60
+  )
+
+  // 🔹 Tabela simples
+  let y = 72
+  pdf.setFontSize(11)
+  pdf.text("Detalhamento por período", 14, y)
+  y += 8
+
+  pdf.setFontSize(9)
   metrics.rows.forEach((row) => {
     pdf.text(
-      `${row.period}: ${row.sales} vendas | Receita R$ ${row.revenue.toFixed(
+      `${row.period} | Vendas: ${row.sales} | Receita: R$ ${row.revenue.toFixed(
         2
-      )} | Ticket Médio R$ ${row.ticket.toFixed(2)}`,
+      )} | Ticket: R$ ${row.ticket.toFixed(2)}`,
       14,
       y
     )
-    y += 8
+    y += 7
   })
 
-  // 🔹 Dados do gráfico
-  y += 10
-  pdf.text("Dados do Gráfico:", 14, y)
-  y += 8
-
-  metrics.chartData.forEach((item) => {
-    const value =
-      type === "sales" ? `${item.value} vendas` : `R$ ${item.value.toFixed(2)}`
-    pdf.text(`${item.date}: ${value}`, 14, y)
-    y += 8
-  })
-
-  pdf.save("relatorio-vendas.pdf")
+  return pdf
 }
