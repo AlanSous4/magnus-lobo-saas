@@ -1,8 +1,12 @@
 import jsPDF from "jspdf"
 import type { SalesMetrics } from "@/lib/sales-metrics"
+import * as htmlToImage from "html-to-image"
+import { createClient } from "@/lib/supabase/client"
 
 type ChartType = "sales" | "revenue" | "ticket"
 type GroupBy = "day" | "month"
+
+const CNPJ_FIXO = "60.227.207.0001-25"
 
 /* =========================
    🔹 Carregar imagem
@@ -17,7 +21,23 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /* =========================
-   🔹 Marca d’água (CORRIGIDA)
+   🔹 Converter gráfico em imagem
+   ========================= */
+async function chartToPng(elementId: string): Promise<string> {
+  const node = document.getElementById(elementId)
+
+  if (!node) {
+    throw new Error("Gráfico não encontrado")
+  }
+
+  return await htmlToImage.toPng(node, {
+    pixelRatio: 2,
+    backgroundColor: "transparent", // mantém transparência
+  })
+}
+
+/* =========================
+   🔹 Marca d’água
    ========================= */
 function drawWatermark(
   pdf: jsPDF,
@@ -27,7 +47,6 @@ function drawWatermark(
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
 
-  // 🔥 Logo ocupa quase a folha inteira
   const logoWidth = pageWidth * 0.95
   const logoHeight = logoWidth * (logo.height / logo.width)
 
@@ -35,20 +54,51 @@ function drawWatermark(
   const y = (pageHeight - logoHeight) / 2
 
   const anyPdf = pdf as any
-
-  // ✅ Salva estado gráfico
   anyPdf.saveGraphicsState()
+  anyPdf.setGState(new anyPdf.GState({ opacity }))
 
-  // ✅ Aplica opacidade real
-  anyPdf.setGState(
-    new anyPdf.GState({ opacity })
-  )
-
-  // 🖼 Marca d’água
   pdf.addImage(logo, "PNG", x, y, logoWidth, logoHeight)
 
-  // 🔁 Restaura estado gráfico
   anyPdf.restoreGraphicsState()
+}
+
+/* =========================
+   🔹 Rodapé
+   ========================= */
+function drawFooter(
+  pdf: jsPDF,
+  {
+    user,
+    period,
+  }: {
+    user: string
+    period: string
+  }
+) {
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const footerY = pageHeight - 10
+
+  const now = new Date().toLocaleString("pt-BR")
+
+  pdf.setFontSize(8)
+  pdf.setTextColor(120)
+
+  // Esquerda
+  pdf.text(`Gerado em ${now}`, 14, footerY)
+
+  // Centro
+  pdf.text(`CNPJ: ${CNPJ_FIXO}`, pageWidth / 2, footerY, {
+    align: "center",
+  })
+
+  // Direita
+  pdf.text(
+    `Usuário: ${user} | Período: ${period}`,
+    pageWidth - 14,
+    footerY,
+    { align: "right" }
+  )
 }
 
 /* =========================
@@ -60,16 +110,26 @@ export async function exportSalesPDF(
   groupBy: GroupBy
 ) {
   const pdf = new jsPDF()
-
-  // 🖼 Logo
   const logo = await loadImage("/Novo-logo-recortado.png")
 
-  // 🟡 Marca d’água na primeira página
-  drawWatermark(pdf, logo)
+  /* 🔐 Usuário logado */
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const userName =
+    user?.user_metadata?.name ||
+    user?.email ||
+    "Usuário não identificado"
+
+  const periodLabel = groupBy === "day" ? "Diário" : "Mensal"
 
   /* =========================
-     🔹 TÍTULO
+     📄 PÁGINA 1 — RESUMO + TABELA
      ========================= */
+  drawWatermark(pdf, logo)
+
   const title =
     type === "sales"
       ? "Relatório de Vendas"
@@ -81,15 +141,8 @@ export async function exportSalesPDF(
   pdf.text(title, 14, 20)
 
   pdf.setFontSize(11)
-  pdf.text(
-    `Agrupamento: ${groupBy === "day" ? "Diário" : "Mensal"}`,
-    14,
-    28
-  )
+  pdf.text(`Agrupamento: ${periodLabel}`, 14, 28)
 
-  /* =========================
-     🔹 RESUMO
-     ========================= */
   let yCursor = 45
 
   pdf.setFontSize(12)
@@ -113,11 +166,7 @@ export async function exportSalesPDF(
     yCursor
   )
 
-  /* =========================
-     🔹 TABELA
-     ========================= */
   yCursor += 12
-
   pdf.setFontSize(11)
   pdf.text("Detalhamento por período", 14, yCursor)
 
@@ -136,11 +185,13 @@ export async function exportSalesPDF(
 
   metrics.rows.forEach((row) => {
     if (yCursor > 280) {
+      drawFooter(pdf, {
+        user: userName,
+        period: periodLabel,
+      })
+
       pdf.addPage()
-
-      // 🔁 Marca d’água nas novas páginas
       drawWatermark(pdf, logo)
-
       yCursor = 20
     }
 
@@ -150,6 +201,30 @@ export async function exportSalesPDF(
     pdf.text(`R$ ${row.ticket.toFixed(2)}`, 150, yCursor)
 
     yCursor += 6
+  })
+
+  drawFooter(pdf, {
+    user: userName,
+    period: periodLabel,
+  })
+
+  /* =========================
+     📄 PÁGINA 2 — SOMENTE GRÁFICO
+     ========================= */
+  pdf.addPage()
+  drawWatermark(pdf, logo)
+
+  const chartImage = await chartToPng("sales-chart")
+  const pageWidth = pdf.internal.pageSize.getWidth()
+
+  pdf.setFontSize(14)
+  pdf.text("Gráfico de Desempenho", 14, 20)
+
+  pdf.addImage(chartImage, "PNG", 14, 30, pageWidth - 28, 140)
+
+  drawFooter(pdf, {
+    user: userName,
+    period: periodLabel,
   })
 
   return pdf

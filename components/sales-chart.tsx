@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { Button } from "@/components/ui/button"
-import { useState } from "react"
+import { useState, useRef } from "react"
 
 type Sale = {
   created_at: string
@@ -23,10 +23,18 @@ type GroupBy = "day" | "month"
 type Props = {
   sales: Sale[]
   type: ChartType
+  initialGroupBy?: GroupBy
 }
 
-export function SalesChart({ sales, type }: Props) {
-  const [groupBy, setGroupBy] = useState<GroupBy>("day")
+export function SalesChart({
+  sales,
+  type,
+  initialGroupBy = "day",
+}: Props) {
+  const [groupBy, setGroupBy] =
+    useState<GroupBy>(initialGroupBy)
+
+  const chartRef = useRef<HTMLDivElement>(null)
 
   const { chartData } = calculateSalesMetrics(
     sales,
@@ -53,8 +61,12 @@ export function SalesChart({ sales, type }: Props) {
         </Button>
       </div>
 
-      {/* 🔹 Gráfico */}
-      <div className="h-72 w-full">
+      {/* 🔹 Gráfico (IMPORTANTE: ref aqui) */}
+      <div
+        ref={chartRef}
+        id="sales-chart"
+        className="h-72 w-full bg-white"
+      >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <XAxis dataKey="date" />
