@@ -22,7 +22,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 function drawWatermark(
   pdf: jsPDF,
   logo: HTMLImageElement,
-  opacity = 0.08
+  opacity = 0.28
 ) {
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
