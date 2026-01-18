@@ -24,16 +24,31 @@ export function SalesHistory({ sales, type, groupBy }: SalesHistoryProps) {
   const metrics: SalesMetrics = calculateSalesMetrics(sales, type, groupBy)
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  function handlePreviewPDF() {
-    const pdf = exportSalesPDF(metrics, type, groupBy)
+  /* =========================
+     🔹 PRÉ-VISUALIZAÇÃO
+     ========================= */
+  async function handlePreviewPDF() {
+    setLoading(true)
+
+    const pdf = await exportSalesPDF(metrics, type, groupBy)
     const url = pdf.output("bloburl")
-    setPreviewUrl(String(url)) // ✅ CORRIGIDO
+
+    setPreviewUrl(url.toString())
+    setLoading(false)
   }
 
-  function handleExportPDF() {
-    const pdf = exportSalesPDF(metrics, type, groupBy)
+  /* =========================
+     🔹 EXPORTAÇÃO
+     ========================= */
+  async function handleExportPDF() {
+    setLoading(true)
+
+    const pdf = await exportSalesPDF(metrics, type, groupBy)
     pdf.save("relatorio-vendas.pdf")
+
+    setLoading(false)
   }
 
   return (
@@ -49,12 +64,19 @@ export function SalesHistory({ sales, type, groupBy }: SalesHistoryProps) {
           </CardTitle>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handlePreviewPDF}>
-              Pré-visualizar PDF
+            <Button
+              variant="outline"
+              onClick={handlePreviewPDF}
+              disabled={loading}
+            >
+              {loading ? "Gerando..." : "Pré-visualizar PDF"}
             </Button>
 
-            <Button onClick={handleExportPDF}>
-              Exportar PDF
+            <Button
+              onClick={handleExportPDF}
+              disabled={loading}
+            >
+              {loading ? "Gerando..." : "Exportar PDF"}
             </Button>
           </div>
         </CardHeader>
@@ -82,7 +104,9 @@ export function SalesHistory({ sales, type, groupBy }: SalesHistoryProps) {
         </CardContent>
       </Card>
 
-      {/* 🔹 MODAL DE PRÉ-VISUALIZAÇÃO */}
+      {/* =========================
+         🔹 MODAL DE PRÉ-VISUALIZAÇÃO
+         ========================= */}
       {previewUrl && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
@@ -93,7 +117,10 @@ export function SalesHistory({ sales, type, groupBy }: SalesHistoryProps) {
               </Button>
             </div>
 
-            <iframe src={previewUrl} className="flex-1 w-full" />
+            <iframe
+              src={previewUrl}
+              className="flex-1 w-full"
+            />
           </div>
         </div>
       )}

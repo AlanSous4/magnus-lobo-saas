@@ -3,10 +3,10 @@ import { redirect } from "next/navigation"
 import { SalesHistory } from "@/components/sales-history"
 
 type Props = {
-  searchParams: {
+  searchParams: Promise<{
     type?: "sales" | "revenue" | "ticket"
     groupBy?: "day" | "month"
-  }
+  }>
 }
 
 export default async function SalesHistoryPage({ searchParams }: Props) {
@@ -20,9 +20,12 @@ export default async function SalesHistoryPage({ searchParams }: Props) {
     redirect("/login")
   }
 
+  // ✅ OBRIGATÓRIO no Next 15+
+  const params = await searchParams
+
   // 🔹 Parâmetros vindos do card ou filtros
-  const type = searchParams.type ?? "revenue"
-  const groupBy = searchParams.groupBy ?? "day"
+  const type = params.type ?? "revenue"
+  const groupBy = params.groupBy ?? "day"
 
   const { data: sales } = await supabase
     .from("sales")
@@ -36,6 +39,7 @@ export default async function SalesHistoryPage({ searchParams }: Props) {
         <h1 className="text-3xl font-bold tracking-tight">
           Histórico de Vendas
         </h1>
+
         <p className="text-muted-foreground">
           Visualização por{" "}
           {type === "sales"
@@ -48,7 +52,7 @@ export default async function SalesHistoryPage({ searchParams }: Props) {
 
       {/* 🔹 Componente centralizado e reutilizável */}
       <SalesHistory
-        sales={sales || []}
+        sales={sales ?? []}
         type={type}
         groupBy={groupBy}
       />
