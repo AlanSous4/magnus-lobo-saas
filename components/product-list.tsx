@@ -9,12 +9,12 @@ import { ptBR } from "date-fns/locale"
 import {
   Package,
   Calendar,
-  TrendingUp,
   AlertCircle,
   Filter,
 } from "lucide-react"
 import { EditProductDialog } from "@/components/edit-product-dialog"
 import { DeleteProductButton } from "@/components/delete-product-button"
+import TestUploadButton from "@/components/test-upload-button"
 
 interface Product {
   id: string
@@ -30,7 +30,6 @@ interface ProductListProps {
   estoqueCritico: number
   diasParaVencer: number
 }
-
 
 type ProductFilter =
   | "all"
@@ -89,39 +88,51 @@ export function ProductList({ products }: ProductListProps) {
   return (
     <>
       {/* =========================
-          🔘 BOTÕES DE FILTRO
+          🔘 FILTROS + CARREGAR FOTOS
           ========================= */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Button
-          variant={filter === "all" ? "default" : "outline"}
-          onClick={() => setFilter("all")}
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          Todos
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        {/* Filtros (lado esquerdo) */}
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            className="cursor-pointer"
+            variant={filter === "all" ? "default" : "outline"}
+            onClick={() => setFilter("all")}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Todos
+          </Button>
 
-        <Button
-          variant={filter === "low-stock" ? "default" : "outline"}
-          onClick={() => setFilter("low-stock")}
-        >
-          ⚠️ Estoque baixo
-        </Button>
+          <Button 
+            className="cursor-pointer"
+            variant={filter === "low-stock" ? "default" : "outline"}
+            onClick={() => setFilter("low-stock")}
+          >
+            ⚠️ Estoque baixo
+          </Button>
 
-        <Button
-          variant={
-            filter === "expiring-soon" ? "default" : "outline"
-          }
-          onClick={() => setFilter("expiring-soon")}
-        >
-          ⏳ Próx. vencimento
-        </Button>
+          <Button 
+            className="cursor-pointer"
+            variant={
+              filter === "expiring-soon" ? "default" : "outline"
+            }
+            onClick={() => setFilter("expiring-soon")}
+          >
+            ⏳ Próx. vencimento
+          </Button>
 
-        <Button
-          variant={filter === "expired" ? "destructive" : "outline"}
-          onClick={() => setFilter("expired")}
-        >
-          ❌ Vencidos
-        </Button>
+          <Button 
+            className="cursor-pointer"
+            variant={filter === "expired" ? "destructive" : "outline"}
+            onClick={() => setFilter("expired")}
+          >
+            ❌ Vencidos
+          </Button>
+        </div>
+
+        {/* Botão Carregar Fotos (lado direito) */}
+        <div className="ml-auto">
+          <TestUploadButton productId="123" />
+        </div>
       </div>
 
       {/* =========================

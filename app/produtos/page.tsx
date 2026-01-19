@@ -91,10 +91,6 @@ export default async function ProductsPage() {
         />
 
         {/* ================= TESTE DE UPLOAD ================= */}
-        <section className="mt-6">
-          <h2 className="text-lg font-semibold">Teste de Upload</h2>
-          <TestUploadButton />
-        </section>
       </main>
     </div>
   );
