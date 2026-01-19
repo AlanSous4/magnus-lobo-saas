@@ -23,6 +23,7 @@ interface Product {
   quantity: number
   expiration_date: string | null
   created_at: string
+  image_url?: string | null
 }
 
 interface ProductListProps {
@@ -37,20 +38,21 @@ type ProductFilter =
   | "expiring-soon"
   | "expired"
 
-export function ProductList({ products }: ProductListProps) {
+export function ProductList({ products, estoqueCritico, diasParaVencer }: ProductListProps) {
   const [filter, setFilter] = useState<ProductFilter>("all")
+  const [localProducts, setLocalProducts] = useState<Product[]>(products)
 
   /* =========================
      🔹 Regras
      ========================= */
-  const isLowStock = (qtd: number) => qtd <= 5
+  const isLowStock = (qtd: number) => qtd <= estoqueCritico
 
   const isExpiringSoon = (date: string | null) => {
     if (!date) return false
     const diff =
       (new Date(date).getTime() - Date.now()) /
       (1000 * 60 * 60 * 24)
-    return diff > 0 && diff <= 7
+    return diff > 0 && diff <= diasParaVencer
   }
 
   const isExpired = (date: string | null) => {
@@ -59,9 +61,18 @@ export function ProductList({ products }: ProductListProps) {
   }
 
   /* =========================
+     🔹 Atualizar imagem no estado local
+     ========================= */
+  const updateProductImage = (productId: string, url: string) => {
+    setLocalProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, image_url: url } : p))
+    )
+  }
+
+  /* =========================
      🔹 Aplicar filtro
      ========================= */
-  const filteredProducts = products.filter((product) => {
+  const filteredProducts = localProducts.filter((product) => {
     if (filter === "low-stock")
       return isLowStock(product.quantity)
 
@@ -74,7 +85,7 @@ export function ProductList({ products }: ProductListProps) {
     return true
   })
 
-  if (products.length === 0) {
+  if (localProducts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Package className="h-12 w-12 text-muted-foreground mb-4" />
@@ -88,7 +99,7 @@ export function ProductList({ products }: ProductListProps) {
   return (
     <>
       {/* =========================
-          🔘 FILTROS + CARREGAR FOTOS
+          🔘 FILTROS + UPLOAD GLOBAL
           ========================= */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         {/* Filtros (lado esquerdo) */}
@@ -112,9 +123,7 @@ export function ProductList({ products }: ProductListProps) {
 
           <Button 
             className="cursor-pointer"
-            variant={
-              filter === "expiring-soon" ? "default" : "outline"
-            }
+            variant={filter === "expiring-soon" ? "default" : "outline"}
             onClick={() => setFilter("expiring-soon")}
           >
             ⏳ Próx. vencimento
@@ -129,21 +138,25 @@ export function ProductList({ products }: ProductListProps) {
           </Button>
         </div>
 
-        {/* Botão Carregar Fotos (lado direito) */}
+        {/* Botão Carregar Foto (lado direito, global) */}
         <div className="ml-auto">
-          <TestUploadButton productId="123" />
+          {/* Exemplo: usa o primeiro produto só para teste */}
+          {localProducts[0] && (
+            <TestUploadButton
+              productId={localProducts[0].id}
+              onUploadSuccess={(url) => updateProductImage(localProducts[0].id, url)}
+            />
+          )}
         </div>
       </div>
 
       {/* =========================
-          🧱 LISTA DE CARDS
+          🧱 LISTA DE CARDS COM UPLOAD POR PRODUTO
           ========================= */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredProducts.map((product) => {
           const expired = isExpired(product.expiration_date)
-          const expiringSoon = isExpiringSoon(
-            product.expiration_date
-          )
+          const expiringSoon = isExpiringSoon(product.expiration_date)
           const lowStock = isLowStock(product.quantity)
 
           return (
@@ -171,22 +184,29 @@ export function ProductList({ products }: ProductListProps) {
                   </div>
                   <div className="flex gap-1">
                     <EditProductDialog product={product} />
-                    <DeleteProductButton
-                      productId={product.id}
-                    />
+                    <DeleteProductButton productId={product.id} />
                   </div>
                 </div>
               </CardHeader>
 
               <CardContent className="space-y-3">
+                {/* Mostrar imagem se existir */}
+                {product.image_url ? (
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    className="w-full h-40 object-cover rounded"
+                  />
+                ) : (
+                  <div className="w-full h-40 bg-gray-200 rounded flex items-center justify-center text-gray-500">
+                    Sem foto
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 text-sm">
                   <Package className="h-4 w-4" />
                   Quantidade:
-                  <Badge
-                    variant={
-                      lowStock ? "destructive" : "default"
-                    }
-                  >
+                  <Badge variant={lowStock ? "destructive" : "default"}>
                     {product.quantity}
                   </Badge>
                 </div>
@@ -204,23 +224,25 @@ export function ProductList({ products }: ProductListProps) {
                           : "outline"
                       }
                     >
-                      {new Date(
-                        product.expiration_date
-                      ).toLocaleDateString("pt-BR")}
-                      {expired && (
-                        <AlertCircle className="ml-1 h-3 w-3" />
-                      )}
+                      {new Date(product.expiration_date).toLocaleDateString("pt-BR")}
+                      {expired && <AlertCircle className="ml-1 h-3 w-3" />}
                     </Badge>
                   </div>
                 )}
 
                 <div className="text-sm text-muted-foreground">
                   Adicionado{" "}
-                  {formatDistanceToNow(
-                    new Date(product.created_at),
-                    { addSuffix: true, locale: ptBR }
-                  )}
+                  {formatDistanceToNow(new Date(product.created_at), {
+                    addSuffix: true,
+                    locale: ptBR,
+                  })}
                 </div>
+
+                {/* Botão de upload específico para cada produto */}
+                <TestUploadButton
+                  productId={product.id}
+                  onUploadSuccess={(url) => updateProductImage(product.id, url)}
+                />
               </CardContent>
             </Card>
           )
