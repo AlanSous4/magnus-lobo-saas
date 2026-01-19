@@ -1,34 +1,35 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { ProductList } from "@/components/product-list";
-import { AddProductDialog } from "@/components/add-product-dialog";
-import { Package, AlertTriangle } from "lucide-react";
-import TestUploadButton from "@/components/test-upload-button"; // 🔹 import do botão de teste
+import { createClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
+import { ProductList } from "@/components/product-list"
+import { AddProductDialog } from "@/components/add-product-dialog"
+import { ProductsRealtimeListener } from "@/components/products-realtime-listener"
+import { Package, AlertTriangle } from "lucide-react"
 
-const ESTOQUE_CRITICO = 5;
-const DIAS_PARA_VENCER = 7;
+const ESTOQUE_CRITICO = 5
+const DIAS_PARA_VENCER = 7
 
 function isNearExpiration(expiresAt: string | null, days = 7) {
-  if (!expiresAt) return false;
+  if (!expiresAt) return false
 
-  const today = new Date();
-  const expiration = new Date(expiresAt);
+  const today = new Date()
+  const expiration = new Date(expiresAt)
 
   const diffDays =
-    (expiration.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    (expiration.getTime() - today.getTime()) /
+    (1000 * 60 * 60 * 24)
 
-  return diffDays <= days;
+  return diffDays <= days
 }
 
 export default async function ProductsPage() {
-  const supabase = await createClient();
+  const supabase = await createClient()
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/login");
+    redirect("/login")
   }
 
   // 🔹 Buscar produtos do usuário
@@ -36,18 +37,18 @@ export default async function ProductsPage() {
     .from("products")
     .select("*")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
 
-  const safeProducts = products || [];
+  const safeProducts = products || []
 
   // 🔹 Contadores de alerta
   const nearExpirationCount = safeProducts.filter((p) =>
     isNearExpiration(p.expires_at, DIAS_PARA_VENCER)
-  ).length;
+  ).length
 
   const lowStockCount = safeProducts.filter(
     (p) => p.stock <= ESTOQUE_CRITICO
-  ).length;
+  ).length
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -56,7 +57,9 @@ export default async function ProductsPage() {
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <Package className="h-6 w-6 text-orange-600" />
-            <h1 className="text-xl font-semibold">Gestão de Produtos</h1>
+            <h1 className="text-xl font-semibold">
+              Gestão de Produtos
+            </h1>
           </div>
           <AddProductDialog userId={user.id} />
         </div>
@@ -64,6 +67,9 @@ export default async function ProductsPage() {
 
       {/* ================= MAIN ================= */}
       <main className="flex-1 container px-4 py-6 space-y-6">
+        {/* 🔄 REALTIME LISTENER (não renderiza nada) */}
+        <ProductsRealtimeListener />
+
         {/* 🔔 ALERTAS VISUAIS */}
         {(nearExpirationCount > 0 || lowStockCount > 0) && (
           <div className="flex flex-wrap gap-4">
@@ -89,9 +95,7 @@ export default async function ProductsPage() {
           estoqueCritico={ESTOQUE_CRITICO}
           diasParaVencer={DIAS_PARA_VENCER}
         />
-
-        {/* ================= TESTE DE UPLOAD ================= */}
       </main>
     </div>
-  );
+  )
 }
