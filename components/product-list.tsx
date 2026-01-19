@@ -195,7 +195,7 @@ export function ProductList({ products, estoqueCritico, diasParaVencer }: Produc
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="w-full h-40 object-cover rounded"
+                    className="w-full h-40 object-contain rounded bg-white"
                   />
                 ) : (
                   <div className="w-full h-40 bg-gray-200 rounded flex items-center justify-center text-gray-500">

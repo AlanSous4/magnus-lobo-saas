@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
+// ⚠️ Use sempre a chave SERVICE_ROLE no backend (nunca no frontend)
 export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY! // ⚠️ chave secreta, só no backend
