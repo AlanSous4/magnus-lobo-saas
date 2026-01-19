@@ -1,8 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { ProductList } from "@/components/product-list"
 import { AddProductDialog } from "@/components/add-product-dialog"
-import { ProductsRealtimeListener } from "@/components/products-realtime-listener"
+import { ProductListClient } from "@/components/product-list-client"
 import { Package, AlertTriangle } from "lucide-react"
 
 const ESTOQUE_CRITICO = 5
@@ -32,7 +31,7 @@ export default async function ProductsPage() {
     redirect("/login")
   }
 
-  // 🔹 Buscar produtos do usuário
+  // 🔹 Buscar produtos do usuário (SERVER)
   const { data: products } = await supabase
     .from("products")
     .select("*")
@@ -41,7 +40,7 @@ export default async function ProductsPage() {
 
   const safeProducts = products || []
 
-  // 🔹 Contadores de alerta
+  // 🔹 Contadores de alerta (SERVER)
   const nearExpirationCount = safeProducts.filter((p) =>
     isNearExpiration(p.expires_at, DIAS_PARA_VENCER)
   ).length
@@ -61,15 +60,13 @@ export default async function ProductsPage() {
               Gestão de Produtos
             </h1>
           </div>
+
           <AddProductDialog userId={user.id} />
         </div>
       </header>
 
       {/* ================= MAIN ================= */}
       <main className="flex-1 container px-4 py-6 space-y-6">
-        {/* 🔄 REALTIME LISTENER (não renderiza nada) */}
-        <ProductsRealtimeListener />
-
         {/* 🔔 ALERTAS VISUAIS */}
         {(nearExpirationCount > 0 || lowStockCount > 0) && (
           <div className="flex flex-wrap gap-4">
@@ -89,9 +86,10 @@ export default async function ProductsPage() {
           </div>
         )}
 
-        {/* 🔹 LISTA DE PRODUTOS */}
-        <ProductList
-          products={safeProducts}
+        {/* 🔹 LISTA DE PRODUTOS (CLIENT + REALTIME GRANULAR) */}
+        <ProductListClient
+          initialProducts={safeProducts}
+          userId={user.id}
           estoqueCritico={ESTOQUE_CRITICO}
           diasParaVencer={DIAS_PARA_VENCER}
         />

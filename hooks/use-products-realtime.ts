@@ -1,11 +1,26 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Product } from "@/types/product";
 
-export function useProductsRealtime(onChange: () => void) {
+type Params = {
+  userId: string;
+  onInsert?: (product: Product) => void;
+  onUpdate?: (product: Product) => void;
+  onDelete?: (id: string) => void;
+};
+
+export function useProductsRealtime({
+  userId,
+  onInsert,
+  onUpdate,
+  onDelete,
+}: Params) {
   useEffect(() => {
-    const supabase = createClient()
+    if (!userId) return;
+
+    const supabase = createClient();
 
     const channel = supabase
       .channel("products-realtime")
@@ -15,15 +30,26 @@ export function useProductsRealtime(onChange: () => void) {
           event: "*",
           schema: "public",
           table: "products",
+          filter: `user_id=eq.${userId}`,
         },
-        () => {
-          onChange()
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            onInsert?.(payload.new as Product);
+          }
+
+          if (payload.eventType === "UPDATE") {
+            onUpdate?.(payload.new as Product);
+          }
+
+          if (payload.eventType === "DELETE") {
+            onDelete?.((payload.old as Product).id);
+          }
         }
       )
-      .subscribe()
+      .subscribe();
 
     return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [onChange])
+      supabase.removeChannel(channel);
+    };
+  }, [userId, onInsert, onUpdate, onDelete]);
 }
