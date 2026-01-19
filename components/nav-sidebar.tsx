@@ -65,7 +65,7 @@ export function NavSidebar() {
           </div>
           <div>
             <h2 className="font-bold leading-tight">Magnus Lobo</h2>
-            <p className="text-xs text-muted-foreground">Padaria</p>
+            <p className="text-xs text-muted-foreground">Padaria Lanchonete</p>
           </div>
         </div>
       </div>
@@ -100,7 +100,7 @@ export function NavSidebar() {
         )}
         <Button
           variant="ghost"
-          className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+          className="w-full justify-start text-destructive cursor-pointer hover:text-destructive hover:bg-destructive/10"
           onClick={handleLogout}
         >
           <LogOut className="mr-2 h-4 w-4" />
