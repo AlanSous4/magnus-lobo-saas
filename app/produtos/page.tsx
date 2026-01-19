@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ProductList } from "@/components/product-list";
 import { AddProductDialog } from "@/components/add-product-dialog";
 import { Package, AlertTriangle } from "lucide-react";
+import TestUploadButton from "@/components/test-upload-button"; // 🔹 import do botão de teste
 
 const ESTOQUE_CRITICO = 5;
 const DIAS_PARA_VENCER = 7;
@@ -88,6 +89,12 @@ export default async function ProductsPage() {
           estoqueCritico={ESTOQUE_CRITICO}
           diasParaVencer={DIAS_PARA_VENCER}
         />
+
+        {/* ================= TESTE DE UPLOAD ================= */}
+        <section className="mt-6">
+          <h2 className="text-lg font-semibold">Teste de Upload</h2>
+          <TestUploadButton />
+        </section>
       </main>
     </div>
   );
