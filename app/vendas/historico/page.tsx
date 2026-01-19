@@ -1,61 +1,32 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
-import { SalesHistory } from "@/components/sales-history"
+import { createClient } from "@/lib/supabase/server";
+import { SalesListClient } from "@/components/sales-list-client";
 
-type Props = {
-  searchParams: Promise<{
-    type?: "sales" | "revenue" | "ticket"
-    groupBy?: "day" | "month"
-  }>
-}
-
-export default async function SalesHistoryPage({ searchParams }: Props) {
-  const supabase = await createClient()
+export default async function SalesHistoryPage() {
+  const supabase = await createClient(); // 👈 AQUI ESTÁ A CORREÇÃO
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login")
+  if (authError || !user) {
+    return null;
   }
 
-  // ✅ OBRIGATÓRIO no Next 15+
-  const params = await searchParams
-
-  // 🔹 Parâmetros vindos do card ou filtros
-  const type = params.type ?? "revenue"
-  const groupBy = params.groupBy ?? "day"
-
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id, total_amount, created_at")
+  const { data: sales, error } = await supabase
+    .from("sales_view")
+    .select("*")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Erro ao buscar vendas:", error);
+  }
 
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Histórico de Vendas
-        </h1>
-
-        <p className="text-muted-foreground">
-          Visualização por{" "}
-          {type === "sales"
-            ? "Quantidade de vendas"
-            : type === "ticket"
-            ? "Ticket médio"
-            : "Receita"}
-        </p>
-      </div>
-
-      {/* 🔹 Componente centralizado e reutilizável */}
-      <SalesHistory
-        sales={sales ?? []}
-        type={type}
-        groupBy={groupBy}
-      />
-    </div>
-  )
+    <SalesListClient
+      initialSales={sales ?? []}
+      userId={user.id}
+    />
+  );
 }

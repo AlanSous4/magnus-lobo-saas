@@ -1,25 +1,31 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
-import { POSInterface } from "@/components/pos-interface"
+import { createClient } from "@/lib/supabase/server";
+import { POSInterface } from "@/components/pos-interface";
 
-export default async function SalesPage() {
-  const supabase = await createClient()
+export default async function VendasPage() {
+  const supabase = await createClient(); // ✅ CORREÇÃO AQUI
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login")
+  if (authError || !user) {
+    return null;
   }
 
-  // Buscar produtos disponíveis
-  const { data: products } = await supabase
+  const { data: products, error } = await supabase
     .from("products")
-    .select("*")
-    .eq("user_id", user.id)
-    .gt("quantity", 0)
-    .order("name")
+    .select("id, name, value, quantity, image_url")
+    .order("name");
 
-  return <POSInterface products={products || []} userId={user.id} />
+  if (error) {
+    console.error("Erro ao buscar produtos:", error);
+  }
+
+  return (
+    <POSInterface
+      products={products ?? []}
+      userId={user.id}
+    />
+  );
 }
