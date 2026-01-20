@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SalesChart } from "@/components/sales-chart";
@@ -13,7 +13,7 @@ import {
 } from "@/lib/sales-metrics";
 
 import { useSalesRealtime } from "@/hooks/use-sales-realtime";
-import type { Sale } from "@/types/sale"; // ✅ tipo único e correto
+import type { Sale } from "@/types/sale";
 
 export type SalesHistoryProps = {
   type: "sales" | "revenue" | "ticket";
@@ -24,28 +24,27 @@ export type SalesHistoryProps = {
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
 
-  const salesForMetrics: MetricsSale[] = sales.map((s) => ({
+  const [days, setDays] = useState<30 | 60 | 90>(30);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const filteredSales = useMemo(() => {
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - days);
+    return sales.filter((sale) => new Date(sale.created_at) >= limitDate);
+  }, [sales, days]);
+
+  const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
     id: s.id,
-  
-    // ✅ MetricsSale espera total_amount
-    // ✅ Sale tem total_value
-    // ✅ Conversão correta e segura
     total_amount: s.total_value ?? 0,
-  
     created_at: s.created_at,
   }));
-  
-  
-  
 
   const metrics: SalesMetrics = calculateSalesMetrics(
     salesForMetrics,
     type,
     groupBy
   );
-
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   async function handlePreviewPDF() {
     setExporting(true);
@@ -68,24 +67,29 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   }
 
   if (loading) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Carregando vendas...
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">Carregando vendas...</p>;
   }
 
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>
-            {type === "sales"
-              ? "Quantidade de Vendas"
-              : type === "ticket"
-              ? "Ticket Médio"
-              : "Faturamento"}
-          </CardTitle>
+        <CardHeader className="space-y-4">
+          <div className="flex justify-between items-center">
+            <CardTitle>Relatório</CardTitle>
+
+            <div className="flex gap-2">
+              {[30, 60, 90].map((d) => (
+                <Button
+                  key={d}
+                  size="sm"
+                  variant={days === d ? "default" : "outline"}
+                  onClick={() => setDays(d as 30 | 60 | 90)}
+                >
+                  {d} dias
+                </Button>
+              ))}
+            </div>
+          </div>
 
           <div className="flex gap-2">
             <Button
@@ -102,38 +106,117 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <SalesChart
-            sales={salesForMetrics}
-            type={type}
-            initialGroupBy={groupBy}
-          />
+  {/* 🔹 GRÁFICO VISÍVEL — apenas para sales/ticket */}
+  {type !== "revenue" && (
+    <SalesChart
+      sales={salesForMetrics}
+      type={type}
+      initialGroupBy={groupBy}
+      chartId="sales-chart-visible"
+    />
+  )}
 
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <strong>Total</strong>
-              <p>{metrics.summary.totalSales}</p>
-            </div>
-            <div>
-              <strong>Média</strong>
-              <p>{metrics.summary.averageTicket.toFixed(2)}</p>
-            </div>
-            <div>
-              <strong>Períodos</strong>
-              <p>{metrics.labels.length}</p>
-            </div>
-          </div>
-        </CardContent>
+  {/* 🔹 RELATÓRIO DE RECEITA */}
+  {type === "revenue" && (
+    <>
+      <div className="grid grid-cols-3 gap-4 text-sm">
+        <div>
+          <strong>Total de vendas</strong>
+          <p>{metrics.summary.totalSales}</p>
+        </div>
+        <div>
+          <strong>Receita total</strong>
+          <p>R$ {metrics.summary.totalRevenue.toFixed(2)}</p>
+        </div>
+        <div>
+          <strong>Ticket médio</strong>
+          <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
+        </div>
+      </div>
+
+      <div className="overflow-auto border rounded-lg">
+        <table className="w-full text-sm">
+          <thead className="bg-muted">
+            <tr>
+              <th className="p-2 text-left">Período</th>
+              <th className="p-2 text-right">Vendas</th>
+              <th className="p-2 text-right">Receita</th>
+              <th className="p-2 text-right">Ticket Médio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.labels.map((label) => {
+              const periodSales = filteredSales.filter((sale) => {
+                const date = new Date(sale.created_at);
+
+                if (groupBy === "day") {
+                  return date.toLocaleDateString("pt-BR") === label;
+                }
+
+                if (groupBy === "month") {
+                  return (
+                    `${date.getMonth() + 1}/${date.getFullYear()}` === label
+                  );
+                }
+
+                return false;
+              });
+
+              const salesCount = periodSales.length;
+              const revenue = periodSales.reduce(
+                (sum, sale) => sum + (sale.total_value ?? 0),
+                0
+              );
+
+              const averageTicket =
+                salesCount > 0 ? revenue / salesCount : 0;
+
+              return (
+                <tr key={label} className="border-t">
+                  <td className="p-2">{label}</td>
+                  <td className="p-2 text-right">{salesCount}</td>
+                  <td className="p-2 text-right">
+                    R$ {revenue.toFixed(2)}
+                  </td>
+                  <td className="p-2 text-right">
+                    R$ {averageTicket.toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )}
+</CardContent>
+
       </Card>
+
+      {/* 🔹 GRÁFICO FIXO PARA PDF (NUNCA SOME) */}
+      <div
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          top: 0,
+          width: "800px",
+          height: "400px",
+        }}
+      >
+        <SalesChart
+          sales={salesForMetrics}
+          type={type}
+          initialGroupBy={groupBy}
+          chartId="sales-chart" // 👈 ESTE É O QUE O PDF USA
+        />
+      </div>
 
       {previewUrl && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-3 border-b">
               <strong>Pré-visualização do PDF</strong>
-              <Button
-                variant="ghost"
-                onClick={() => setPreviewUrl(null)}
-              >
+              <Button variant="ghost" onClick={() => setPreviewUrl(null)}>
                 Fechar
               </Button>
             </div>
