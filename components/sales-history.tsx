@@ -5,8 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SalesChart } from "@/components/sales-chart";
 import { exportSalesPDF } from "@/components/pdf-export";
-import { calculateSalesMetrics, Sale as MetricsSale, SalesMetrics } from "@/lib/sales-metrics";
-import { useSalesRealtime, Sale as RealtimeSale } from "@/hooks/use-sales-realtime";
+
+import {
+  calculateSalesMetrics,
+  Sale as MetricsSale,
+  SalesMetrics,
+} from "@/lib/sales-metrics";
+
+import { useSalesRealtime } from "@/hooks/use-sales-realtime";
+import type { Sale } from "@/types/sale"; // ✅ tipo único e correto
 
 export type SalesHistoryProps = {
   type: "sales" | "revenue" | "ticket";
@@ -17,13 +24,25 @@ export type SalesHistoryProps = {
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
 
-  const salesForMetrics: MetricsSale[] = sales.map((s: RealtimeSale) => ({
+  const salesForMetrics: MetricsSale[] = sales.map((s) => ({
     id: s.id,
-    total_amount: s.total_value,
+  
+    // ✅ MetricsSale espera total_amount
+    // ✅ Sale tem total_value
+    // ✅ Conversão correta e segura
+    total_amount: s.total_value ?? 0,
+  
     created_at: s.created_at,
   }));
+  
+  
+  
 
-  const metrics: SalesMetrics = calculateSalesMetrics(salesForMetrics, type, groupBy);
+  const metrics: SalesMetrics = calculateSalesMetrics(
+    salesForMetrics,
+    type,
+    groupBy
+  );
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -48,19 +67,32 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Carregando vendas...</p>;
+  if (loading) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Carregando vendas...
+      </p>
+    );
+  }
 
   return (
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>
-            {type === "sales" ? "Quantidade de Vendas" :
-             type === "ticket" ? "Ticket Médio" : "Faturamento"}
+            {type === "sales"
+              ? "Quantidade de Vendas"
+              : type === "ticket"
+              ? "Ticket Médio"
+              : "Faturamento"}
           </CardTitle>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handlePreviewPDF} disabled={exporting}>
+            <Button
+              variant="outline"
+              onClick={handlePreviewPDF}
+              disabled={exporting}
+            >
               {exporting ? "Gerando..." : "Pré-visualizar PDF"}
             </Button>
             <Button onClick={handleExportPDF} disabled={exporting}>
@@ -70,8 +102,11 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         </CardHeader>
 
         <CardContent className="space-y-6">
-        <SalesChart sales={salesForMetrics} type={type} initialGroupBy={groupBy} />
-
+          <SalesChart
+            sales={salesForMetrics}
+            type={type}
+            initialGroupBy={groupBy}
+          />
 
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
@@ -95,7 +130,10 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-3 border-b">
               <strong>Pré-visualização do PDF</strong>
-              <Button variant="ghost" onClick={() => setPreviewUrl(null)}>
+              <Button
+                variant="ghost"
+                onClick={() => setPreviewUrl(null)}
+              >
                 Fechar
               </Button>
             </div>
