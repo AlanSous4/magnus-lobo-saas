@@ -34,7 +34,7 @@ export function DashboardCards({
       </Link>
 
       {/* Vendas */}
-      <Link href="/vendas/historico?type=sales" className="group">
+      <Link href="/vendas/relatorio?type=sales" className="group">
         <Card className="cursor-pointer transition hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
@@ -49,7 +49,7 @@ export function DashboardCards({
       </Link>
 
       {/* Receita */}
-      <Link href="/vendas/historico?type=revenue" className="group">
+      <Link href="/vendas/relatorio?type=revenue" className="group">
         <Card className="cursor-pointer transition hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
@@ -66,7 +66,7 @@ export function DashboardCards({
       </Link>
 
       {/* Ticket Médio */}
-      <Link href="/vendas/historico?type=ticket" className="group">
+      <Link href="/vendas/relatorio?type=ticket" className="group">
         <Card className="cursor-pointer transition hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">

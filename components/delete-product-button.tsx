@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,40 +12,43 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client"; // ✅ instância única
+import { useRouter } from "next/navigation";
 
 interface DeleteProductButtonProps {
-  productId: string
+  productId: string;
 }
 
 export function DeleteProductButton({ productId }: DeleteProductButtonProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleDelete = async () => {
-    const supabase = createClient()
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
-      const { error } = await supabase.from("products").delete().eq("id", productId)
+      const { error } = await supabase.from("products").delete().eq("id", productId);
 
-      if (error) throw error
+      if (error) throw error;
 
-      router.refresh()
-    } catch (error) {
-      console.error("[v0] Error deleting product:", error)
+      router.refresh();
+    } catch (err) {
+      console.error("[v0] Error deleting product:", err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive cursor-pointer">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive hover:text-destructive cursor-pointer"
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </AlertDialogTrigger>
@@ -68,5 +71,5 @@ export function DeleteProductButton({ productId }: DeleteProductButtonProps) {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }

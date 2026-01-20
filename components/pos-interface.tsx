@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   ShoppingCart,
   CreditCard,
@@ -17,7 +16,7 @@ import {
   X,
   Check,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client"; // ✅ instância única
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -67,8 +66,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedPayment, setSelectedPayment] =
-    useState<PaymentMethod | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -122,10 +120,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   };
 
   const getTotalAmount = () =>
-    cart.reduce(
-      (total, item) => total + item.value * item.cartQuantity,
-      0
-    );
+    cart.reduce((total, item) => total + item.value * item.cartQuantity, 0);
 
   /* =========================
      💳 FINALIZAR VENDA
@@ -139,10 +134,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const processSale = async () => {
     if (!selectedPayment) return;
 
-    const supabase = createClient();
     setIsProcessing(true);
 
     try {
+      // ✅ usa instância única supabase, não createClient()
       const { data: sale, error: saleError } = await supabase
         .from("sales")
         .insert({
@@ -156,27 +151,21 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       if (saleError) throw saleError;
 
       for (const item of cart) {
-        const { error: itemError } = await supabase
-          .from("sale_items")
-          .insert({
-            sale_id: sale.id,
-            product_id: item.id,
-            quantity: item.cartQuantity,
-            unit_price: item.value,
-            subtotal: item.value * item.cartQuantity,
-          });
+        await supabase.from("sale_items").insert({
+          sale_id: sale.id,
+          product_id: item.id,
+          quantity: item.cartQuantity,
+          unit_price: item.value,
+          subtotal: item.value * item.cartQuantity,
+        });
 
-        if (itemError) throw itemError;
-
-        const { error: updateError } = await supabase
+        await supabase
           .from("products")
           .update({
             quantity: item.quantity - item.cartQuantity,
             exit_date: new Date().toISOString(),
           })
           .eq("id", item.id);
-
-        if (updateError) throw updateError;
       }
 
       setCart([]);
@@ -201,7 +190,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* ================= PRODUTOS ================= */}
+      {/* PRODUTOS */}
       <div className="flex-1 flex flex-col border-r">
         <div className="border-b p-4">
           <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
@@ -221,11 +210,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
             {filteredProducts.map((product) => (
               <Card
                 key={product.id}
-                className="cursor-pointer hover:bg-accent transition-colors"
+                className="cursor-pointer hover:bg-accent"
                 onClick={() => addToCart(product)}
               >
-                {/* IMAGEM */}
-                <div className="h-24 w-full bg-muted flex items-center justify-center overflow-hidden rounded-t-md">
+                <div className="h-24 bg-muted flex items-center justify-center overflow-hidden rounded-t-md">
                   {product.image_url ? (
                     <img
                       src={product.image_url}
@@ -240,9 +228,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                 </div>
 
                 <CardHeader className="p-3 pb-1">
-                  <CardTitle className="text-sm leading-tight line-clamp-2">
-                    {product.name}
-                  </CardTitle>
+                  <CardTitle className="text-sm line-clamp-2">{product.name}</CardTitle>
                 </CardHeader>
 
                 <CardContent className="p-3 pt-0">
@@ -259,7 +245,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         </ScrollArea>
       </div>
 
-      {/* ================= CARRINHO ================= */}
+      {/* CARRINHO */}
       <div className="w-full sm:w-96 flex flex-col bg-muted/30">
         <div className="border-b p-4 bg-background">
           <h2 className="text-xl font-semibold">Carrinho</h2>
@@ -292,12 +278,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                         <Button
                           size="icon"
                           variant="outline"
-                          onClick={() =>
-                            updateQuantity(
-                              item.id,
-                              item.cartQuantity - 1
-                            )
-                          }
+                          onClick={() => updateQuantity(item.id, item.cartQuantity - 1)}
                         >
                           -
                         </Button>
@@ -305,12 +286,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                         <Button
                           size="icon"
                           variant="outline"
-                          onClick={() =>
-                            updateQuantity(
-                              item.id,
-                              item.cartQuantity + 1
-                            )
-                          }
+                          onClick={() => updateQuantity(item.id, item.cartQuantity + 1)}
                           disabled={item.cartQuantity >= item.quantity}
                         >
                           +
@@ -318,8 +294,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                       </div>
 
                       <span className="font-bold text-orange-600">
-                        R${" "}
-                        {(item.value * item.cartQuantity).toFixed(2)}
+                        R$ {(item.value * item.cartQuantity).toFixed(2)}
                       </span>
                     </div>
                   </CardContent>
@@ -332,9 +307,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         <div className="border-t p-4 space-y-4 bg-background">
           <div className="flex justify-between text-lg font-bold">
             <span>Total</span>
-            <span className="text-orange-600">
-              R$ {getTotalAmount().toFixed(2)}
-            </span>
+            <span className="text-orange-600">R$ {getTotalAmount().toFixed(2)}</span>
           </div>
 
           <Button
@@ -348,14 +321,12 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         </div>
       </div>
 
-      {/* ================= DIALOG PAGAMENTO ================= */}
+      {/* DIALOG PAGAMENTO */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Forma de Pagamento</DialogTitle>
-            <DialogDescription>
-              Total: R$ {getTotalAmount().toFixed(2)}
-            </DialogDescription>
+            <DialogDescription>Total: R$ {getTotalAmount().toFixed(2)}</DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-3 py-4">
@@ -364,9 +335,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               return (
                 <Button
                   key={method.id}
-                  variant={
-                    selectedPayment === method.id ? "default" : "outline"
-                  }
+                  variant={selectedPayment === method.id ? "default" : "outline"}
                   className="h-20 flex flex-col gap-2"
                   onClick={() => setSelectedPayment(method.id)}
                 >
@@ -378,30 +347,26 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowPayment(false)}
-            >
+            <Button variant="outline" onClick={() => setShowPayment(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={processSale}
-              disabled={!selectedPayment || isProcessing}
-            >
+            <Button onClick={processSale} disabled={!selectedPayment || isProcessing}>
               {isProcessing ? "Processando..." : "Confirmar Venda"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ================= DIALOG SUCESSO ================= */}
+      {/* DIALOG SUCESSO */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
         <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="sr-only">Venda realizada com sucesso</DialogTitle>
+          </DialogHeader>
+
           <div className="flex flex-col items-center p-6">
             <Check className="h-10 w-10 text-green-600 mb-3" />
-            <p className="text-muted-foreground">
-              Venda realizada com sucesso
-            </p>
+            <p className="text-muted-foreground">Venda realizada com sucesso</p>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client"; // ✅ instância única
 import { Product } from "@/types/product";
 
 type Params = {
@@ -20,8 +20,7 @@ export function useProductsRealtime({
   useEffect(() => {
     if (!userId) return;
 
-    const supabase = createClient();
-
+    // ✅ usa a instância única do supabase
     const channel = supabase
       .channel("products-realtime")
       .on(
@@ -33,16 +32,16 @@ export function useProductsRealtime({
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT") {
-            onInsert?.(payload.new as Product);
-          }
-
-          if (payload.eventType === "UPDATE") {
-            onUpdate?.(payload.new as Product);
-          }
-
-          if (payload.eventType === "DELETE") {
-            onDelete?.((payload.old as Product).id);
+          switch (payload.eventType) {
+            case "INSERT":
+              onInsert?.(payload.new as Product);
+              break;
+            case "UPDATE":
+              onUpdate?.(payload.new as Product);
+              break;
+            case "DELETE":
+              onDelete?.((payload.old as Product).id);
+              break;
           }
         }
       )

@@ -1,63 +1,68 @@
-"use client"
+"use client";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { ShoppingBag, LayoutDashboard, Package, ShoppingCart, LogOut, User } from "lucide-react"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { useEffect, useState } from "react"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ShoppingBag, LayoutDashboard, Package, ShoppingCart, LogOut, User } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 
 const navItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Vendas (PDV)",
-    href: "/vendas",
-    icon: ShoppingCart,
-  },
-  {
-    title: "Produtos",
-    href: "/produtos",
-    icon: Package,
-  },
-]
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Vendas (PDV)", href: "/vendas", icon: ShoppingCart },
+  { title: "Produtos", href: "/produtos", icon: Package },
+];
 
 export function NavSidebar() {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [username, setUsername] = useState<string>("")
+  const pathname = usePathname();
+  const router = useRouter();
+  const [username, setUsername] = useState<string>("");
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      try {
+        // ✅ Usa a instância única do supabase
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (user) {
-        const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single()
+        if (user) {
+          const { data: profile, error } = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", user.id)
+            .single();
 
-        if (profile) {
-          setUsername(profile.username)
+          if (error) {
+            console.error("Erro ao buscar perfil:", error.message);
+            return;
+          }
+
+          if (profile) {
+            setUsername(profile.username);
+          }
         }
+      } catch (err) {
+        console.error("Erro ao buscar usuário:", err);
       }
-    }
+    };
 
-    fetchUserProfile()
-  }, [])
+    fetchUserProfile();
+  }, []);
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push("/login")
-  }
+    try {
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch (err) {
+      console.error("Erro ao sair:", err);
+    }
+  };
 
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-background">
+      {/* Logo e nome */}
       <div className="border-b p-6">
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-linear-to-br from-orange-500 to-amber-600">
@@ -70,27 +75,32 @@ export function NavSidebar() {
         </div>
       </div>
 
+      {/* Menu de navegação */}
       <nav className="flex-1 space-y-1 p-4">
         {navItems.map((item) => {
-          const Icon = item.icon
-          const isActive = pathname === item.href
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
 
           return (
             <Button
               key={item.href}
               asChild
               variant={isActive ? "secondary" : "ghost"}
-              className={cn("w-full justify-start", isActive && "bg-orange-100 text-orange-900 hover:bg-orange-100")}
+              className={cn(
+                "w-full justify-start",
+                isActive && "bg-orange-100 text-orange-900 hover:bg-orange-100"
+              )}
             >
               <Link href={item.href}>
                 <Icon className="mr-2 h-4 w-4" />
                 {item.title}
               </Link>
             </Button>
-          )
+          );
         })}
       </nav>
 
+      {/* Footer com usuário e logout */}
       <div className="border-t p-4 space-y-2">
         {username && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50">
@@ -108,5 +118,5 @@ export function NavSidebar() {
         </Button>
       </div>
     </div>
-  )
+  );
 }

@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import type React from "react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,46 +10,45 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Plus } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Plus } from "lucide-react";
+import { supabase } from "@/lib/supabase/client"; // ✅ instância única
+import { useRouter } from "next/navigation";
 
 interface AddProductDialogProps {
-  userId: string
+  userId: string;
 }
 
 export function AddProductDialog({ userId }: AddProductDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const [formData, setFormData] = useState({
     name: "",
     value: "",
     quantity: "",
     expiration_date: "",
-  })
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const supabase = createClient()
-    setIsLoading(true)
-    setError(null)
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const { error } = await supabase.from("products").insert({
+      const { error: insertError } = await supabase.from("products").insert({
         name: formData.name,
         value: Number.parseFloat(formData.value),
         quantity: Number.parseInt(formData.quantity),
         expiration_date: formData.expiration_date || null,
         user_id: userId,
-      })
+      });
 
-      if (error) throw error
+      if (insertError) throw insertError;
 
       // Resetar formulário
       setFormData({
@@ -57,15 +56,15 @@ export function AddProductDialog({ userId }: AddProductDialogProps) {
         value: "",
         quantity: "",
         expiration_date: "",
-      })
-      setOpen(false)
-      router.refresh()
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Erro ao adicionar produto")
+      });
+      setOpen(false);
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao adicionar produto");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -127,14 +126,25 @@ export function AddProductDialog({ userId }: AddProductDialogProps) {
               id="expiration_date"
               type="date"
               value={formData.expiration_date}
-              onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, expiration_date: e.target.value })
+              }
             />
           </div>
 
-          {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          {error && (
+            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={isLoading}
+            >
               Cancelar
             </Button>
             <Button type="submit" disabled={isLoading}>
@@ -144,5 +154,5 @@ export function AddProductDialog({ userId }: AddProductDialogProps) {
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

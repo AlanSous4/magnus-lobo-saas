@@ -1,26 +1,28 @@
-import { createClient } from "@/lib/supabase/server";
-import { SalesListClient } from "@/components/sales-list-client";
+import { createClient } from "@/lib/supabase/server"
+import { SalesListClient } from "@/components/sales-list-client"
 
 export default async function SalesHistoryPage() {
-  const supabase = await createClient(); // 👈 AQUI ESTÁ A CORREÇÃO
+  const supabase = await createClient()
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return null;
+    // Você pode redirecionar ou renderizar um fallback aqui
+    return null
   }
 
   const { data: sales, error } = await supabase
-    .from("sales_view")
+    .from("sales") // ✅ usar a tabela existente
     .select("*")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Erro ao buscar vendas:", error);
+    // Loga o erro, mas mantém a página funcional
+    console.error("Erro ao buscar vendas:", error)
   }
 
   return (
@@ -28,5 +30,5 @@ export default async function SalesHistoryPage() {
       initialSales={sales ?? []}
       userId={user.id}
     />
-  );
+  )
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sale } from "@/types/sale";
+import type { Sale } from "@/types/sale"; // ✅ mesmo tipo usado no hook
 import { useSalesRealtime } from "@/hooks/use-sales-realtime";
 import { SaleCard } from "@/components/sale-card";
 
@@ -10,30 +10,18 @@ type Props = {
   userId: string;
 };
 
-export function SalesListClient({
-  initialSales,
-  userId,
-}: Props) {
-  const [sales, setSales] =
-    useState<Sale[]>(initialSales);
+export function SalesListClient({ initialSales, userId }: Props) {
+  const [sales, setSales] = useState<Sale[]>(initialSales);
 
+  // 🔹 Hook Realtime agora com tipos corretos
   useSalesRealtime({
     userId,
-    onInsert: (sale) => {
-      setSales((prev) => [sale, ...prev]);
-    },
-    onUpdate: (updated) => {
+    onInsert: (sale) => setSales((prev) => [sale, ...prev]),
+    onUpdate: (updated) =>
       setSales((prev) =>
-        prev.map((s) =>
-          s.id === updated.id ? updated : s
-        )
-      );
-    },
-    onDelete: (id) => {
-      setSales((prev) =>
-        prev.filter((s) => s.id !== id)
-      );
-    },
+        prev.map((s) => (s.id === updated.id ? updated : s))
+      ),
+    onDelete: (id) => setSales((prev) => prev.filter((s) => s.id !== id)),
   });
 
   return (

@@ -1,112 +1,95 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { SalesChart } from "@/components/sales-chart"
-import { Button } from "@/components/ui/button"
-import { exportSalesPDF } from "@/components/pdf-export"
-import { calculateSalesMetrics, SalesMetrics } from "@/lib/sales-metrics"
-
-export type Sale = {
-  id: string
-  total_amount: number
-  created_at: string
-}
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { SalesChart } from "@/components/sales-chart";
+import { exportSalesPDF } from "@/components/pdf-export";
+import { calculateSalesMetrics, Sale as MetricsSale, SalesMetrics } from "@/lib/sales-metrics";
+import { useSalesRealtime, Sale as RealtimeSale } from "@/hooks/use-sales-realtime";
 
 export type SalesHistoryProps = {
-  sales: Sale[]
-  type: "sales" | "revenue" | "ticket"
-  groupBy: "day" | "month"
-}
+  type: "sales" | "revenue" | "ticket";
+  groupBy: "day" | "month";
+  userId: string;
+};
 
-export function SalesHistory({ sales, type, groupBy }: SalesHistoryProps) {
-  // 🔹 MÉTRICAS ÚNICAS (gráfico + PDF)
-  const metrics: SalesMetrics = calculateSalesMetrics(sales, type, groupBy)
+export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
+  const { sales, loading } = useSalesRealtime({ userId });
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const salesForMetrics: MetricsSale[] = sales.map((s: RealtimeSale) => ({
+    id: s.id,
+    total_amount: s.total_value,
+    created_at: s.created_at,
+  }));
 
-  /* =========================
-     🔹 PRÉ-VISUALIZAÇÃO
-     ========================= */
+  const metrics: SalesMetrics = calculateSalesMetrics(salesForMetrics, type, groupBy);
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
   async function handlePreviewPDF() {
-    setLoading(true)
-
-    const pdf = await exportSalesPDF(metrics, type, groupBy)
-    const url = pdf.output("bloburl")
-
-    setPreviewUrl(url.toString())
-    setLoading(false)
+    setExporting(true);
+    try {
+      const pdf = await exportSalesPDF(metrics, type, groupBy);
+      setPreviewUrl(pdf.output("bloburl").toString());
+    } finally {
+      setExporting(false);
+    }
   }
 
-  /* =========================
-     🔹 EXPORTAÇÃO
-     ========================= */
   async function handleExportPDF() {
-    setLoading(true)
-
-    const pdf = await exportSalesPDF(metrics, type, groupBy)
-    pdf.save("relatorio-vendas.pdf")
-
-    setLoading(false)
+    setExporting(true);
+    try {
+      const pdf = await exportSalesPDF(metrics, type, groupBy);
+      pdf.save("relatorio-vendas.pdf");
+    } finally {
+      setExporting(false);
+    }
   }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Carregando vendas...</p>;
 
   return (
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>
-            {type === "sales"
-              ? "Quantidade de Vendas"
-              : type === "ticket"
-              ? "Ticket Médio"
-              : "Receita por Período"}
+            {type === "sales" ? "Quantidade de Vendas" :
+             type === "ticket" ? "Ticket Médio" : "Faturamento"}
           </CardTitle>
 
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handlePreviewPDF}
-              disabled={loading}
-            >
-              {loading ? "Gerando..." : "Pré-visualizar PDF"}
+            <Button variant="outline" onClick={handlePreviewPDF} disabled={exporting}>
+              {exporting ? "Gerando..." : "Pré-visualizar PDF"}
             </Button>
-
-            <Button
-              onClick={handleExportPDF}
-              disabled={loading}
-            >
-              {loading ? "Gerando..." : "Exportar PDF"}
+            <Button onClick={handleExportPDF} disabled={exporting}>
+              {exporting ? "Gerando..." : "Exportar PDF"}
             </Button>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* 🔹 Gráfico */}
-          <SalesChart sales={sales} type={type} />
+        <SalesChart sales={salesForMetrics} type={type} initialGroupBy={groupBy} />
 
-          {/* 🔹 Lista detalhada */}
-          <div className="space-y-2">
-            {sales.map((sale) => (
-              <div key={sale.id} className="flex justify-between text-sm">
-                <span>
-                  {new Date(sale.created_at).toLocaleDateString("pt-BR")}
-                </span>
 
-                <span className="font-medium">
-                  {type === "sales"
-                    ? "1 venda"
-                    : `R$ ${Number(sale.total_amount).toFixed(2)}`}
-                </span>
-              </div>
-            ))}
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <strong>Total</strong>
+              <p>{metrics.summary.totalSales}</p>
+            </div>
+            <div>
+              <strong>Média</strong>
+              <p>{metrics.summary.averageTicket.toFixed(2)}</p>
+            </div>
+            <div>
+              <strong>Períodos</strong>
+              <p>{metrics.labels.length}</p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* =========================
-         🔹 MODAL DE PRÉ-VISUALIZAÇÃO
-         ========================= */}
       {previewUrl && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
@@ -116,14 +99,10 @@ export function SalesHistory({ sales, type, groupBy }: SalesHistoryProps) {
                 Fechar
               </Button>
             </div>
-
-            <iframe
-              src={previewUrl}
-              className="flex-1 w-full"
-            />
+            <iframe src={previewUrl} className="flex-1 w-full" />
           </div>
         </div>
       )}
     </>
-  )
+  );
 }
