@@ -52,11 +52,13 @@ export default async function DashboardPage() {
     }).length ?? 0
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <div className="flex-1 space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
+      <div className="space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          Dashboard
+        </h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Visão geral da Padaria Lanchonete Magnus Lobo
         </p>
       </div>
@@ -73,8 +75,8 @@ export default async function DashboardPage() {
       {lowStockProducts > 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="pt-4">
-            <p className="text-sm text-orange-700 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
+            <p className="flex items-center gap-2 text-sm text-orange-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
               {lowStockProducts} produto(s) com estoque baixo
             </p>
           </CardContent>
@@ -85,8 +87,8 @@ export default async function DashboardPage() {
       {expiringSoon > 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <AlertCircle className="h-5 w-5 text-orange-600 shrink-0" />
               Atenção: Produtos com validade próxima
             </CardTitle>
           </CardHeader>
@@ -95,7 +97,7 @@ export default async function DashboardPage() {
               {expiringSoon} produto(s) vencendo nos próximos 7 dias.
               <Link
                 href="/produtos"
-                className="ml-2 text-orange-600 hover:underline font-medium"
+                className="ml-2 font-medium text-orange-600 hover:underline"
               >
                 Ver produtos
               </Link>
@@ -105,10 +107,12 @@ export default async function DashboardPage() {
       )}
 
       {/* 🔹 GRID INFERIOR */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Vendas Recentes</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              Vendas Recentes
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <RecentSales sales={recentSales || []} />
@@ -117,7 +121,9 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Ações Rápidas</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              Ações Rápidas
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button asChild className="w-full justify-start" size="lg">
