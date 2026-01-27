@@ -16,16 +16,16 @@ export function DashboardCards({
   averageTicket,
 }: DashboardCardsProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       
       {/* Produtos */}
       <Link href="/produtos" className="group">
-        <Card className="cursor-pointer transition hover:shadow-md">
+        <Card className="cursor-pointer transition-shadow lg:hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Produtos Cadastrados
             </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            <Package className="h-4 w-4 text-muted-foreground lg:group-hover:text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{productsCount}</div>
@@ -35,12 +35,12 @@ export function DashboardCards({
 
       {/* Vendas */}
       <Link href="/vendas/relatorio?type=sales" className="group">
-        <Card className="cursor-pointer transition hover:shadow-md">
+        <Card className="cursor-pointer transition-shadow lg:hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Vendas (30 dias)
             </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            <ShoppingCart className="h-4 w-4 text-muted-foreground lg:group-hover:text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{salesCount}</div>
@@ -50,12 +50,12 @@ export function DashboardCards({
 
       {/* Receita */}
       <Link href="/vendas/relatorio?type=revenue" className="group">
-        <Card className="cursor-pointer transition hover:shadow-md">
+        <Card className="cursor-pointer transition-shadow lg:hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Receita (30 dias)
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            <DollarSign className="h-4 w-4 text-muted-foreground lg:group-hover:text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -67,12 +67,12 @@ export function DashboardCards({
 
       {/* Ticket Médio */}
       <Link href="/vendas/relatorio?type=ticket" className="group">
-        <Card className="cursor-pointer transition hover:shadow-md">
+        <Card className="cursor-pointer transition-shadow lg:hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Ticket Médio
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground lg:group-hover:text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">

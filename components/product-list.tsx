@@ -106,15 +106,11 @@ export function ProductList({
       {/* =========================
           🔘 FILTROS + UPLOAD GLOBAL
           ========================= */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Button
-            className="cursor-pointer"
-            variant={
-              filter === "all"
-                ? "default"
-                : "outline"
-            }
+            className="cursor-pointer w-full sm:w-auto"
+            variant={filter === "all" ? "default" : "outline"}
             onClick={() => setFilter("all")}
           >
             <Filter className="h-4 w-4 mr-2" />
@@ -122,40 +118,24 @@ export function ProductList({
           </Button>
 
           <Button
-            className="cursor-pointer"
-            variant={
-              filter === "low-stock"
-                ? "default"
-                : "outline"
-            }
-            onClick={() =>
-              setFilter("low-stock")
-            }
+            className="cursor-pointer w-full sm:w-auto"
+            variant={filter === "low-stock" ? "default" : "outline"}
+            onClick={() => setFilter("low-stock")}
           >
             ⚠️ Estoque baixo
           </Button>
 
           <Button
-            className="cursor-pointer"
-            variant={
-              filter === "expiring-soon"
-                ? "default"
-                : "outline"
-            }
-            onClick={() =>
-              setFilter("expiring-soon")
-            }
+            className="cursor-pointer w-full sm:w-auto"
+            variant={filter === "expiring-soon" ? "default" : "outline"}
+            onClick={() => setFilter("expiring-soon")}
           >
             ⏳ Próx. vencimento
           </Button>
 
           <Button
-            className="cursor-pointer"
-            variant={
-              filter === "expired"
-                ? "destructive"
-                : "outline"
-            }
+            className="cursor-pointer w-full sm:w-auto"
+            variant={filter === "expired" ? "destructive" : "outline"}
             onClick={() => setFilter("expired")}
           >
             ❌ Vencidos
@@ -177,9 +157,9 @@ export function ProductList({
       </div>
 
       {/* =========================
-          🧱 LISTA DE CARDS (micro-update)
+          🧱 LISTA DE CARDS
           ========================= */}
-      <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredProducts.map((product) => (
           <ProductCard
             key={product.id}
