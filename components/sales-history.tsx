@@ -13,7 +13,6 @@ import {
 } from "@/lib/sales-metrics";
 
 import { useSalesRealtime } from "@/hooks/use-sales-realtime";
-import type { Sale } from "@/types/sale";
 
 export type SalesHistoryProps = {
   type: "sales" | "revenue" | "ticket";
@@ -31,7 +30,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const filteredSales = useMemo(() => {
     const limitDate = new Date();
     limitDate.setDate(limitDate.getDate() - days);
-    return sales.filter((sale) => new Date(sale.created_at) >= limitDate);
+    return sales.filter(
+      (sale) => new Date(sale.created_at) >= limitDate
+    );
   }, [sales, days]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
@@ -42,7 +43,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
   const metrics: SalesMetrics = calculateSalesMetrics(
     salesForMetrics,
-    type,
+    "revenue", // 🔥 relatório sempre baseado em receita
     groupBy
   );
 
@@ -67,7 +68,11 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Carregando vendas...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Carregando vendas...
+      </p>
+    );
   }
 
   return (
@@ -75,7 +80,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
       <Card>
         <CardHeader className="space-y-4">
           <div className="flex justify-between items-center">
-            <CardTitle>Relatório</CardTitle>
+            <CardTitle>Relatório de Receita</CardTitle>
 
             <div className="flex gap-2">
               {[30, 60, 90].map((d) => (
@@ -106,94 +111,76 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         </CardHeader>
 
         <CardContent className="space-y-6">
-  {/* 🔹 GRÁFICO VISÍVEL — apenas para sales/ticket */}
-  {type !== "revenue" && (
-    <SalesChart
-      sales={salesForMetrics}
-      type={type}
-      initialGroupBy={groupBy}
-      chartId="sales-chart-visible"
-    />
-  )}
+          {/* ✅ RESUMO GERAL — SEMPRE VISÍVEL */}
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <strong>Total de vendas</strong>
+              <p>{metrics.summary.totalSales}</p>
+            </div>
+            <div>
+              <strong>Receita total</strong>
+              <p>R$ {metrics.summary.totalRevenue.toFixed(2)}</p>
+            </div>
+            <div>
+              <strong>Ticket médio</strong>
+              <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
+            </div>
+          </div>
 
-  {/* 🔹 RELATÓRIO DE RECEITA */}
-  {type === "revenue" && (
-    <>
-      <div className="grid grid-cols-3 gap-4 text-sm">
-        <div>
-          <strong>Total de vendas</strong>
-          <p>{metrics.summary.totalSales}</p>
-        </div>
-        <div>
-          <strong>Receita total</strong>
-          <p>R$ {metrics.summary.totalRevenue.toFixed(2)}</p>
-        </div>
-        <div>
-          <strong>Ticket médio</strong>
-          <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
-        </div>
-      </div>
-
-      <div className="overflow-auto border rounded-lg">
-        <table className="w-full text-sm">
-          <thead className="bg-muted">
-            <tr>
-              <th className="p-2 text-left">Período</th>
-              <th className="p-2 text-right">Vendas</th>
-              <th className="p-2 text-right">Receita</th>
-              <th className="p-2 text-right">Ticket Médio</th>
-            </tr>
-          </thead>
-          <tbody>
-            {metrics.labels.map((label) => {
-              const periodSales = filteredSales.filter((sale) => {
-                const date = new Date(sale.created_at);
-
-                if (groupBy === "day") {
-                  return date.toLocaleDateString("pt-BR") === label;
-                }
-
-                if (groupBy === "month") {
-                  return (
-                    `${date.getMonth() + 1}/${date.getFullYear()}` === label
-                  );
-                }
-
-                return false;
-              });
-
-              const salesCount = periodSales.length;
-              const revenue = periodSales.reduce(
-                (sum, sale) => sum + (sale.total_value ?? 0),
-                0
-              );
-
-              const averageTicket =
-                salesCount > 0 ? revenue / salesCount : 0;
-
-              return (
-                <tr key={label} className="border-t">
-                  <td className="p-2">{label}</td>
-                  <td className="p-2 text-right">{salesCount}</td>
-                  <td className="p-2 text-right">
-                    R$ {revenue.toFixed(2)}
-                  </td>
-                  <td className="p-2 text-right">
-                    R$ {averageTicket.toFixed(2)}
-                  </td>
+          {/* ✅ TABELA — SEMPRE NO LUGAR DO GRÁFICO */}
+          <div className="overflow-auto border rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="p-2 text-left">Período</th>
+                  <th className="p-2 text-right">Vendas</th>
+                  <th className="p-2 text-right">Receita</th>
+                  <th className="p-2 text-right">Ticket Médio</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )}
-</CardContent>
+              </thead>
+              <tbody>
+                {metrics.labels.map((label) => {
+                  const periodSales = filteredSales.filter((sale) => {
+                    const date = new Date(sale.created_at);
+                    return date.toLocaleDateString("pt-BR") === label;
+                  });
 
+                  const salesCount = periodSales.length;
+                  const revenue = periodSales.reduce(
+                    (sum, sale) => sum + (sale.total_value ?? 0),
+                    0
+                  );
+
+                  return (
+                    <tr key={label} className="border-t">
+                      <td className="p-2">{label}</td>
+                      <td className="p-2 text-right">{salesCount}</td>
+                      <td className="p-2 text-right">
+                        R$ {revenue.toFixed(2)}
+                      </td>
+                      <td className="p-2 text-right">
+                        R$ {(revenue / (salesCount || 1)).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ❌ GRÁFICO NA TELA BLOQUEADO PARA 30 DIAS */}
+          {days !== 30 && (
+            <SalesChart
+              sales={salesForMetrics}
+              type={type}
+              initialGroupBy={groupBy}
+              chartId="sales-chart-visible"
+            />
+          )}
+        </CardContent>
       </Card>
 
-      {/* 🔹 GRÁFICO FIXO PARA PDF (NUNCA SOME) */}
+      {/* ✅ GRÁFICO EXCLUSIVO PARA PDF (SEMPRE EXISTE) */}
       <div
         style={{
           position: "absolute",
@@ -207,7 +194,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           sales={salesForMetrics}
           type={type}
           initialGroupBy={groupBy}
-          chartId="sales-chart" // 👈 ESTE É O QUE O PDF USA
+          chartId="sales-chart"
         />
       </div>
 
@@ -216,7 +203,10 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-3 border-b">
               <strong>Pré-visualização do PDF</strong>
-              <Button variant="ghost" onClick={() => setPreviewUrl(null)}>
+              <Button
+                variant="ghost"
+                onClick={() => setPreviewUrl(null)}
+              >
                 Fechar
               </Button>
             </div>

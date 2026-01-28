@@ -6,6 +6,7 @@ import {
   ChartType,
   GroupBy,
 } from "@/lib/sales-metrics";
+
 import {
   LineChart,
   Line,
@@ -14,6 +15,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -21,7 +23,7 @@ type Props = {
   sales: MetricsSale[];
   type: ChartType;
   initialGroupBy?: GroupBy;
-  chartId?: string; // 👈 permite reutilizar
+  chartId?: string;
 };
 
 export function SalesChart({
@@ -51,7 +53,6 @@ export function SalesChart({
         </Button>
       </div>
 
-      {/* 🔹 ID fixo e garantido */}
       <div id={chartId} className="h-72 w-full bg-white">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
