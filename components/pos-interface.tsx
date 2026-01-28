@@ -63,8 +63,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedPayment, setSelectedPayment] =
-    useState<PaymentMethod | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(
+    null
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -85,9 +86,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       if (existing.cartQuantity < existing.quantity) {
         setCart(
           cart.map((i) =>
-            i.id === product.id
-              ? { ...i, cartQuantity: i.cartQuantity + 1 }
-              : i
+            i.id === product.id ? { ...i, cartQuantity: i.cartQuantity + 1 } : i
           )
         );
       }
@@ -103,9 +102,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     if (q <= 0) {
       setCart(cart.filter((i) => i.id !== id));
     } else if (q <= item.quantity) {
-      setCart(
-        cart.map((i) => (i.id === id ? { ...i, cartQuantity: q } : i))
-      );
+      setCart(cart.map((i) => (i.id === id ? { ...i, cartQuantity: q } : i)));
     }
   };
 
@@ -206,10 +203,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               >
                 <div className="h-20 bg-muted flex items-center justify-center">
                   {p.image_url ? (
-                    <img
-                      src={p.image_url}
-                      className="h-full object-contain"
-                    />
+                    <img src={p.image_url} className="h-full object-contain" />
                   ) : (
                     <span className="text-xs">Sem imagem</span>
                   )}
@@ -230,12 +224,21 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       </div>
 
       {/* CARRINHO */}
+      {/* CARRINHO */}
       <aside className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t lg:static lg:w-96 lg:border-l lg:border-t-0 flex flex-col">
+        {/* HEADER DO CARRINHO */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b font-semibold">
+          <ShoppingCart className="h-5 w-5 text-orange-600" />
+          Carrinho
+        </div>
+
+        {/* ITENS (SCROLL) */}
         <ScrollArea className="max-h-56 lg:flex-1 p-3">
           {cart.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center">
-              Carrinho vazio
-            </p>
+            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+              <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
+              <p className="text-sm">Carrinho vazio</p>
+            </div>
           ) : (
             cart.map((item) => (
               <div
@@ -291,12 +294,11 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           )}
         </ScrollArea>
 
+        {/* FOOTER FIXO */}
         <div className="p-4 border-t">
           <div className="flex justify-between font-bold mb-3">
             <span>Total</span>
-            <span className="text-orange-600">
-              R$ {total.toFixed(2)}
-            </span>
+            <span className="text-orange-600">R$ {total.toFixed(2)}</span>
           </div>
 
           <Button
@@ -315,9 +317,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Forma de Pagamento</DialogTitle>
-            <DialogDescription>
-              Total: R$ {total.toFixed(2)}
-            </DialogDescription>
+            <DialogDescription>Total: R$ {total.toFixed(2)}</DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-3 py-4">
