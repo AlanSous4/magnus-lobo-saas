@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SalesChart } from "@/components/sales-chart";
@@ -26,6 +26,16 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // ✅ Detecta mobile com segurança
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsMobile(
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      );
+    }
+  }, []);
 
   const filteredSales = useMemo(() => {
     const limitDate = new Date();
@@ -43,11 +53,16 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
   const metrics: SalesMetrics = calculateSalesMetrics(
     salesForMetrics,
-    "revenue", // 🔥 relatório sempre baseado em receita
+    "revenue",
     groupBy
   );
 
   async function handlePreviewPDF() {
+    // 📱 Mobile → download direto
+    if (isMobile) {
+      return handleExportPDF();
+    }
+
     setExporting(true);
     try {
       const pdf = await exportSalesPDF(metrics, type, groupBy);
@@ -102,16 +117,22 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               onClick={handlePreviewPDF}
               disabled={exporting}
             >
-              {exporting ? "Gerando..." : "Pré-visualizar PDF"}
+              {exporting
+                ? "Gerando..."
+                : isMobile
+                ? "Baixar PDF"
+                : "Pré-visualizar PDF"}
             </Button>
-            <Button onClick={handleExportPDF} disabled={exporting}>
-              {exporting ? "Gerando..." : "Exportar PDF"}
-            </Button>
+
+            {!isMobile && (
+              <Button onClick={handleExportPDF} disabled={exporting}>
+                {exporting ? "Gerando..." : "Exportar PDF"}
+              </Button>
+            )}
           </div>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* ✅ RESUMO GERAL — SEMPRE VISÍVEL */}
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <strong>Total de vendas</strong>
@@ -127,7 +148,6 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </div>
           </div>
 
-          {/* ✅ TABELA — SEMPRE NO LUGAR DO GRÁFICO */}
           <div className="overflow-auto border rounded-lg">
             <table className="w-full text-sm">
               <thead className="bg-muted">
@@ -142,7 +162,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                 {metrics.labels.map((label) => {
                   const periodSales = filteredSales.filter((sale) => {
                     const date = new Date(sale.created_at);
-                    return date.toLocaleDateString("pt-BR") === label;
+                    return (
+                      date.toLocaleDateString("pt-BR") === label
+                    );
                   });
 
                   const salesCount = periodSales.length;
@@ -168,7 +190,6 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </table>
           </div>
 
-          {/* ❌ GRÁFICO NA TELA BLOQUEADO PARA 30 DIAS */}
           {days !== 30 && (
             <SalesChart
               sales={salesForMetrics}
@@ -180,7 +201,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         </CardContent>
       </Card>
 
-      {/* ✅ GRÁFICO EXCLUSIVO PARA PDF (SEMPRE EXISTE) */}
+      {/* 🔒 Gráfico invisível só para PDF */}
       <div
         style={{
           position: "absolute",
@@ -198,7 +219,8 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         />
       </div>
 
-      {previewUrl && (
+      {/* 🖥️ Preview APENAS no desktop */}
+      {!isMobile && previewUrl && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-3 border-b">

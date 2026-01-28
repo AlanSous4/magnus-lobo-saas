@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { SalesHistory } from "@/components/sales-history";
 
-export default function RelatorioVendasClient() {
+function RelatorioVendasContent() {
   const searchParams = useSearchParams();
+
   const type =
     (searchParams.get("type") as "sales" | "revenue" | "ticket") ?? "sales";
 
@@ -19,7 +20,7 @@ export default function RelatorioVendasClient() {
       } = await supabase.auth.getUser();
 
       if (user) {
-        setUserId(user.id); // ✅ UUID REAL
+        setUserId(user.id);
       }
     }
 
@@ -40,5 +41,19 @@ export default function RelatorioVendasClient() {
       groupBy="day"
       userId={userId}
     />
+  );
+}
+
+export default function RelatorioVendasClient() {
+  return (
+    <Suspense
+      fallback={
+        <p className="text-sm text-muted-foreground">
+          Carregando relatório...
+        </p>
+      }
+    >
+      <RelatorioVendasContent />
+    </Suspense>
   );
 }
