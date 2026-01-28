@@ -63,9 +63,8 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(
-    null
-  );
+  const [selectedPayment, setSelectedPayment] =
+    useState<PaymentMethod | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -86,7 +85,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       if (existing.cartQuantity < existing.quantity) {
         setCart(
           cart.map((i) =>
-            i.id === product.id ? { ...i, cartQuantity: i.cartQuantity + 1 } : i
+            i.id === product.id
+              ? { ...i, cartQuantity: i.cartQuantity + 1 }
+              : i
           )
         );
       }
@@ -102,7 +103,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     if (q <= 0) {
       setCart(cart.filter((i) => i.id !== id));
     } else if (q <= item.quantity) {
-      setCart(cart.map((i) => (i.id === id ? { ...i, cartQuantity: q } : i)));
+      setCart(
+        cart.map((i) => (i.id === id ? { ...i, cartQuantity: q } : i))
+      );
     }
   };
 
@@ -172,14 +175,15 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   };
 
   /* =========================
-     LAYOUT
+     LAYOUT (SCROLL CORRIGIDO)
   ========================= */
 
   return (
-    <div className="h-screen flex flex-col lg:flex-row">
-      {/* PRODUTOS */}
-      <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b bg-background">
+    <div className="h-screen flex overflow-hidden">
+      {/* COLUNA ESQUERDA */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* PDV + BUSCA (FIXO) */}
+        <div className="p-4 border-b bg-background shrink-0">
           <h1 className="text-lg font-bold flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-orange-600" />
             PDV - Ponto de Venda
@@ -193,112 +197,121 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           />
         </div>
 
-        <ScrollArea className="flex-1 p-3 pb-32 lg:pb-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filteredProducts.map((p) => (
-              <Card
-                key={p.id}
-                onClick={() => addToCart(p)}
-                className="cursor-pointer"
-              >
-                <div className="h-20 bg-muted flex items-center justify-center">
-                  {p.image_url ? (
-                    <img src={p.image_url} className="h-full object-contain" />
-                  ) : (
-                    <span className="text-xs">Sem imagem</span>
-                  )}
-                </div>
-                <CardContent className="p-2">
-                  <p className="text-sm line-clamp-2">{p.name}</p>
-                  <div className="flex justify-between mt-1">
-                    <span className="font-bold text-orange-600">
-                      R$ {p.value.toFixed(2)}
-                    </span>
-                    <Badge>{p.quantity}</Badge>
+        {/* PRODUTOS (SCROLL FUNCIONAL) */}
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredProducts.map((p) => (
+                <Card
+                  key={p.id}
+                  onClick={() => addToCart(p)}
+                  className="cursor-pointer"
+                >
+                  <div className="h-20 bg-muted flex items-center justify-center">
+                    {p.image_url ? (
+                      <img
+                        src={p.image_url}
+                        className="h-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-xs">Sem imagem</span>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </ScrollArea>
+                  <CardContent className="p-2">
+                    <p className="text-sm line-clamp-2">{p.name}</p>
+                    <div className="flex justify-between mt-1">
+                      <span className="font-bold text-orange-600">
+                        R$ {p.value.toFixed(2)}
+                      </span>
+                      <Badge>{p.quantity}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
       </div>
 
-      {/* CARRINHO */}
-      {/* CARRINHO */}
-      <aside className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t lg:static lg:w-96 lg:border-l lg:border-t-0 flex flex-col">
-        {/* HEADER DO CARRINHO */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b font-semibold">
+      {/* COLUNA DIREITA — CARRINHO */}
+      <aside className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t lg:static lg:w-96 lg:h-screen lg:border-l lg:border-t-0 flex flex-col shrink-0 min-h-0">
+        {/* HEADER */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b font-semibold shrink-0">
           <ShoppingCart className="h-5 w-5 text-orange-600" />
           Carrinho
         </div>
 
-        {/* ITENS (SCROLL) */}
-        <ScrollArea className="max-h-56 lg:flex-1 p-3">
-          {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-              <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
-              <p className="text-sm">Carrinho vazio</p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between gap-2 mb-3"
-              >
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    R$ {item.value.toFixed(2)}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-7 w-7"
-                    onClick={() =>
-                      updateQuantity(item.id, item.cartQuantity - 1)
-                    }
-                  >
-                    -
-                  </Button>
-
-                  <span className="w-6 text-center text-sm font-medium">
-                    {item.cartQuantity}
-                  </span>
-
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-7 w-7"
-                    onClick={() =>
-                      updateQuantity(item.id, item.cartQuantity + 1)
-                    }
-                    disabled={item.cartQuantity >= item.quantity}
-                  >
-                    +
-                  </Button>
-
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => removeFromCart(item.id)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+        {/* ITENS (SCROLL FUNCIONAL) */}
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full p-3">
+            {cart.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
+                <p className="text-sm">Carrinho vazio</p>
               </div>
-            ))
-          )}
-        </ScrollArea>
+            ) : (
+              cart.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 mb-3"
+                >
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      R$ {item.value.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7"
+                      onClick={() =>
+                        updateQuantity(item.id, item.cartQuantity - 1)
+                      }
+                    >
+                      -
+                    </Button>
+
+                    <span className="w-6 text-center text-sm font-medium">
+                      {item.cartQuantity}
+                    </span>
+
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7"
+                      onClick={() =>
+                        updateQuantity(item.id, item.cartQuantity + 1)
+                      }
+                      disabled={item.cartQuantity >= item.quantity}
+                    >
+                      +
+                    </Button>
+
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => removeFromCart(item.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </ScrollArea>
+        </div>
 
         {/* FOOTER FIXO */}
-        <div className="p-4 border-t">
+        <div className="p-4 border-t shrink-0">
           <div className="flex justify-between font-bold mb-3">
             <span>Total</span>
-            <span className="text-orange-600">R$ {total.toFixed(2)}</span>
+            <span className="text-orange-600">
+              R$ {total.toFixed(2)}
+            </span>
           </div>
 
           <Button
@@ -312,7 +325,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         </div>
       </aside>
 
-      {/* PAGAMENTO */}
+      {/* DIALOGS */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
         <DialogContent>
           <DialogHeader>
@@ -351,13 +364,11 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         </DialogContent>
       </Dialog>
 
-      {/* SUCESSO */}
       <Dialog open={showSuccess}>
         <DialogContent>
           <VisuallyHidden>
             <DialogTitle>Venda concluída</DialogTitle>
           </VisuallyHidden>
-
           <div className="flex flex-col items-center p-6">
             <Check className="h-10 w-10 text-green-600 mb-3" />
             <p>Venda realizada com sucesso</p>
