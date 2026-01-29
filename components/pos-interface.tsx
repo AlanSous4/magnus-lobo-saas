@@ -51,6 +51,18 @@ interface POSInterfaceProps {
 
 type PaymentMethod = "credit" | "debit" | "vr" | "va" | "cash";
 
+/* =========================
+   ITENS COM INPUT DIRETO (POR ID)
+========================= */
+
+// 👉 SUBSTITUA PELOS IDS REAIS DO SUPABASE
+const ITEM_IDS_COM_INPUT_DIRETO = [
+  "9dc37797-d950-4301-b76e-dcedf4e1e2ba",
+  "0a7a1410-5ce1-4972-81d0-df302a95c98c",
+  "e51a1063-2c63-4266-ae03-b5bb28da1863",
+  "5b491d05-8115-487b-9f42-deb68414bc9e",
+];
+
 const paymentMethods = [
   { id: "credit" as PaymentMethod, label: "Crédito", icon: CreditCard },
   { id: "debit" as PaymentMethod, label: "Débito", icon: CreditCard },
@@ -69,6 +81,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const router = useRouter();
+
+  /* =========================
+     BUSCA (CONTINUA POR NOME)
+  ========================= */
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -104,7 +120,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       setCart(cart.filter((i) => i.id !== id));
     } else if (q <= item.quantity) {
       setCart(
-        cart.map((i) => (i.id === id ? { ...i, cartQuantity: q } : i))
+        cart.map((i) =>
+          i.id === id ? { ...i, cartQuantity: q } : i
+        )
       );
     }
   };
@@ -175,14 +193,13 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   };
 
   /* =========================
-     LAYOUT (SCROLL CORRIGIDO)
+     LAYOUT
   ========================= */
 
   return (
     <div className="h-screen flex overflow-hidden">
       {/* COLUNA ESQUERDA */}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* PDV + BUSCA (FIXO) */}
         <div className="p-4 border-b bg-background shrink-0">
           <h1 className="text-lg font-bold flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-orange-600" />
@@ -197,7 +214,6 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           />
         </div>
 
-        {/* PRODUTOS (SCROLL FUNCIONAL) */}
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full p-3">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -233,24 +249,20 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         </div>
       </div>
 
-      {/* COLUNA DIREITA — CARRINHO */}
-      <aside className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t lg:static lg:w-96 lg:h-screen lg:border-l lg:border-t-0 flex flex-col shrink-0 min-h-0">
-        {/* HEADER */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b font-semibold shrink-0">
+      {/* CARRINHO */}
+      <aside className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t lg:static lg:w-96 lg:h-screen lg:border-l lg:border-t-0 flex flex-col min-h-0">
+        <div className="flex items-center gap-2 px-4 py-3 border-b font-semibold">
           <ShoppingCart className="h-5 w-5 text-orange-600" />
           Carrinho
         </div>
 
-        {/* ITENS (SCROLL FUNCIONAL) */}
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full p-3">
-            {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
-                <p className="text-sm">Carrinho vazio</p>
-              </div>
-            ) : (
-              cart.map((item) => (
+            {cart.map((item) => {
+              const hasInputDireto =
+                ITEM_IDS_COM_INPUT_DIRETO.includes(item.id);
+
+              return (
                 <div
                   key={item.id}
                   className="flex items-center justify-between gap-2 mb-3"
@@ -274,9 +286,25 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                       -
                     </Button>
 
-                    <span className="w-6 text-center text-sm font-medium">
-                      {item.cartQuantity}
-                    </span>
+                    {hasInputDireto ? (
+                      <Input
+                        type="number"
+                        min={1}
+                        max={item.quantity}
+                        value={item.cartQuantity}
+                        onChange={(e) =>
+                          updateQuantity(
+                            item.id,
+                            Number(e.target.value)
+                          )
+                        }
+                        className="w-14 h-7 text-center px-1"
+                      />
+                    ) : (
+                      <span className="w-6 text-center text-sm font-medium">
+                        {item.cartQuantity}
+                      </span>
+                    )}
 
                     <Button
                       size="icon"
@@ -300,13 +328,12 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                     </Button>
                   </div>
                 </div>
-              ))
-            )}
+              );
+            })}
           </ScrollArea>
         </div>
 
-        {/* FOOTER FIXO */}
-        <div className="p-4 border-t shrink-0">
+        <div className="p-4 border-t">
           <div className="flex justify-between font-bold mb-3">
             <span>Total</span>
             <span className="text-orange-600">
@@ -330,7 +357,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Forma de Pagamento</DialogTitle>
-            <DialogDescription>Total: R$ {total.toFixed(2)}</DialogDescription>
+            <DialogDescription>
+              Total: R$ {total.toFixed(2)}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-3 py-4">
@@ -339,7 +368,11 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               return (
                 <Button
                   key={m.id}
-                  variant={selectedPayment === m.id ? "default" : "outline"}
+                  variant={
+                    selectedPayment === m.id
+                      ? "default"
+                      : "outline"
+                  }
                   className="h-20 flex flex-col gap-2"
                   onClick={() => setSelectedPayment(m.id)}
                 >
@@ -351,14 +384,19 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPayment(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowPayment(false)}
+            >
               Cancelar
             </Button>
             <Button
               onClick={processSale}
               disabled={!selectedPayment || isProcessing}
             >
-              {isProcessing ? "Processando..." : "Confirmar Venda"}
+              {isProcessing
+                ? "Processando..."
+                : "Confirmar Venda"}
             </Button>
           </DialogFooter>
         </DialogContent>
