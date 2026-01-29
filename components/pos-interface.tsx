@@ -35,13 +35,13 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 interface Product {
   id: string;
   name: string;
-  value: number;
-  quantity: number;
+  value: number;     // unit: preço unidade | weight: preço por 100g
+  quantity: number;  // unit: unidades | weight: gramas
   image_url?: string | null;
 }
 
 interface CartItem extends Product {
-  cartQuantity: number;
+  cartQuantity: number; // unit: unidades | weight: gramas
 }
 
 interface POSInterfaceProps {
@@ -52,15 +52,14 @@ interface POSInterfaceProps {
 type PaymentMethod = "credit" | "debit" | "vr" | "va" | "cash";
 
 /* =========================
-   ITENS COM INPUT DIRETO (POR ID)
+   PRODUTOS POR GRAMA (IDS)
 ========================= */
 
-// 👉 SUBSTITUA PELOS IDS REAIS DO SUPABASE
-const ITEM_IDS_COM_INPUT_DIRETO = [
-  "9dc37797-d950-4301-b76e-dcedf4e1e2ba",
-  "0a7a1410-5ce1-4972-81d0-df302a95c98c",
-  "e51a1063-2c63-4266-ae03-b5bb28da1863",
-  "5b491d05-8115-487b-9f42-deb68414bc9e",
+const WEIGHT_PRODUCT_IDS = [
+  "b8a6c2ca-623c-41a2-bfec-9fa27ce7c6cc",
+  "193b8a3a-d2a7-485d-bb31-59157002eea6",
+  "f27d497c-f0c7-4f3b-9a86-25130ec03dd4",
+  "3dc7d0cc-eb8a-42e4-828d-b62727d96cf2",
 ];
 
 const paymentMethods = [
@@ -83,7 +82,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const router = useRouter();
 
   /* =========================
-     BUSCA (CONTINUA POR NOME)
+     BUSCA POR NOME
   ========================= */
 
   const filteredProducts = products.filter((p) =>
@@ -94,21 +93,26 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
      CARRINHO
   ========================= */
 
+  const isWeightProduct = (id: string) =>
+    WEIGHT_PRODUCT_IDS.includes(id);
+
   const addToCart = (product: Product) => {
     const existing = cart.find((i) => i.id === product.id);
+    const isWeight = isWeightProduct(product.id);
 
     if (existing) {
-      if (existing.cartQuantity < existing.quantity) {
-        setCart(
-          cart.map((i) =>
-            i.id === product.id
-              ? { ...i, cartQuantity: i.cartQuantity + 1 }
-              : i
-          )
-        );
-      }
+      updateQuantity(
+        product.id,
+        existing.cartQuantity + (isWeight ? 100 : 1)
+      );
     } else {
-      setCart([...cart, { ...product, cartQuantity: 1 }]);
+      setCart([
+        ...cart,
+        {
+          ...product,
+          cartQuantity: isWeight ? 100 : 1,
+        },
+      ]);
     }
   };
 
@@ -131,10 +135,13 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     setCart(cart.filter((i) => i.id !== id));
   };
 
-  const total = cart.reduce(
-    (sum, item) => sum + item.value * item.cartQuantity,
-    0
-  );
+  const total = cart.reduce((sum, item) => {
+    const isWeight = isWeightProduct(item.id);
+    const subtotal = isWeight
+      ? (item.value / 100) * item.cartQuantity
+      : item.value * item.cartQuantity;
+    return sum + subtotal;
+  }, 0);
 
   /* =========================
      FINALIZAR VENDA
@@ -161,12 +168,17 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         .single();
 
       for (const item of cart) {
+        const isWeight = isWeightProduct(item.id);
+        const subtotal = isWeight
+          ? (item.value / 100) * item.cartQuantity
+          : item.value * item.cartQuantity;
+
         await supabase.from("sale_items").insert({
           sale_id: sale!.id,
           product_id: item.id,
           quantity: item.cartQuantity,
           unit_price: item.value,
-          subtotal: item.value * item.cartQuantity,
+          subtotal,
         });
 
         await supabase
@@ -225,10 +237,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                 >
                   <div className="h-20 bg-muted flex items-center justify-center">
                     {p.image_url ? (
-                      <img
-                        src={p.image_url}
-                        className="h-full object-contain"
-                      />
+                      <img src={p.image_url} className="h-full object-contain" />
                     ) : (
                       <span className="text-xs">Sem imagem</span>
                     )}
@@ -259,8 +268,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full p-3">
             {cart.map((item) => {
-              const hasInputDireto =
-                ITEM_IDS_COM_INPUT_DIRETO.includes(item.id);
+              const isWeight = isWeightProduct(item.id);
 
               return (
                 <div
@@ -271,6 +279,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                     <p className="text-sm font-medium">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
                       R$ {item.value.toFixed(2)}
+                      {isWeight && " / 100g"}
                     </p>
                   </div>
 
@@ -280,40 +289,43 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                       variant="outline"
                       className="h-7 w-7"
                       onClick={() =>
-                        updateQuantity(item.id, item.cartQuantity - 1)
+                        updateQuantity(
+                          item.id,
+                          item.cartQuantity - (isWeight ? 100 : 1)
+                        )
                       }
                     >
                       -
                     </Button>
 
-                    {hasInputDireto ? (
+                    <div className="flex flex-col items-center">
                       <Input
                         type="number"
-                        min={1}
-                        max={item.quantity}
+                        min={isWeight ? 100 : 1}
+                        step={isWeight ? 50 : 1}
                         value={item.cartQuantity}
                         onChange={(e) =>
-                          updateQuantity(
-                            item.id,
-                            Number(e.target.value)
-                          )
+                          updateQuantity(item.id, Number(e.target.value))
                         }
                         className="w-14 h-7 text-center px-1"
                       />
-                    ) : (
-                      <span className="w-6 text-center text-sm font-medium">
-                        {item.cartQuantity}
-                      </span>
-                    )}
+                      {isWeight && (
+                        <span className="text-[10px] text-muted-foreground leading-none">
+                          g
+                        </span>
+                      )}
+                    </div>
 
                     <Button
                       size="icon"
                       variant="outline"
                       className="h-7 w-7"
                       onClick={() =>
-                        updateQuantity(item.id, item.cartQuantity + 1)
+                        updateQuantity(
+                          item.id,
+                          item.cartQuantity + (isWeight ? 100 : 1)
+                        )
                       }
-                      disabled={item.cartQuantity >= item.quantity}
                     >
                       +
                     </Button>
@@ -369,9 +381,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                 <Button
                   key={m.id}
                   variant={
-                    selectedPayment === m.id
-                      ? "default"
-                      : "outline"
+                    selectedPayment === m.id ? "default" : "outline"
                   }
                   className="h-20 flex flex-col gap-2"
                   onClick={() => setSelectedPayment(m.id)}
@@ -394,9 +404,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               onClick={processSale}
               disabled={!selectedPayment || isProcessing}
             >
-              {isProcessing
-                ? "Processando..."
-                : "Confirmar Venda"}
+              {isProcessing ? "Processando..." : "Confirmar Venda"}
             </Button>
           </DialogFooter>
         </DialogContent>
