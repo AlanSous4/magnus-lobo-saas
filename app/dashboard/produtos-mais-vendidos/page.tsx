@@ -17,6 +17,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import { TrendingUp, Package } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -27,30 +28,51 @@ type Produto = {
   quantidade: number;
 };
 
+type Venda = {
+  venda_id: string;
+  data_venda: string;
+  quantidade: number;
+  valor: number;
+};
+
 export default function ProdutosMaisVendidosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [totalVendidos, setTotalVendidos] = useState<number>(0);
   const [periodo, setPeriodo] = useState("7");
+  const [vendasProduto, setVendasProduto] = useState<Venda[]>([]);
+  const [produtoSelecionado, setProdutoSelecionado] = useState<string | null>(
+    null
+  );
+
+  async function fetchProdutosMaisVendidos() {
+    const { data, error } = await supabase.rpc("produtos_mais_vendidos", {
+      periodo: parseInt(periodo),
+    });
+
+    if (!error && data) {
+      setProdutos(data);
+      setTotalVendidos(
+        data.reduce((acc: number, item: Produto) => acc + item.quantidade, 0)
+      );
+    }
+  }
+
+  async function fetchVendasPorProduto(nome: string) {
+    const { data, error } = await supabase.rpc("vendas_por_produto", {
+      periodo: parseInt(periodo),
+      produto_nome: nome,
+    });
+
+    if (!error && data) {
+      setProdutoSelecionado(nome);
+      setVendasProduto(data);
+    }
+  }
 
   useEffect(() => {
-    async function fetchProdutosMaisVendidos() {
-      const { data, error } = await supabase.rpc("produtos_mais_vendidos", {
-        periodo: parseInt(periodo),
-      });
-
-      if (error) {
-        console.error("Erro ao buscar produtos:", error);
-      } else {
-        setProdutos(data);
-        const total = data.reduce(
-          (acc: number, item: Produto) => acc + item.quantidade,
-          0
-        );
-        setTotalVendidos(total);
-      }
-    }
-
     fetchProdutosMaisVendidos();
+    setProdutoSelecionado(null);
+    setVendasProduto([]);
   }, [periodo]);
 
   const produtoLider = produtos[0];
@@ -151,12 +173,20 @@ export default function ProdutosMaisVendidosPage() {
             </CardHeader>
             <CardContent className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={produtos}>
-                  <XAxis dataKey="nome" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="quantidade" radius={[6, 6, 0, 0]} />
-                </BarChart>
+              <BarChart data={produtos}>
+  <XAxis dataKey="nome" />
+  <YAxis />
+  <Tooltip />
+  <Bar dataKey="quantidade" radius={[6, 6, 0, 0]}>
+    {produtos.map((entry, index) => (
+      <Cell
+        key={`cell-${index}`}
+        fill={["#f97316", "#fb923c", "#facc15", "#22c55e", "#3b82f6"][index % 5]}
+      />
+    ))}
+  </Bar>
+</BarChart>
+
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -169,9 +199,10 @@ export default function ProdutosMaisVendidosPage() {
             <CardContent>
               <div className="space-y-3">
                 {produtos.map((item, index) => (
-                  <div
+                  <button
                     key={item.nome}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    onClick={() => fetchVendasPorProduto(item.nome)}
+                    className="w-full text-left flex items-center justify-between rounded-lg border p-3 hover:bg-orange-50"
                   >
                     <div className="flex items-center gap-3">
                       <span className="font-bold text-orange-600">
@@ -182,11 +213,42 @@ export default function ProdutosMaisVendidosPage() {
                     <Badge variant="secondary">
                       {item.quantidade} vendidos
                     </Badge>
-                  </div>
+                  </button>
                 ))}
               </div>
             </CardContent>
           </Card>
+
+          {/* Detalhes do produto selecionado */}
+          {produtoSelecionado && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Vendas de {produtoSelecionado}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {vendasProduto.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma venda encontrada no período.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {vendasProduto.map((venda) => (
+                      <div
+                        key={venda.venda_id}
+                        className="flex justify-between border rounded p-2"
+                      >
+                        <span>
+                          {new Date(venda.data_venda).toLocaleString("pt-BR")}
+                        </span>
+                        <span>{venda.quantidade} unid.</span>
+                        <span>R$ {venda.valor.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
     </div>
