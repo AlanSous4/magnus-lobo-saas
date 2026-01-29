@@ -1,47 +1,59 @@
-"use client"
+"use client";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Card, CardContent, CardHeader, CardTitle
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from "@/components/ui/select"
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer
-} from "recharts"
-import { TrendingUp, Package } from "lucide-react"
-import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase/client"
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { TrendingUp, Package } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase/client";
 
 type Produto = {
-  nome: string
-  quantidade: number
-}
+  nome: string;
+  quantidade: number;
+};
 
 export default function ProdutosMaisVendidosPage() {
-  const [produtos, setProdutos] = useState<Produto[]>([])
-  const [totalVendidos, setTotalVendidos] = useState<number>(0)
-  const [periodo, setPeriodo] = useState("7")
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [totalVendidos, setTotalVendidos] = useState<number>(0);
+  const [periodo, setPeriodo] = useState("7");
 
   useEffect(() => {
     async function fetchProdutosMaisVendidos() {
-      const { data, error } = await supabase.rpc("produtos_mais_vendidos", { periodo: parseInt(periodo) })
+      const { data, error } = await supabase.rpc("produtos_mais_vendidos", {
+        periodo: parseInt(periodo),
+      });
 
       if (error) {
-        console.error("Erro ao buscar produtos:", error)
+        console.error("Erro ao buscar produtos:", error);
       } else {
-        setProdutos(data)
-        const total = data.reduce((acc: number, item: Produto) => acc + item.quantidade, 0)
-        setTotalVendidos(total)
+        setProdutos(data);
+        const total = data.reduce(
+          (acc: number, item: Produto) => acc + item.quantidade,
+          0
+        );
+        setTotalVendidos(total);
       }
     }
 
-    fetchProdutosMaisVendidos()
-  }, [periodo])
+    fetchProdutosMaisVendidos();
+  }, [periodo]);
 
-  const produtoLider = produtos[0]
+  const produtoLider = produtos[0];
 
   return (
     <div className="h-screen overflow-hidden flex">
@@ -50,13 +62,24 @@ export default function ProdutosMaisVendidosPage() {
         <div className="p-4 flex-1 overflow-y-auto">
           <h2 className="font-bold text-lg mb-4">Menu</h2>
           <ul className="space-y-2 text-sm">
-            <li><a href="/dashboard">Dashboard</a></li>
-            <li><a href="/produtos-mais-vendidos" className="font-semibold text-orange-600">Produtos mais vendidos</a></li>
+            <li>
+              <a href="/dashboard">Dashboard</a>
+            </li>
+            <li>
+              <a
+                href="/produtos-mais-vendidos"
+                className="font-semibold text-orange-600"
+              >
+                Produtos mais vendidos
+              </a>
+            </li>
           </ul>
         </div>
         <div className="p-4 border-t shrink-0">
           <span className="block text-sm font-medium mb-2">Usuário: Alan</span>
-          <Button variant="outline" className="w-full">Sair</Button>
+          <Button variant="outline" className="w-full">
+            Sair
+          </Button>
         </div>
       </aside>
 
@@ -66,14 +89,18 @@ export default function ProdutosMaisVendidosPage() {
           {/* Título */}
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-bold">Produtos mais vendidos</h1>
-            <p className="text-sm text-muted-foreground">Análise dos produtos com maior saída no período</p>
+            <p className="text-sm text-muted-foreground">
+              Análise dos produtos com maior saída no período
+            </p>
           </div>
 
           {/* Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Produto líder</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Produto líder
+                </CardTitle>
                 <TrendingUp className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
@@ -86,12 +113,16 @@ export default function ProdutosMaisVendidosPage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total de itens vendidos</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total de itens vendidos
+                </CardTitle>
                 <Package className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{totalVendidos}</p>
-                <p className="text-xs text-muted-foreground">no período selecionado</p>
+                <p className="text-xs text-muted-foreground">
+                  no período selecionado
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -103,11 +134,13 @@ export default function ProdutosMaisVendidosPage() {
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="0">Hoje</SelectItem>
                 <SelectItem value="7">Últimos 7 dias</SelectItem>
                 <SelectItem value="30">Últimos 30 dias</SelectItem>
                 <SelectItem value="90">Últimos 90 dias</SelectItem>
               </SelectContent>
             </Select>
+
             <Button variant="outline">Exportar relatório</Button>
           </div>
 
@@ -136,12 +169,19 @@ export default function ProdutosMaisVendidosPage() {
             <CardContent>
               <div className="space-y-3">
                 {produtos.map((item, index) => (
-                  <div key={item.nome} className="flex items-center justify-between rounded-lg border p-3">
+                  <div
+                    key={item.nome}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
                     <div className="flex items-center gap-3">
-                      <span className="font-bold text-orange-600">#{index + 1}</span>
+                      <span className="font-bold text-orange-600">
+                        #{index + 1}
+                      </span>
                       <span className="font-medium">{item.nome}</span>
                     </div>
-                    <Badge variant="secondary">{item.quantidade} vendidos</Badge>
+                    <Badge variant="secondary">
+                      {item.quantidade} vendidos
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -150,5 +190,5 @@ export default function ProdutosMaisVendidosPage() {
         </main>
       </div>
     </div>
-  )
+  );
 }
