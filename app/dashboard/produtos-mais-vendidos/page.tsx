@@ -1,39 +1,48 @@
 "use client"
 
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardHeader, CardTitle
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from "recharts"
 import { TrendingUp, Package } from "lucide-react"
+import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase/client"
 
-const produtos = [
-  { nome: "Pão Francês", quantidade: 420 },
-  { nome: "Coxinha", quantidade: 310 },
-  { nome: "Pão de Queijo", quantidade: 260 },
-  { nome: "Bolo de Chocolate", quantidade: 180 },
-  { nome: "Refrigerante Lata", quantidade: 150 },
-]
+type Produto = {
+  nome: string
+  quantidade: number
+}
 
 export default function ProdutosMaisVendidosPage() {
+  const [produtos, setProdutos] = useState<Produto[]>([])
+  const [totalVendidos, setTotalVendidos] = useState<number>(0)
+  const [periodo, setPeriodo] = useState("7")
+
+  useEffect(() => {
+    async function fetchProdutosMaisVendidos() {
+      const { data, error } = await supabase.rpc("produtos_mais_vendidos", { periodo: parseInt(periodo) })
+
+      if (error) {
+        console.error("Erro ao buscar produtos:", error)
+      } else {
+        setProdutos(data)
+        const total = data.reduce((acc: number, item: Produto) => acc + item.quantidade, 0)
+        setTotalVendidos(total)
+      }
+    }
+
+    fetchProdutosMaisVendidos()
+  }, [periodo])
+
+  const produtoLider = produtos[0]
+
   return (
     <div className="h-screen overflow-hidden flex">
       {/* 🔹 Menu lateral fixo */}
@@ -41,81 +50,55 @@ export default function ProdutosMaisVendidosPage() {
         <div className="p-4 flex-1 overflow-y-auto">
           <h2 className="font-bold text-lg mb-4">Menu</h2>
           <ul className="space-y-2 text-sm">
-            <li>
-              <a href="/dashboard">Dashboard</a>
-            </li>
-            <li>
-              <a
-                href="/produtos-mais-vendidos"
-                className="font-semibold text-orange-600"
-              >
-                Produtos mais vendidos
-              </a>
-            </li>
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/produtos-mais-vendidos" className="font-semibold text-orange-600">Produtos mais vendidos</a></li>
           </ul>
         </div>
-
-        {/* 🔹 Área logada fixa */}
         <div className="p-4 border-t shrink-0">
-          <span className="block text-sm font-medium mb-2">
-            Usuário: Alan
-          </span>
-          <Button variant="outline" className="w-full">
-            Sair
-          </Button>
+          <span className="block text-sm font-medium mb-2">Usuário: Alan</span>
+          <Button variant="outline" className="w-full">Sair</Button>
         </div>
       </aside>
 
       {/* 🔹 Área principal */}
       <div className="flex-1 flex flex-col md:ml-2 h-screen overflow-hidden">
-        {/* 🔹 Conteúdo com scroll (alinhado ao dashboard) */}
         <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
           {/* Título */}
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold">
-              Produtos mais vendidos
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Análise dos produtos com maior saída no período
-            </p>
+            <h1 className="text-2xl font-bold">Produtos mais vendidos</h1>
+            <p className="text-sm text-muted-foreground">Análise dos produtos com maior saída no período</p>
           </div>
 
           {/* Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Produto líder
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Produto líder</CardTitle>
                 <TrendingUp className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
-                <p className="text-lg font-bold">Pão Francês</p>
+                <p className="text-lg font-bold">{produtoLider?.nome || "—"}</p>
                 <Badge className="mt-2 bg-orange-100 text-orange-900">
-                  420 vendidos
+                  {produtoLider?.quantidade || 0} vendidos
                 </Badge>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total de itens vendidos
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Total de itens vendidos</CardTitle>
                 <Package className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">1.320</p>
-                <p className="text-xs text-muted-foreground">
-                  no período selecionado
-                </p>
+                <p className="text-2xl font-bold">{totalVendidos}</p>
+                <p className="text-xs text-muted-foreground">no período selecionado</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Filtros */}
           <div className="flex items-center justify-between gap-4">
-            <Select defaultValue="30">
+            <Select defaultValue={periodo} onValueChange={setPeriodo}>
               <SelectTrigger className="w-50">
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
@@ -125,10 +108,7 @@ export default function ProdutosMaisVendidosPage() {
                 <SelectItem value="90">Últimos 90 dias</SelectItem>
               </SelectContent>
             </Select>
-
-            <Button variant="outline">
-              Exportar relatório
-            </Button>
+            <Button variant="outline">Exportar relatório</Button>
           </div>
 
           {/* Gráfico */}
@@ -148,7 +128,7 @@ export default function ProdutosMaisVendidosPage() {
             </CardContent>
           </Card>
 
-          {/* Ranking */}
+          {/* Ranking Top 5 */}
           <Card>
             <CardHeader>
               <CardTitle>Ranking de vendas</CardTitle>
@@ -156,21 +136,12 @@ export default function ProdutosMaisVendidosPage() {
             <CardContent>
               <div className="space-y-3">
                 {produtos.map((item, index) => (
-                  <div
-                    key={item.nome}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                  >
+                  <div key={item.nome} className="flex items-center justify-between rounded-lg border p-3">
                     <div className="flex items-center gap-3">
-                      <span className="font-bold text-orange-600">
-                        #{index + 1}
-                      </span>
-                      <span className="font-medium">
-                        {item.nome}
-                      </span>
+                      <span className="font-bold text-orange-600">#{index + 1}</span>
+                      <span className="font-medium">{item.nome}</span>
                     </div>
-                    <Badge variant="secondary">
-                      {item.quantidade} vendidos
-                    </Badge>
+                    <Badge variant="secondary">{item.quantidade} vendidos</Badge>
                   </div>
                 ))}
               </div>
