@@ -162,8 +162,6 @@ export default function ProdutosMaisVendidosPage() {
                 <SelectItem value="90">Últimos 90 dias</SelectItem>
               </SelectContent>
             </Select>
-
-            <Button variant="outline">Exportar relatório</Button>
           </div>
 
           {/* Gráfico */}
@@ -173,20 +171,27 @@ export default function ProdutosMaisVendidosPage() {
             </CardHeader>
             <CardContent className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={produtos}>
-  <XAxis dataKey="nome" />
-  <YAxis />
-  <Tooltip />
-  <Bar dataKey="quantidade" radius={[6, 6, 0, 0]}>
-    {produtos.map((entry, index) => (
-      <Cell
-        key={`cell-${index}`}
-        fill={["#f97316", "#fb923c", "#facc15", "#22c55e", "#3b82f6"][index % 5]}
-      />
-    ))}
-  </Bar>
-</BarChart>
-
+                <BarChart data={produtos}>
+                  <XAxis dataKey="nome" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="quantidade" radius={[6, 6, 0, 0]}>
+                    {produtos.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          [
+                            "#5e6ac0",
+                            "#7986cc",
+                            "#9ea8db",
+                            "#c6c9e8",
+                            "#e8eaf6",
+                          ][index % 5]
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
