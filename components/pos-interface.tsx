@@ -35,13 +35,13 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 interface Product {
   id: string;
   name: string;
-  value: number;     // unit: preço unidade | weight: preço por 100g
-  quantity: number;  // unit: unidades | weight: gramas
+  value: number;
+  quantity: number;
   image_url?: string | null;
 }
 
 interface CartItem extends Product {
-  cartQuantity: number; // unit: unidades | weight: gramas
+  cartQuantity: number;
 }
 
 interface POSInterfaceProps {
@@ -52,7 +52,7 @@ interface POSInterfaceProps {
 type PaymentMethod = "credit" | "debit" | "vr" | "va" | "cash";
 
 /* =========================
-   PRODUTOS POR GRAMA (IDS)
+   PRODUTOS POR PESO (IDS)
 ========================= */
 
 const WEIGHT_PRODUCT_IDS = [
@@ -81,17 +81,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
   const router = useRouter();
 
-  /* =========================
-     BUSCA POR NOME
-  ========================= */
-
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  /* =========================
-     CARRINHO
-  ========================= */
 
   const isWeightProduct = (id: string) =>
     WEIGHT_PRODUCT_IDS.includes(id);
@@ -142,10 +134,6 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       : item.value * item.cartQuantity;
     return sum + subtotal;
   }, 0);
-
-  /* =========================
-     FINALIZAR VENDA
-  ========================= */
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -204,10 +192,6 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     }
   };
 
-  /* =========================
-     LAYOUT
-  ========================= */
-
   return (
     <div className="h-screen flex overflow-hidden">
       {/* COLUNA ESQUERDA */}
@@ -229,30 +213,44 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full p-3">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {filteredProducts.map((p) => (
-                <Card
-                  key={p.id}
-                  onClick={() => addToCart(p)}
-                  className="cursor-pointer"
-                >
-                  <div className="h-20 bg-muted flex items-center justify-center">
-                    {p.image_url ? (
-                      <img src={p.image_url} className="h-full object-contain" />
-                    ) : (
-                      <span className="text-xs">Sem imagem</span>
-                    )}
-                  </div>
-                  <CardContent className="p-2">
-                    <p className="text-sm line-clamp-2">{p.name}</p>
-                    <div className="flex justify-between mt-1">
-                      <span className="font-bold text-orange-600">
-                        R$ {p.value.toFixed(2)}
-                      </span>
-                      <Badge>{p.quantity}</Badge>
+              {filteredProducts.map((p) => {
+                const isWeight = isWeightProduct(p.id);
+
+                return (
+                  <Card
+                    key={p.id}
+                    onClick={() => addToCart(p)}
+                    className="cursor-pointer"
+                  >
+                    <div className="h-20 bg-muted flex items-center justify-center relative">
+                      {p.image_url ? (
+                        <img
+                          src={p.image_url}
+                          className="h-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-xs">Sem imagem</span>
+                      )}
+
+                      {isWeight && (
+                        <Badge className="absolute top-1 right-1 text-[10px]">
+                          Venda por peso
+                        </Badge>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    <CardContent className="p-2">
+                      <p className="text-sm line-clamp-2">{p.name}</p>
+                      <div className="flex justify-between mt-1 items-center">
+                        <span className="font-bold text-orange-600">
+                          R$ {p.value.toFixed(2)}
+                        </span>
+                        <Badge>{p.quantity}</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </ScrollArea>
         </div>
@@ -277,10 +275,19 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                 >
                   <div className="flex-1">
                     <p className="text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      R$ {item.value.toFixed(2)}
-                      {isWeight && " / 100g"}
-                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        R$ {item.value.toFixed(2)}
+                        {isWeight && " / 100g"}
+                      </p>
+
+                      {isWeight && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Venda por peso
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -298,23 +305,16 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                       -
                     </Button>
 
-                    <div className="flex flex-col items-center">
-                      <Input
-                        type="number"
-                        min={isWeight ? 100 : 1}
-                        step={isWeight ? 50 : 1}
-                        value={item.cartQuantity}
-                        onChange={(e) =>
-                          updateQuantity(item.id, Number(e.target.value))
-                        }
-                        className="w-14 h-7 text-center px-1"
-                      />
-                      {isWeight && (
-                        <span className="text-[10px] text-muted-foreground leading-none">
-                          g
-                        </span>
-                      )}
-                    </div>
+                    <Input
+                      type="number"
+                      min={isWeight ? 100 : 1}
+                      step={isWeight ? 50 : 1}
+                      value={item.cartQuantity}
+                      onChange={(e) =>
+                        updateQuantity(item.id, Number(e.target.value))
+                      }
+                      className="w-14 h-7 text-center px-1"
+                    />
 
                     <Button
                       size="icon"
@@ -347,8 +347,8 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
         <div className="p-4 border-t">
           <div className="flex justify-between font-bold mb-3">
-            <span>Total</span>
-            <span className="text-orange-600">
+            <span className="text-3xl">Total</span>
+            <span className="text-3xl text-orange-600">
               R$ {total.toFixed(2)}
             </span>
           </div>
