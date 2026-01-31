@@ -28,10 +28,19 @@ export default async function DashboardPage() {
     .select("*")
     .eq("user_id", user.id)
 
+  // 🔹 FILTRO: SOMENTE VENDAS DO DIA ATUAL
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
+  const todayEnd = new Date()
+  todayEnd.setHours(23, 59, 59, 999)
+
   const { data: recentSales } = await supabase
     .from("sales")
     .select("*")
     .eq("user_id", user.id)
+    .gte("created_at", todayStart.toISOString())
+    .lte("created_at", todayEnd.toISOString())
     .order("created_at", { ascending: false })
     .limit(5)
 
@@ -52,9 +61,7 @@ export default async function DashboardPage() {
     }).length ?? 0
 
   return (
-    // 🔹 Container da página (controla altura)
     <div className="h-screen overflow-hidden flex flex-col">
-      {/* 🔹 Conteúdo com scroll */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         {/* Header */}
         <div className="space-y-1">
@@ -66,7 +73,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* 🔹 Cards clicáveis */}
+        {/* 🔹 Cards */}
         <DashboardCards
           productsCount={metrics.productsCount}
           salesCount={metrics.salesCount}
