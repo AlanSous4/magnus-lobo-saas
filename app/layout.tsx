@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: "Padaria Lanchonete Magnus Lobo - Sistema de Gestão",
   description: "Sistema completo de vendas e gestão de estoque para padaria",
   generator: "v0.app",
+
+  // 🔹 PWA
+  manifest: "/manifest.json",
+  themeColor: "#f97316",
+
   icons: {
     icon: [
       {
@@ -30,6 +35,13 @@ export const metadata: Metadata = {
   },
 }
 
+// 🔹 Viewport otimizado para app
+export const viewport: Viewport = {
+  themeColor: "#f97316",
+  width: "device-width",
+  initialScale: 1,
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -37,7 +49,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className={`font-sans antialiased`}>
+      <body className="font-sans antialiased">
         {children}
         <Analytics />
       </body>
