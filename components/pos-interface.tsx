@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
   Coffee,
   Check,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -31,7 +32,6 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 /* =========================
    TIPOS
 ========================= */
-
 interface Product {
   id: string;
   name: string;
@@ -54,7 +54,6 @@ type PaymentMethod = "credit" | "debit" | "vr" | "va" | "cash";
 /* =========================
    PRODUTOS POR PESO (IDS)
 ========================= */
-
 const WEIGHT_PRODUCT_IDS = [
   "b8a6c2ca-623c-41a2-bfec-9fa27ce7c6cc",
   "193b8a3a-d2a7-485d-bb31-59157002eea6",
@@ -70,6 +69,36 @@ const paymentMethods = [
   { id: "cash" as PaymentMethod, label: "Dinheiro", icon: Wallet },
 ];
 
+/* =========================
+   BACK BUTTON PWA
+========================= */
+function BackButtonApp() {
+  const [isPWA, setIsPWA] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true;
+    setIsPWA(standalone);
+  }, []);
+
+  if (!isPWA) return null;
+
+  return (
+    <button
+      onClick={() => router.push("/dashboard")}
+      className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1 rounded-md hover:bg-orange-700 transition"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      Voltar
+    </button>
+  );
+}
+
+/* =========================
+   COMPONENTE PRINCIPAL
+========================= */
 export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,8 +114,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const isWeightProduct = (id: string) =>
-    WEIGHT_PRODUCT_IDS.includes(id);
+  const isWeightProduct = (id: string) => WEIGHT_PRODUCT_IDS.includes(id);
 
   const addToCart = (product: Product) => {
     const existing = cart.find((i) => i.id === product.id);
@@ -192,24 +220,33 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     }
   };
 
+  /* =========================
+     RENDER
+  ========================= */
   return (
     <div className="h-screen flex overflow-hidden">
       {/* COLUNA ESQUERDA */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="p-4 border-b bg-background shrink-0">
+        {/* CABEÇALHO COM BOTÃO VOLTAR */}
+        <div className="p-4 border-b bg-background shrink-0 flex items-center justify-between">
           <h1 className="text-lg font-bold flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-orange-600" />
             PDV - Ponto de Venda
           </h1>
 
-          <Input
-            className="mt-3"
-            placeholder="Buscar produtos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          {/* 🔹 Botão Voltar PWA */}
+          <BackButtonApp />
         </div>
 
+        {/* INPUT DE BUSCA */}
+        <Input
+          className="mt-3 px-2 py-1"
+          placeholder="Buscar produtos..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+
+        {/* LISTA DE PRODUTOS */}
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full p-3">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
