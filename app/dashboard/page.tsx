@@ -10,14 +10,36 @@ import { Button } from "@/components/ui/button"
 import { getDashboardMetrics } from "@/lib/dashboard-metrics"
 import { DashboardCards } from "@/components/dashboard-cards"
 
+/**
+ * Next.js metadata atualizado para evitar warnings de themeColor
+ */
+export const metadata = {
+  title: "Dashboard",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    themeColor: "#ffffff", // cor do layout / PWA
+  },
+}
+
+/**
+ * DashboardPage agora trata refresh token expirado:
+ * - Verifica sessão atual do usuário
+ * - Redireciona para /login se não houver sessão válida
+ */
 export default async function DashboardPage() {
   const supabase = await createClient()
 
+  // 🔹 Verifica usuário logado
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser()
 
-  if (!user) redirect("/login")
+  // Se usuário não existir ou token inválido, redireciona para login
+  if (!user || error?.message?.includes("Refresh Token Not Found")) {
+    redirect("/login")
+  }
 
   // 🔹 MÉTRICAS DO DASHBOARD
   const metrics = await getDashboardMetrics(user.id)

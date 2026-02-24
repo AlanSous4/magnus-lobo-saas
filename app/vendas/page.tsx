@@ -1,18 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { POSInterface } from "@/components/pos-interface";
 
 export default async function VendasPage() {
-  const supabase = await createClient(); // ✅ CORREÇÃO AQUI
+  const supabase = await createClient(); // ✅ Supabase client server-side
 
+  // 🔹 Verifica usuário logado
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError || !user) {
-    return null;
+  // Redireciona para login se token expirou ou não houver usuário
+  if (authError?.message?.includes("Refresh Token Not Found") || !user) {
+    redirect("/login");
   }
 
+  // 🔹 Busca produtos
   const { data: products, error } = await supabase
     .from("products")
     .select("id, name, value, quantity, image_url")

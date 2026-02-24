@@ -1,5 +1,6 @@
 import withPWAInit from "next-pwa";
 
+/** Configuração do PWA */
 const withPWA = withPWAInit({
   dest: "public",
   register: true,
@@ -9,9 +10,12 @@ const withPWA = withPWAInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {}, // 🔥 Resolve conflito com Next 16
+
   typescript: {
     ignoreBuildErrors: true,
   },
+
   images: {
     unoptimized: true,
   },

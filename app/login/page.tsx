@@ -31,9 +31,19 @@ export default function LoginPage() {
       })
 
       if (error) throw error
+
+      // 🔹 Opcional: pode limpar sessão antiga antes de redirecionar
+      await supabase.auth.refreshSession()
+
       router.push("/dashboard")
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Erro ao fazer login")
+      setError(
+        error instanceof Error
+          ? error.message.includes("Refresh Token Not Found")
+            ? "Sua sessão expirou, faça login novamente."
+            : error.message
+          : "Erro ao fazer login"
+      )
     } finally {
       setIsLoading(false)
     }
