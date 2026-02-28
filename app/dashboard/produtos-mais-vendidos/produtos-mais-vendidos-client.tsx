@@ -62,43 +62,48 @@ export default function ProdutosMaisVendidosClient() {
       </aside>
 
       {/* 🔹 Área principal */}
-      <div className="flex-1 flex flex-col md:ml-2 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col md:ml-64 h-screen overflow-hidden">
         <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+
           {/* Título */}
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold">Produtos mais vendidos</h1>
-            <p className="text-sm text-muted-foreground">Análise dos produtos com maior saída no período</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Produtos mais vendidos</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Análise dos produtos com maior saída no período
+            </p>
           </div>
 
           {/* Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Produto líder</CardTitle>
-                <TrendingUp className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-sm sm:text-base font-medium">Produto líder</CardTitle>
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
               </CardHeader>
               <CardContent>
-                <p className="text-lg font-bold">{produtoLider?.nome || "—"}</p>
+                <p className="text-lg sm:text-xl font-bold">{produtoLider?.nome || "—"}</p>
                 <Badge className="mt-2 bg-orange-100 text-orange-900">{produtoLider?.quantidade || 0} vendidos</Badge>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total de itens vendidos</CardTitle>
-                <Package className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-sm sm:text-base font-medium">Total de itens vendidos</CardTitle>
+                <Package className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{totalVendidos}</p>
-                <p className="text-xs text-muted-foreground">no período selecionado</p>
+                <p className="text-2xl sm:text-3xl font-bold">{totalVendidos}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">no período selecionado</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Filtros */}
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <Select defaultValue={periodo} onValueChange={setPeriodo}>
-              <SelectTrigger className="w-50"><SelectValue placeholder="Período" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="0">Hoje</SelectItem>
                 <SelectItem value="7">Últimos 7 dias</SelectItem>
@@ -136,7 +141,7 @@ export default function ProdutosMaisVendidosClient() {
                   <button
                     key={item.nome}
                     onClick={() => fetchVendasPorProduto(item.nome)}
-                    className="w-full text-left flex items-center justify-between rounded-lg border p-3 hover:bg-orange-50"
+                    className="w-full text-left flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-3 hover:bg-orange-50 gap-2 sm:gap-0"
                   >
                     <div className="flex items-center gap-3">
                       <span className="font-bold text-orange-600">#{index + 1}</span>
@@ -157,9 +162,9 @@ export default function ProdutosMaisVendidosClient() {
                 {vendasProduto.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhuma venda encontrada no período.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 overflow-x-auto">
                     {vendasProduto.map((venda) => (
-                      <div key={venda.venda_id} className="flex justify-between border rounded p-2">
+                      <div key={venda.venda_id} className="flex justify-between border rounded p-2 min-w-75">
                         <span>{new Date(venda.data_venda).toLocaleString("pt-BR")}</span>
                         <span>{venda.quantidade} unid.</span>
                         <span>R$ {venda.valor.toFixed(2)}</span>

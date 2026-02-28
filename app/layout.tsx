@@ -12,9 +12,7 @@ export const metadata: Metadata = {
   description: "Sistema completo de vendas e gestão de estoque para padaria",
   generator: "v0.app",
 
-  // 🔹 PWA
   manifest: "/manifest.json",
-  themeColor: "#f97316",
 
   icons: {
     icon: [
@@ -35,7 +33,7 @@ export const metadata: Metadata = {
   },
 }
 
-// 🔹 Viewport otimizado para app
+// 🔹 Viewport otimizado para app (Next 16 exige aqui)
 export const viewport: Viewport = {
   themeColor: "#f97316",
   width: "device-width",
@@ -52,6 +50,21 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         {children}
         <Analytics />
+
+        {/* 🔥 Registro manual do Service Worker */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function() { console.log('✅ SW registrado'); })
+                    .catch(function(err) { console.log('❌ SW erro:', err); });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   )

@@ -6,11 +6,14 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
+  buildExcludes: [/middleware-manifest\.json$/],
 });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  turbopack: {}, // 🔥 Resolve conflito com Next 16
+  reactStrictMode: true,
+
+  turbopack: {},
 
   typescript: {
     ignoreBuildErrors: true,
