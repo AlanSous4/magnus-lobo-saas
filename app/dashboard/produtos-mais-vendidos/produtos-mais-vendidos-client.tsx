@@ -62,7 +62,7 @@ export default function ProdutosMaisVendidosClient() {
       </aside>
 
       {/* 🔹 Área principal */}
-      <div className="flex-1 flex flex-col md:ml-64 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col  h-screen overflow-hidden">
         <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
 
           {/* Título */}
