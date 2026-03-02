@@ -4,52 +4,33 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const geist = Geist({ subsets: ["latin"] })
+const geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Padaria Lanchonete Magnus Lobo - Sistema de Gestão",
-  description: "Sistema completo de vendas e gestão de estoque para padaria",
+  // ✅ BASE REAL DO PROJETO (ESSENCIAL PARA OG/TWITTER)
+  metadataBase: new URL("https://v0-padaria-system.vercel.app"),
 
-  openGraph: {
-    title: "Padaria Lanchonete Magnus Lobo",
-    description: "Sistema completo de vendas e gestão de estoque para padaria",
-    url: "https://SEU-DOMINIO-AQUI.com",
-    siteName: "Magnus Lobo",
-    images: [
-      {
-        url: "https://SEU-DOMINIO-AQUI.com/preview-dashboard.png",
-        width: 1200,
-        height: 630,
-        alt: "Sistema Magnus Lobo",
-      },
-    ],
-    locale: "pt_BR",
-    type: "website",
+  title: {
+    default: "Padaria Lanchonete Magnus Lobo - Sistema de Gestão",
+    template: "%s | Magnus Lobo",
   },
 
-  manifest: "/manifest.json",
+  description:
+    "Sistema completo de vendas, controle de estoque e gestão para padarias e lanchonetes",
 
-  icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    apple: "/apple-icon.png",
+  // ✅ SEO OK, sem forçar preview global
+  robots: {
+    index: true,
+    follow: true,
   },
+
+  // ❗ NÃO DEFINIMOS openGraph AQUI
+  // Cada página (ex: /preview) controla seu próprio OG
+  // Isso evita conflito e cache errado no WhatsApp
 }
 
-// 🔹 Viewport otimizado para app (Next 16 exige aqui)
+// 🔹 Viewport (Next 15+ correto aqui)
 export const viewport: Viewport = {
   themeColor: "#f97316",
   width: "device-width",
@@ -58,25 +39,30 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="pt-BR">
-      <body className="font-sans antialiased">
+      <body
+        className={`${geist.className} ${geistMono.className} font-sans antialiased`}
+      >
         {children}
+
+        {/* Analytics */}
         <Analytics />
 
-        {/* 🔥 Registro manual do Service Worker */}
+        {/* 🔥 Service Worker (mantido, sem alteração) */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function() { console.log('✅ SW registrado'); })
-                    .catch(function(err) { console.log('❌ SW erro:', err); });
-                });
+                window.addEventListener('load', function () {
+                  navigator.serviceWorker
+                    .register('/sw.js')
+                    .then(() => console.log('✅ SW registrado'))
+                    .catch(err => console.log('❌ SW erro:', err))
+                })
               }
             `,
           }}
