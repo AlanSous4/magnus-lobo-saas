@@ -1,9 +1,15 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 export const metadata: Metadata = {
+  // ✅ BASE ABSOLUTA (OBRIGATÓRIO)
   metadataBase: new URL("https://v0-padaria-system.vercel.app"),
 
   title: "Sistema de Padaria | Magnus Lobo",
@@ -15,6 +21,7 @@ export const metadata: Metadata = {
     follow: true,
   },
 
+  // ✅ OPEN GRAPH (WhatsApp / Facebook)
   openGraph: {
     title: "Sistema de Padaria | Magnus Lobo",
     description:
@@ -23,7 +30,8 @@ export const metadata: Metadata = {
     siteName: "Sistema de Padaria Magnus Lobo",
     images: [
       {
-        url: "/preview-dashboard.png", // 👈 Next resolve com metadataBase
+        // ✅ URL ABSOLUTA DA IMAGEM
+        url: "https://v0-padaria-system.vercel.app/preview-dashboard.png",
         width: 1200,
         height: 630,
         alt: "Dashboard do Sistema de Padaria Magnus Lobo",
@@ -33,11 +41,15 @@ export const metadata: Metadata = {
     type: "website",
   },
 
+  // ✅ TWITTER (X)
   twitter: {
     card: "summary_large_image",
     title: "Sistema de Padaria | Magnus Lobo",
-    description: "Gestão completa para padarias e lanchonetes",
-    images: ["/preview-dashboard.png"],
+    description:
+      "Sistema completo para controle de vendas e estoque em padarias",
+    images: [
+      "https://v0-padaria-system.vercel.app/preview-dashboard.png",
+    ],
   },
 }
 
@@ -53,10 +65,11 @@ export default function PreviewPage() {
 
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">
-            Controle vendas, estoque, produtos e faturamento em um sistema simples
-            e eficiente, feito para padarias e lanchonetes.
+            Controle vendas, estoque, produtos e faturamento em um sistema
+            simples e eficiente, feito para padarias e lanchonetes.
           </p>
 
+          {/* Imagem VISUAL (não interfere no OG) */}
           <img
             src="/preview-dashboard.png"
             alt="Preview do Dashboard"
