@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Fragment } from "react";
 
 import {
   calculateSalesMetrics,
@@ -29,6 +28,7 @@ type SaleWithItems = {
   created_at: string;
   total_value?: number | null;
   items?: SaleItem[];
+  payment_method?: string | null; // ✅ ADICIONADO
 };
 
 export type SalesHistoryProps = {
@@ -50,12 +50,8 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
 
-  const [selectedDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
-  const [selectedMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  );
+  const [selectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
@@ -66,24 +62,20 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const filteredSales = useMemo(() => {
     if (periodMode === "daily") {
       return typedSales.filter(
-        (s) =>
-          new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
+        (s) => new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
       );
     }
 
     if (periodMode === "month") {
       return typedSales.filter(
-        (s) =>
-          new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
+        (s) => new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
       );
     }
 
     const limitDate = new Date();
     limitDate.setDate(limitDate.getDate() - days);
 
-    return typedSales.filter(
-      (s) => new Date(s.created_at) >= limitDate
-    );
+    return typedSales.filter((s) => new Date(s.created_at) >= limitDate);
   }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
@@ -92,11 +84,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     created_at: s.created_at,
   }));
 
-  const metrics: SalesMetrics = calculateSalesMetrics(
-    salesForMetrics,
-    "revenue",
-    groupBy
-  );
+  const metrics: SalesMetrics = calculateSalesMetrics(salesForMetrics, "revenue", groupBy);
 
   /* =========================
      🔹 AGRUPA ITENS IGUAIS
@@ -118,13 +106,23 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     return Array.from(map.values());
   }
 
+  /* =========================
+     🔹 MAPA DE FORMAS DE PAGAMENTO
+  ========================== */
+
+  const paymentLabelMap: Record<string, string> = {
+    cash: "Dinheiro",
+    card: "Cartão",
+    pix: "PIX",
+    vr: "Vale Refeição",
+    va: "Vale Alimentação",
+  };
+
   /* ========================= */
 
   if (loading) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Carregando vendas...
-      </p>
+      <p className="text-sm text-muted-foreground">Carregando vendas...</p>
     );
   }
 
@@ -139,11 +137,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               <Button
                 key={d}
                 size="sm"
-                variant={
-                  periodMode === "range" && days === d
-                    ? "default"
-                    : "outline"
-                }
+                variant={periodMode === "range" && days === d ? "default" : "outline"}
                 onClick={() => {
                   setPeriodMode("range");
                   setDays(d as 30 | 60 | 90);
@@ -203,39 +197,25 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               {metrics.labels.map((label) => {
                 const periodSales = filteredSales.filter(
                   (s) =>
-                    new Date(s.created_at).toLocaleDateString("pt-BR") ===
-                    label
+                    new Date(s.created_at).toLocaleDateString("pt-BR") === label
                 );
 
-                const revenue = periodSales.reduce(
-                  (sum, s) => sum + (s.total_value ?? 0),
-                  0
-                );
-
+                const revenue = periodSales.reduce((sum, s) => sum + (s.total_value ?? 0), 0);
                 const isOpen = expandedLabel === label;
 
-                const allItems = groupItems(
-                  periodSales.flatMap((s) => s.items ?? [])
-                );
+                const allItems = groupItems(periodSales.flatMap((s) => s.items ?? []));
 
                 return (
                   <Fragment key={label}>
                     <tr
                       className="border-t cursor-pointer hover:bg-muted/50"
-                      onClick={() =>
-                        setExpandedLabel(isOpen ? null : label)
-                      }
+                      onClick={() => setExpandedLabel(isOpen ? null : label)}
                     >
                       <td className="p-2">{label}</td>
+                      <td className="p-2 text-right">{periodSales.length}</td>
+                      <td className="p-2 text-right">R$ {revenue.toFixed(2)}</td>
                       <td className="p-2 text-right">
-                        {periodSales.length}
-                      </td>
-                      <td className="p-2 text-right">
-                        R$ {revenue.toFixed(2)}
-                      </td>
-                      <td className="p-2 text-right">
-                        R${" "}
-                        {(revenue / (periodSales.length || 1)).toFixed(2)}
+                        R$ {(revenue / (periodSales.length || 1)).toFixed(2)}
                       </td>
                     </tr>
 
@@ -243,6 +223,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                       <tr className="bg-muted/30">
                         <td colSpan={4} className="p-3">
                           <div className="space-y-1 text-sm">
+                            {/* ✅ Detalhes dos produtos */}
                             {allItems.length > 0 ? (
                               allItems.map((item) => (
                                 <div
@@ -253,8 +234,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                                     {item.product_name} ({item.quantity}x)
                                   </span>
                                   <span>
-                                    R${" "}
-                                    {(item.quantity * item.price).toFixed(2)}
+                                    R$ {(item.quantity * item.price).toFixed(2)}
                                   </span>
                                 </div>
                               ))
@@ -263,6 +243,19 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                                 Venda sem itens detalhados
                               </p>
                             )}
+
+                            {/* ✅ Forma de pagamento por venda */}
+                            {periodSales.map((s) => (
+                              <div
+                                key={`${label}-payment-${s.id}`}
+                                className="flex justify-between font-semibold text-xs mt-1"
+                              >
+                                <span>Pagamento:</span>
+                                <span>
+                                  {paymentLabelMap[s.payment_method ?? ""] ?? s.payment_method ?? "Desconhecido"}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </td>
                       </tr>

@@ -11,7 +11,23 @@ import { TrendingUp, Package } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 type Produto = { nome: string; quantidade: number };
-type Venda = { venda_id: string; data_venda: string; quantidade: number; valor: number };
+type VendaItem = { nome: string; quantidade: number; valor: number };
+type Venda = {
+  venda_id: string;
+  data_venda: string;
+  payment_method: string;
+  items: VendaItem[];
+  total: number;
+};
+
+// Mapeamento de formas de pagamento
+const paymentLabelMap: Record<string, string> = {
+  cash: "Dinheiro",
+  card: "Cartão",
+  pix: "PIX",
+  vr: "Vale Refeição",
+  va: "Vale Alimentação",
+};
 
 export default function ProdutosMaisVendidosClient() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -20,20 +36,77 @@ export default function ProdutosMaisVendidosClient() {
   const [vendasProduto, setVendasProduto] = useState<Venda[]>([]);
   const [produtoSelecionado, setProdutoSelecionado] = useState<string | null>(null);
 
+  // Fetch produtos mais vendidos
   async function fetchProdutosMaisVendidos() {
     const { data, error } = await supabase.rpc("produtos_mais_vendidos", { periodo: parseInt(periodo) });
     if (!error && data) {
-      setProdutos(data);
-      setTotalVendidos(data.reduce((acc: number, item: Produto) => acc + item.quantidade, 0));
+      const normalizedData = (data as Produto[]).map(item => ({
+        nome: item.nome || "Produto desconhecido",
+        quantidade: item.quantidade,
+      }));
+      setProdutos(normalizedData);
+      setTotalVendidos(normalizedData.reduce((acc, item) => acc + item.quantidade, 0));
     }
   }
 
+  // Fetch vendas por produto com forma de pagamento correta
   async function fetchVendasPorProduto(nome: string) {
-    const { data, error } = await supabase.rpc("vendas_por_produto", { periodo: parseInt(periodo), produto_nome: nome });
-    if (!error && data) {
-      setProdutoSelecionado(nome);
-      setVendasProduto(data);
-    }
+    // 1️⃣ Buscar itens do produto selecionado
+    const { data: items, error: itemsError } = await supabase
+      .from("sale_items")
+      .select(`
+        sale_id,
+        quantity,
+        unit_price,
+        product_id,
+        products!inner(name)
+      `)
+      .eq("products.name", nome);
+
+    if (itemsError || !items) return;
+
+    // 2️⃣ Buscar vendas correspondentes
+    const saleIds = Array.from(new Set(items.map(i => i.sale_id)));
+    const { data: sales, error: salesError } = await supabase
+      .from("sales")
+      .select("id, payment_method, created_at")
+      .in("id", saleIds);
+
+    if (salesError || !sales) return;
+
+    // 3️⃣ Mapear vendas por ID
+    const salesMap = Object.fromEntries((sales as any[]).map(sale => [sale.id, sale]));
+
+    // 4️⃣ Agrupar itens por venda
+    const vendasMap: Record<string, Venda> = {};
+    (items as any[]).forEach(item => {
+      const vendaId = item.sale_id;
+      const saleData = salesMap[vendaId];
+      const paymentRaw = saleData?.payment_method;
+      const payment = paymentLabelMap[paymentRaw] || paymentRaw || "Desconhecido";
+
+      if (!vendasMap[vendaId]) {
+        vendasMap[vendaId] = {
+          venda_id: vendaId,
+          data_venda: saleData?.created_at || new Date().toISOString(),
+          payment_method: payment,
+          items: [],
+          total: 0,
+        };
+      }
+
+      vendasMap[vendaId].items.push({
+        nome: item.products?.name || "Produto desconhecido",
+        quantidade: item.quantity,
+        valor: item.unit_price,
+      });
+
+      vendasMap[vendaId].total += item.unit_price * item.quantity;
+    });
+
+    const normalizedData = Object.values(vendasMap);
+    setProdutoSelecionado(nome);
+    setVendasProduto(normalizedData);
   }
 
   useEffect(() => {
@@ -162,12 +235,23 @@ export default function ProdutosMaisVendidosClient() {
                 {vendasProduto.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhuma venda encontrada no período.</p>
                 ) : (
-                  <div className="space-y-2 overflow-x-auto">
+                  <div className="space-y-4 overflow-x-auto">
                     {vendasProduto.map((venda) => (
-                      <div key={venda.venda_id} className="flex justify-between border rounded p-2 min-w-75">
-                        <span>{new Date(venda.data_venda).toLocaleString("pt-BR")}</span>
-                        <span>{venda.quantidade} unid.</span>
-                        <span>R$ {venda.valor.toFixed(2)}</span>
+                      <div key={venda.venda_id} className="border rounded p-3 min-w-75 space-y-1">
+                        <div className="flex justify-between font-semibold">
+                          <span>{new Date(venda.data_venda).toLocaleString("pt-BR")}</span>
+                          <span>{venda.items.length} itens</span>
+                          <span>R$ {venda.total.toFixed(2)}</span>
+                          <span>{venda.payment_method}</span>
+                        </div>
+                        <div className="pl-4 space-y-1">
+                          {venda.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between">
+                              <span>{item.nome} ({item.quantidade}x)</span>
+                              <span>R$ {item.valor.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
