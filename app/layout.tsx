@@ -10,7 +10,23 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Padaria Lanchonete Magnus Lobo - Sistema de Gestão",
   description: "Sistema completo de vendas e gestão de estoque para padaria",
-  generator: "v0.app",
+
+  openGraph: {
+    title: "Padaria Lanchonete Magnus Lobo",
+    description: "Sistema completo de vendas e gestão de estoque para padaria",
+    url: "https://SEU-DOMINIO-AQUI.com",
+    siteName: "Magnus Lobo",
+    images: [
+      {
+        url: "https://SEU-DOMINIO-AQUI.com/preview-dashboard.png",
+        width: 1200,
+        height: 630,
+        alt: "Sistema Magnus Lobo",
+      },
+    ],
+    locale: "pt_BR",
+    type: "website",
+  },
 
   manifest: "/manifest.json",
 
