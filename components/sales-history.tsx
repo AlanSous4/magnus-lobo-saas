@@ -20,10 +20,22 @@ export type SalesHistoryProps = {
   userId: string;
 };
 
+type PeriodMode = "range" | "daily" | "month";
+
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
 
   const [days, setDays] = useState<30 | 60 | 90>(30);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
+
+  const [selectedDate, setSelectedDate] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(() =>
+    new Date().toISOString().slice(0, 7)
+  );
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -31,19 +43,37 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   // ✅ Detecta mobile com segurança
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setIsMobile(
-        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-      );
+      setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
     }
   }, []);
 
+  // ✅ FILTRO CENTRAL (range / diário / mês)
   const filteredSales = useMemo(() => {
+    if (periodMode === "daily") {
+      return sales.filter((sale) => {
+        const saleDate = new Date(sale.created_at)
+          .toISOString()
+          .slice(0, 10);
+        return saleDate === selectedDate;
+      });
+    }
+
+    if (periodMode === "month") {
+      return sales.filter((sale) => {
+        const saleMonth = new Date(sale.created_at)
+          .toISOString()
+          .slice(0, 7);
+        return saleMonth === selectedMonth;
+      });
+    }
+
     const limitDate = new Date();
     limitDate.setDate(limitDate.getDate() - days);
+
     return sales.filter(
       (sale) => new Date(sale.created_at) >= limitDate
     );
-  }, [sales, days]);
+  }, [sales, days, periodMode, selectedDate, selectedMonth]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
     id: s.id,
@@ -58,10 +88,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   );
 
   async function handlePreviewPDF() {
-    // 📱 Mobile → download direto
-    if (isMobile) {
-      return handleExportPDF();
-    }
+    if (isMobile) return handleExportPDF();
 
     setExporting(true);
     try {
@@ -94,22 +121,64 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     <>
       <Card>
         <CardHeader className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-3">
             <CardTitle>Relatório de Receita</CardTitle>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {[30, 60, 90].map((d) => (
                 <Button
                   key={d}
                   size="sm"
-                  variant={days === d ? "default" : "outline"}
-                  onClick={() => setDays(d as 30 | 60 | 90)}
+                  variant={
+                    periodMode === "range" && days === d
+                      ? "default"
+                      : "outline"
+                  }
+                  onClick={() => {
+                    setPeriodMode("range");
+                    setDays(d as 30 | 60 | 90);
+                  }}
                 >
                   {d} dias
                 </Button>
               ))}
+
+              <Button
+                size="sm"
+                variant={periodMode === "daily" ? "default" : "outline"}
+                onClick={() => setPeriodMode("daily")}
+              >
+                Diário
+              </Button>
+
+              <Button
+                size="sm"
+                variant={periodMode === "month" ? "default" : "outline"}
+                onClick={() => setPeriodMode("month")}
+              >
+                Mês
+              </Button>
             </div>
           </div>
+
+          {/* 🔽 Seletores extras */}
+          {periodMode === "daily" && (
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="border rounded px-2 py-1 text-sm w-fit"
+            />
+          )}
+
+          {periodMode === "month" && (
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="border rounded px-2 py-1 text-sm w-fit"
+            />
+          )}
 
           <div className="flex gap-2">
             <Button
@@ -162,9 +231,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                 {metrics.labels.map((label) => {
                   const periodSales = filteredSales.filter((sale) => {
                     const date = new Date(sale.created_at);
-                    return (
-                      date.toLocaleDateString("pt-BR") === label
-                    );
+                    return date.toLocaleDateString("pt-BR") === label;
                   });
 
                   const salesCount = periodSales.length;
@@ -190,7 +257,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </table>
           </div>
 
-          {days !== 30 && (
+          {periodMode === "range" && days !== 30 && (
             <SalesChart
               sales={salesForMetrics}
               type={type}
@@ -201,7 +268,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         </CardContent>
       </Card>
 
-      {/* 🔒 Gráfico invisível só para PDF */}
+      {/* 🔒 Gráfico invisível para PDF */}
       <div
         style={{
           position: "absolute",
@@ -219,7 +286,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         />
       </div>
 
-      {/* 🖥️ Preview APENAS no desktop */}
+      {/* 🖥️ Preview desktop */}
       {!isMobile && previewUrl && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
