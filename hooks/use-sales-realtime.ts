@@ -37,12 +37,12 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       setLoading(true);
 
       /* =========================
-         1️⃣ BUSCA VENDAS
+         1️⃣ BUSCA VENDAS (COM PAYMENT)
       ========================= */
 
       const { data: salesData, error: salesError } = await supabase
         .from("sales")
-        .select("id, user_id, total_amount, created_at")
+        .select("id, user_id, total_amount, created_at, payment_method")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -71,7 +71,8 @@ export function useSalesRealtime({ userId }: { userId: string }) {
 
       const { data: itemsData, error: itemsError } = await supabase
         .from("sale_items")
-        .select(`
+        .select(
+          `
           id,
           sale_id,
           quantity,
@@ -79,7 +80,8 @@ export function useSalesRealtime({ userId }: { userId: string }) {
           products (
             name
           )
-        `)
+        `
+        )
         .in("sale_id", saleIds);
 
       if (itemsError) {
@@ -91,10 +93,10 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       ========================= */
 
       const normalizedItems: SaleItem[] = Array.isArray(itemsData)
-        ? itemsData.map((item: any) => ({
+        ? itemsData.map((item) => ({
             id: item.id,
             sale_id: item.sale_id,
-            product_name: item.products?.name ?? "Produto",
+            product_name: item.products?.[0]?.name,
             quantity: Number(item.quantity) || 0,
             price: Number(item.unit_price) || 0,
           }))
@@ -124,6 +126,9 @@ export function useSalesRealtime({ userId }: { userId: string }) {
         quantity: 1,
 
         total_value: Number(sale.total_amount) || 0,
+
+        // ✅ FORMA DE PAGAMENTO (CORREÇÃO PRINCIPAL)
+        payment_method: sale.payment_method,
 
         // ✅ Itens detalhados
         items: itemsBySale[sale.id] ?? [],
