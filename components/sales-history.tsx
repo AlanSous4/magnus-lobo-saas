@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SalesChart } from "@/components/sales-chart";
-import { exportSalesPDF } from "@/components/pdf-export";
+import { Fragment } from "react";
 
 import {
   calculateSalesMetrics,
@@ -14,6 +13,24 @@ import {
 
 import { useSalesRealtime } from "@/hooks/use-sales-realtime";
 
+/* =========================
+   🔹 TIPOS CORRETOS
+========================= */
+
+type SaleItem = {
+  id: string;
+  product_name: string;
+  quantity: number;
+  price: number;
+};
+
+type SaleWithItems = {
+  id: string;
+  created_at: string;
+  total_value?: number | null;
+  items?: SaleItem[];
+};
+
 export type SalesHistoryProps = {
   type: "sales" | "revenue" | "ticket";
   groupBy: "day" | "month";
@@ -22,58 +39,52 @@ export type SalesHistoryProps = {
 
 type PeriodMode = "range" | "daily" | "month";
 
+/* =========================
+   COMPONENTE
+========================= */
+
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
+  const typedSales = sales as SaleWithItems[];
 
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
 
-  const [selectedDate, setSelectedDate] = useState<string>(() =>
+  const [selectedDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
-
-  const [selectedMonth, setSelectedMonth] = useState<string>(() =>
+  const [selectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
-  // ✅ Detecta mobile com segurança
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
-    }
-  }, []);
+  /* =========================
+     FILTRO CENTRAL
+  ========================= */
 
-  // ✅ FILTRO CENTRAL (range / diário / mês)
   const filteredSales = useMemo(() => {
     if (periodMode === "daily") {
-      return sales.filter((sale) => {
-        const saleDate = new Date(sale.created_at)
-          .toISOString()
-          .slice(0, 10);
-        return saleDate === selectedDate;
-      });
+      return typedSales.filter(
+        (s) =>
+          new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
+      );
     }
 
     if (periodMode === "month") {
-      return sales.filter((sale) => {
-        const saleMonth = new Date(sale.created_at)
-          .toISOString()
-          .slice(0, 7);
-        return saleMonth === selectedMonth;
-      });
+      return typedSales.filter(
+        (s) =>
+          new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
+      );
     }
 
     const limitDate = new Date();
     limitDate.setDate(limitDate.getDate() - days);
 
-    return sales.filter(
-      (sale) => new Date(sale.created_at) >= limitDate
+    return typedSales.filter(
+      (s) => new Date(s.created_at) >= limitDate
     );
-  }, [sales, days, periodMode, selectedDate, selectedMonth]);
+  }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
     id: s.id,
@@ -87,27 +98,27 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     groupBy
   );
 
-  async function handlePreviewPDF() {
-    if (isMobile) return handleExportPDF();
+  /* =========================
+     🔹 AGRUPA ITENS IGUAIS
+  ========================= */
 
-    setExporting(true);
-    try {
-      const pdf = await exportSalesPDF(metrics, type, groupBy);
-      setPreviewUrl(pdf.output("bloburl").toString());
-    } finally {
-      setExporting(false);
-    }
+  function groupItems(items: SaleItem[]) {
+    const map = new Map<string, SaleItem>();
+
+    items.forEach((item) => {
+      const existing = map.get(item.product_name);
+
+      if (existing) {
+        existing.quantity += item.quantity;
+      } else {
+        map.set(item.product_name, { ...item });
+      }
+    });
+
+    return Array.from(map.values());
   }
 
-  async function handleExportPDF() {
-    setExporting(true);
-    try {
-      const pdf = await exportSalesPDF(metrics, type, groupBy);
-      pdf.save("relatorio-vendas.pdf");
-    } finally {
-      setExporting(false);
-    }
-  }
+  /* ========================= */
 
   if (loading) {
     return (
@@ -118,191 +129,151 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader className="space-y-4">
-          <div className="flex justify-between items-center flex-wrap gap-3">
-            <CardTitle>Relatório de Receita</CardTitle>
+    <Card>
+      <CardHeader className="space-y-4">
+        <div className="flex justify-between items-center flex-wrap gap-3">
+          <CardTitle>Relatório de Receita</CardTitle>
 
-            <div className="flex gap-2 flex-wrap">
-              {[30, 60, 90].map((d) => (
-                <Button
-                  key={d}
-                  size="sm"
-                  variant={
-                    periodMode === "range" && days === d
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() => {
-                    setPeriodMode("range");
-                    setDays(d as 30 | 60 | 90);
-                  }}
-                >
-                  {d} dias
-                </Button>
-              ))}
-
+          <div className="flex gap-2 flex-wrap">
+            {[30, 60, 90].map((d) => (
               <Button
+                key={d}
                 size="sm"
-                variant={periodMode === "daily" ? "default" : "outline"}
-                onClick={() => setPeriodMode("daily")}
+                variant={
+                  periodMode === "range" && days === d
+                    ? "default"
+                    : "outline"
+                }
+                onClick={() => {
+                  setPeriodMode("range");
+                  setDays(d as 30 | 60 | 90);
+                }}
               >
-                Diário
+                {d} dias
               </Button>
+            ))}
 
-              <Button
-                size="sm"
-                variant={periodMode === "month" ? "default" : "outline"}
-                onClick={() => setPeriodMode("month")}
-              >
-                Mês
-              </Button>
-            </div>
-          </div>
-
-          {/* 🔽 Seletores extras */}
-          {periodMode === "daily" && (
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="border rounded px-2 py-1 text-sm w-fit"
-            />
-          )}
-
-          {periodMode === "month" && (
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="border rounded px-2 py-1 text-sm w-fit"
-            />
-          )}
-
-          <div className="flex gap-2">
             <Button
-              variant="outline"
-              onClick={handlePreviewPDF}
-              disabled={exporting}
+              size="sm"
+              variant={periodMode === "daily" ? "default" : "outline"}
+              onClick={() => setPeriodMode("daily")}
             >
-              {exporting
-                ? "Gerando..."
-                : isMobile
-                ? "Baixar PDF"
-                : "Pré-visualizar PDF"}
+              Diário
             </Button>
 
-            {!isMobile && (
-              <Button onClick={handleExportPDF} disabled={exporting}>
-                {exporting ? "Gerando..." : "Exportar PDF"}
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant={periodMode === "month" ? "default" : "outline"}
+              onClick={() => setPeriodMode("month")}
+            >
+              Mês
+            </Button>
           </div>
-        </CardHeader>
+        </div>
+      </CardHeader>
 
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <strong>Total de vendas</strong>
-              <p>{metrics.summary.totalSales}</p>
-            </div>
-            <div>
-              <strong>Receita total</strong>
-              <p>R$ {metrics.summary.totalRevenue.toFixed(2)}</p>
-            </div>
-            <div>
-              <strong>Ticket médio</strong>
-              <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
-            </div>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <strong>Total de vendas</strong>
+            <p>{metrics.summary.totalSales}</p>
           </div>
+          <div>
+            <strong>Receita total</strong>
+            <p>R$ {metrics.summary.totalRevenue.toFixed(2)}</p>
+          </div>
+          <div>
+            <strong>Ticket médio</strong>
+            <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
+          </div>
+        </div>
 
-          <div className="overflow-auto border rounded-lg">
-            <table className="w-full text-sm">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="p-2 text-left">Período</th>
-                  <th className="p-2 text-right">Vendas</th>
-                  <th className="p-2 text-right">Receita</th>
-                  <th className="p-2 text-right">Ticket Médio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.labels.map((label) => {
-                  const periodSales = filteredSales.filter((sale) => {
-                    const date = new Date(sale.created_at);
-                    return date.toLocaleDateString("pt-BR") === label;
-                  });
+        <div className="overflow-auto border rounded-lg">
+          <table className="w-full text-sm">
+            <thead className="bg-muted">
+              <tr>
+                <th className="p-2 text-left">Período</th>
+                <th className="p-2 text-right">Vendas</th>
+                <th className="p-2 text-right">Receita</th>
+                <th className="p-2 text-right">Ticket Médio</th>
+              </tr>
+            </thead>
 
-                  const salesCount = periodSales.length;
-                  const revenue = periodSales.reduce(
-                    (sum, sale) => sum + (sale.total_value ?? 0),
-                    0
-                  );
+            <tbody>
+              {metrics.labels.map((label) => {
+                const periodSales = filteredSales.filter(
+                  (s) =>
+                    new Date(s.created_at).toLocaleDateString("pt-BR") ===
+                    label
+                );
 
-                  return (
-                    <tr key={label} className="border-t">
+                const revenue = periodSales.reduce(
+                  (sum, s) => sum + (s.total_value ?? 0),
+                  0
+                );
+
+                const isOpen = expandedLabel === label;
+
+                const allItems = groupItems(
+                  periodSales.flatMap((s) => s.items ?? [])
+                );
+
+                return (
+                  <Fragment key={label}>
+                    <tr
+                      className="border-t cursor-pointer hover:bg-muted/50"
+                      onClick={() =>
+                        setExpandedLabel(isOpen ? null : label)
+                      }
+                    >
                       <td className="p-2">{label}</td>
-                      <td className="p-2 text-right">{salesCount}</td>
+                      <td className="p-2 text-right">
+                        {periodSales.length}
+                      </td>
                       <td className="p-2 text-right">
                         R$ {revenue.toFixed(2)}
                       </td>
                       <td className="p-2 text-right">
-                        R$ {(revenue / (salesCount || 1)).toFixed(2)}
+                        R${" "}
+                        {(revenue / (periodSales.length || 1)).toFixed(2)}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
 
-          {periodMode === "range" && days !== 30 && (
-            <SalesChart
-              sales={salesForMetrics}
-              type={type}
-              initialGroupBy={groupBy}
-              chartId="sales-chart-visible"
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 🔒 Gráfico invisível para PDF */}
-      <div
-        style={{
-          position: "absolute",
-          left: "-9999px",
-          top: 0,
-          width: "800px",
-          height: "400px",
-        }}
-      >
-        <SalesChart
-          sales={salesForMetrics}
-          type={type}
-          initialGroupBy={groupBy}
-          chartId="sales-chart"
-        />
-      </div>
-
-      {/* 🖥️ Preview desktop */}
-      {!isMobile && previewUrl && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white w-[90%] h-[90%] rounded-lg overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-3 border-b">
-              <strong>Pré-visualização do PDF</strong>
-              <Button
-                variant="ghost"
-                onClick={() => setPreviewUrl(null)}
-              >
-                Fechar
-              </Button>
-            </div>
-            <iframe src={previewUrl} className="flex-1 w-full" />
-          </div>
+                    {isOpen && (
+                      <tr className="bg-muted/30">
+                        <td colSpan={4} className="p-3">
+                          <div className="space-y-1 text-sm">
+                            {allItems.length > 0 ? (
+                              allItems.map((item) => (
+                                <div
+                                  key={`${label}-${item.product_name}`}
+                                  className="flex justify-between"
+                                >
+                                  <span>
+                                    {item.product_name} ({item.quantity}x)
+                                  </span>
+                                  <span>
+                                    R${" "}
+                                    {(item.quantity * item.price).toFixed(2)}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-muted-foreground">
+                                Venda sem itens detalhados
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
-    </>
+      </CardContent>
+    </Card>
   );
 }
