@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import type { Sale } from "@/types/sale";
 
 /* =========================
-   🔹 TIPOS INTERNOS
+   🔹 TIPOS
 ========================= */
 
 type SaleItem = {
@@ -14,6 +14,18 @@ type SaleItem = {
   product_name: string;
   quantity: number;
   price: number;
+};
+
+/* =========================
+   🔹 MAPA PAGAMENTO
+========================= */
+
+const paymentLabelMap: Record<string, string> = {
+  credit: "Crédito",
+  debit: "Débito",
+  vr: "Vale Refeição",
+  va: "Vale Alimentação",
+  cash: "Dinheiro",
 };
 
 /* =========================
@@ -37,7 +49,7 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       setLoading(true);
 
       /* =========================
-         1️⃣ BUSCA VENDAS (COM PAYMENT)
+         1️⃣ BUSCA VENDAS
       ========================= */
 
       const { data: salesData, error: salesError } = await supabase
@@ -66,22 +78,21 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       const saleIds = salesData.map((s) => s.id);
 
       /* =========================
-         2️⃣ BUSCA ITENS (JOIN PRODUCTS)
+         2️⃣ BUSCA ITENS + JOIN EXPLÍCITO
       ========================= */
 
       const { data: itemsData, error: itemsError } = await supabase
         .from("sale_items")
-        .select(
-          `
+        .select(`
           id,
           sale_id,
           quantity,
           unit_price,
-          products (
+          product_id,
+          products!sale_items_product_id_fkey (
             name
           )
-        `
-        )
+        `)
         .in("sale_id", saleIds);
 
       if (itemsError) {
@@ -89,30 +100,31 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       }
 
       /* =========================
-         3️⃣ NORMALIZA ITENS
+         3️⃣ NORMALIZA + AGRUPA ITENS POR VENDA
       ========================= */
 
       const normalizedItems: SaleItem[] = Array.isArray(itemsData)
-        ? itemsData.map((item) => ({
+        ? itemsData.map((item: any) => ({
             id: item.id,
             sale_id: item.sale_id,
-            product_name: item.products?.[0]?.name,
+            product_name: item.products?.name ?? "Produto desconhecido",
             quantity: Number(item.quantity) || 0,
             price: Number(item.unit_price) || 0,
           }))
         : [];
 
-      const itemsBySale = normalizedItems.reduce<Record<string, SaleItem[]>>(
+      // 🔹 AGRUPA POR sale_id
+      const itemsBySale: Record<string, SaleItem[]> = normalizedItems.reduce(
         (acc, item) => {
           if (!acc[item.sale_id]) acc[item.sale_id] = [];
           acc[item.sale_id].push(item);
           return acc;
         },
-        {}
+        {} as Record<string, SaleItem[]>
       );
 
       /* =========================
-         4️⃣ NORMALIZA PARA Sale
+         4️⃣ NORMALIZA VENDAS
       ========================= */
 
       const normalizedSales: Sale[] = salesData.map((sale) => ({
@@ -120,17 +132,16 @@ export function useSalesRealtime({ userId }: { userId: string }) {
         user_id: sale.user_id,
         created_at: sale.created_at,
 
-        // Campos exigidos pelo tipo Sale
         product_id: "MULTI",
         product_name: "Venda",
         quantity: 1,
 
         total_value: Number(sale.total_amount) || 0,
 
-        // ✅ FORMA DE PAGAMENTO (CORREÇÃO PRINCIPAL)
-        payment_method: sale.payment_method,
+        payment_method:
+          paymentLabelMap[sale.payment_method] ?? "Não informado",
 
-        // ✅ Itens detalhados
+        // ✅ ITENS DETALHADOS COM NOMES CORRETOS
         items: itemsBySale[sale.id] ?? [],
       }));
 
