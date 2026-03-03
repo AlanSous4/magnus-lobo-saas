@@ -28,7 +28,7 @@ type SaleWithItems = {
   created_at: string;
   total_value?: number | null;
   items?: SaleItem[];
-  payment_method?: string | null; // ✅ ADICIONADO
+  payment_method?: string | null;
 };
 
 export type SalesHistoryProps = {
@@ -50,8 +50,8 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
 
-  const [selectedDate] = useState(new Date().toISOString().slice(0, 10));
-  const [selectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
@@ -92,17 +92,14 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
   function groupItems(items: SaleItem[]) {
     const map = new Map<string, SaleItem>();
-
     items.forEach((item) => {
       const existing = map.get(item.product_name);
-
       if (existing) {
         existing.quantity += item.quantity;
       } else {
         map.set(item.product_name, { ...item });
       }
     });
-
     return Array.from(map.values());
   }
 
@@ -132,7 +129,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
         <div className="flex justify-between items-center flex-wrap gap-3">
           <CardTitle>Relatório de Receita</CardTitle>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             {[30, 60, 90].map((d) => (
               <Button
                 key={d}
@@ -155,6 +152,15 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               Diário
             </Button>
 
+            {periodMode === "daily" && (
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              />
+            )}
+
             <Button
               size="sm"
               variant={periodMode === "month" ? "default" : "outline"}
@@ -162,6 +168,15 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             >
               Mês
             </Button>
+
+            {periodMode === "month" && (
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              />
+            )}
           </div>
         </div>
       </CardHeader>
@@ -223,7 +238,6 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                       <tr className="bg-muted/30">
                         <td colSpan={4} className="p-3">
                           <div className="space-y-1 text-sm">
-                            {/* ✅ Detalhes dos produtos */}
                             {allItems.length > 0 ? (
                               allItems.map((item) => (
                                 <div
@@ -244,7 +258,6 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                               </p>
                             )}
 
-                            {/* ✅ Forma de pagamento por venda */}
                             {periodSales.map((s) => (
                               <div
                                 key={`${label}-payment-${s.id}`}
