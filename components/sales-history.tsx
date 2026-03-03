@@ -50,8 +50,12 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toISOString().slice(0, 7)
+  );
 
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
@@ -64,11 +68,13 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
     if (periodMode === "daily") {
       filtered = typedSales.filter(
-        (s) => new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
+        (s) =>
+          new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
       );
     } else if (periodMode === "month") {
       filtered = typedSales.filter(
-        (s) => new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
+        (s) =>
+          new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
       );
     } else {
       const limitDate = new Date();
@@ -76,7 +82,10 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
       filtered = typedSales.filter((s) => new Date(s.created_at) >= limitDate);
     }
 
-    return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return filtered.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
@@ -85,7 +94,11 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     created_at: s.created_at,
   }));
 
-  const metrics: SalesMetrics = calculateSalesMetrics(salesForMetrics, "revenue", groupBy);
+  const metrics: SalesMetrics = calculateSalesMetrics(
+    salesForMetrics,
+    "revenue",
+    groupBy
+  );
 
   /* =========================
      🔹 MAPA DE FORMAS DE PAGAMENTO
@@ -119,7 +132,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   }, [metrics.labels, periodMode, selectedDate, selectedMonth]);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Carregando vendas...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Carregando vendas...</p>
+    );
   }
 
   return (
@@ -133,7 +148,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               <Button
                 key={d}
                 size="sm"
-                variant={periodMode === "range" && days === d ? "default" : "outline"}
+                variant={
+                  periodMode === "range" && days === d ? "default" : "outline"
+                }
                 onClick={() => {
                   setPeriodMode("range");
                   setDays(d as 30 | 60 | 90);
@@ -210,12 +227,25 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             <tbody>
               {labelsToRender.map((label) => {
                 const periodSales = filteredSales.filter((s) => {
-                  if (periodMode === "daily") return new Date(s.created_at).toISOString().slice(0, 10) === selectedDate;
-                  if (periodMode === "month") return new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth;
-                  return new Date(s.created_at).toLocaleDateString("pt-BR") === label;
+                  if (periodMode === "daily")
+                    return (
+                      new Date(s.created_at).toISOString().slice(0, 10) ===
+                      selectedDate
+                    );
+                  if (periodMode === "month")
+                    return (
+                      new Date(s.created_at).toISOString().slice(0, 7) ===
+                      selectedMonth
+                    );
+                  return (
+                    new Date(s.created_at).toLocaleDateString("pt-BR") === label
+                  );
                 });
 
-                const revenue = periodSales.reduce((sum, s) => sum + (s.total_value ?? 0), 0);
+                const revenue = periodSales.reduce(
+                  (sum, s) => sum + (s.total_value ?? 0),
+                  0
+                );
                 const isOpen = expandedLabel === label;
 
                 return (
@@ -226,7 +256,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                     >
                       <td className="p-2">{label}</td>
                       <td className="p-2 text-right">{periodSales.length}</td>
-                      <td className="p-2 text-right">R$ {revenue.toFixed(2)}</td>
+                      <td className="p-2 text-right">
+                        R$ {revenue.toFixed(2)}
+                      </td>
                       <td className="p-2 text-right">
                         R$ {(revenue / (periodSales.length || 1)).toFixed(2)}
                       </td>
@@ -240,9 +272,14 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                               <div className="flex justify-between font-semibold">
                                 <span>Venda: {sale.id}</span>
                                 <span>
-                                  Pagamento: {paymentLabelMap[sale.payment_method ?? ""] ?? sale.payment_method ?? "Desconhecido"}
+                                  Pagamento:{" "}
+                                  {paymentLabelMap[sale.payment_method ?? ""] ??
+                                    sale.payment_method ??
+                                    "Desconhecido"}
                                 </span>
-                                <span>Total: R$ {(sale.total_value ?? 0).toFixed(2)}</span>
+                                <span>
+                                  Total: R$ {(sale.total_value ?? 0).toFixed(2)}
+                                </span>
                               </div>
 
                               {/* Lista de itens com hover laranja apenas na linha expandida */}
@@ -251,14 +288,31 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                                   sale.items.map((item) => (
                                     <div
                                       key={`${sale.id}-${item.id}`}
-                                      className="flex justify-between px-2 py-1 rounded hover:bg-[rgb(255,237,212)]"
+                                      className="grid grid-cols-3 items-center px-2 py-1 rounded hover:bg-[rgb(255,237,212)]"
                                     >
-                                      <span>{item.product_name} ({item.quantity}.UN)</span>
-                                      <span>R$ {(item.price * item.quantity).toFixed(2)}</span>
+                                      {/* Produto alinhado à esquerda */}
+                                      <span className="text-left">
+                                        {item.product_name}
+                                      </span>
+
+                                      {/* Quantidade centralizada (referência à coluna "Vendas") */}
+                                      <span className="text-center -translate-x-5 inline-block">
+                                        ({item.quantity}.UN)
+                                      </span>
+
+                                      {/* Preço alinhado à direita */}
+                                      <span className="text-right">
+                                        R${" "}
+                                        {(item.price * item.quantity).toFixed(
+                                          2
+                                        )}
+                                      </span>
                                     </div>
                                   ))
                                 ) : (
-                                  <p className="text-muted-foreground">Venda sem itens detalhados</p>
+                                  <p className="text-muted-foreground">
+                                    Venda sem itens detalhados
+                                  </p>
                                 )}
                               </div>
                             </div>
