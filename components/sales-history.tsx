@@ -11,25 +11,7 @@ import {
 } from "@/lib/sales-metrics";
 
 import { useSalesRealtime } from "@/hooks/use-sales-realtime";
-
-/* =========================
-   🔹 TIPOS CORRETOS
-========================= */
-
-type SaleItem = {
-  id: string;
-  product_name: string;
-  quantity: number;
-  price: number;
-};
-
-type SaleWithItems = {
-  id: string;
-  created_at: string;
-  total_value?: number | null;
-  items?: SaleItem[];
-  payment_method?: string | null;
-};
+import type { Sale } from "@/types/sale"; // ✅ usa o tipo oficial
 
 export type SalesHistoryProps = {
   type: "sales" | "revenue" | "ticket";
@@ -39,13 +21,11 @@ export type SalesHistoryProps = {
 
 type PeriodMode = "range" | "daily" | "month";
 
-/* =========================
-   COMPONENTE
-========================= */
-
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
-  const typedSales = sales as SaleWithItems[];
+
+  // ✅ agora tipado corretamente, sem cast
+  const typedSales: Sale[] = sales;
 
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
@@ -84,7 +64,8 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
     return filtered.sort(
       (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.created_at).getTime() -
+        new Date(a.created_at).getTime()
     );
   }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
@@ -94,31 +75,18 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     created_at: s.created_at,
   }));
 
+  // ✅ AGORA USA A PROP type (antes estava fixo como "revenue")
   const metrics: SalesMetrics = calculateSalesMetrics(
     salesForMetrics,
-    "revenue",
+    type,
     groupBy
   );
 
-  /* =========================
-     🔹 MAPA DE FORMAS DE PAGAMENTO
-  ========================== */
-
-  const paymentLabelMap: Record<string, string> = {
-    cash: "Dinheiro",
-    card: "Cartão",
-    pix: "PIX",
-    vr: "Vale Refeição",
-    va: "Vale Alimentação",
-  };
-
-  /* =========================
-     🔹 LABELS PARA A TABELA
-  ========================== */
-
   const labelsToRender = useMemo(() => {
     if (periodMode === "daily") {
-      return [selectedDate].map((d) => new Date(d).toLocaleDateString("pt-BR"));
+      return [selectedDate].map((d) =>
+        new Date(d).toLocaleDateString("pt-BR")
+      );
     }
 
     if (periodMode === "month") {
@@ -133,7 +101,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
   if (loading) {
     return (
-      <p className="text-sm text-muted-foreground">Carregando vendas...</p>
+      <p className="text-sm text-muted-foreground">
+        Carregando vendas...
+      </p>
     );
   }
 
@@ -149,7 +119,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                 key={d}
                 size="sm"
                 variant={
-                  periodMode === "range" && days === d ? "default" : "outline"
+                  periodMode === "range" && days === d
+                    ? "default"
+                    : "outline"
                 }
                 onClick={() => {
                   setPeriodMode("range");
@@ -228,15 +200,15 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               {labelsToRender.map((label) => {
                 const periodSales = filteredSales.filter((s) => {
                   if (periodMode === "daily")
-                    return (
-                      new Date(s.created_at).toISOString().slice(0, 10) ===
-                      selectedDate
-                    );
+                    return new Date(s.created_at)
+                      .toISOString()
+                      .slice(0, 10) === selectedDate;
+
                   if (periodMode === "month")
-                    return (
-                      new Date(s.created_at).toISOString().slice(0, 7) ===
-                      selectedMonth
-                    );
+                    return new Date(s.created_at)
+                      .toISOString()
+                      .slice(0, 7) === selectedMonth;
+
                   return (
                     new Date(s.created_at).toLocaleDateString("pt-BR") === label
                   );
@@ -246,16 +218,21 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                   (sum, s) => sum + (s.total_value ?? 0),
                   0
                 );
+
                 const isOpen = expandedLabel === label;
 
                 return (
                   <Fragment key={label}>
                     <tr
                       className="border-t cursor-pointer hover:bg-muted/50"
-                      onClick={() => setExpandedLabel(isOpen ? null : label)}
+                      onClick={() =>
+                        setExpandedLabel(isOpen ? null : label)
+                      }
                     >
                       <td className="p-2">{label}</td>
-                      <td className="p-2 text-right">{periodSales.length}</td>
+                      <td className="p-2 text-right">
+                        {periodSales.length}
+                      </td>
                       <td className="p-2 text-right">
                         R$ {revenue.toFixed(2)}
                       </td>
@@ -266,49 +243,46 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
                     {isOpen &&
                       periodSales.map((sale) => (
-                        <tr key={`expanded-${sale.id}`} className="bg-muted/30">
+                        <tr key={sale.id} className="bg-muted/30">
                           <td colSpan={4} className="p-3">
                             <div className="space-y-2 text-sm border-b pb-2">
                               <div className="flex justify-between font-semibold">
                                 <span>Venda: {sale.id}</span>
                                 <span>
-                                  Pagamento:{" "}
-                                  {paymentLabelMap[sale.payment_method ?? ""] ??
-                                    sale.payment_method ??
-                                    "Desconhecido"}
+                                  Pagamento: {sale.payment_method ?? "Desconhecido"}
                                 </span>
                                 <span>
                                   Total: R$ {(sale.total_value ?? 0).toFixed(2)}
                                 </span>
                               </div>
 
-                              {/* Lista de itens com hover laranja apenas na linha expandida */}
                               <div className="pl-4 space-y-1">
-                                {sale.items && sale.items.length > 0 ? (
-                                  sale.items.map((item) => (
-                                    <div
-                                      key={`${sale.id}-${item.id}`}
-                                      className="grid grid-cols-3 items-center px-2 py-1 rounded hover:bg-[rgb(255,237,212)]"
-                                    >
-                                      {/* Produto alinhado à esquerda */}
-                                      <span className="text-left">
-                                        {item.product_name}
-                                      </span>
+                                {sale.items.length > 0 ? (
+                                  sale.items.map((item) => {
+                                    const valor =
+                                      item.price * item.quantity;
 
-                                      {/* Quantidade centralizada (referência à coluna "Vendas") */}
-                                      <span className="text-center -translate-x-5 inline-block">
-                                        ({item.quantity}.UN)
-                                      </span>
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        className="grid grid-cols-3 items-center px-2 py-1 rounded hover:bg-[rgb(255,237,212)] transition-colors"
+                                      >
+                                        <span>{item.product_name}</span>
 
-                                      {/* Preço alinhado à direita */}
-                                      <span className="text-right">
-                                        R${" "}
-                                        {(item.price * item.quantity).toFixed(
-                                          2
-                                        )}
-                                      </span>
-                                    </div>
-                                  ))
+                                        <span className="text-center">
+                                          (
+                                          {item.is_weight
+                                            ? `${item.quantity.toFixed(3)} KG`
+                                            : `${item.quantity} UN`}
+                                          )
+                                        </span>
+
+                                        <span className="text-right">
+                                          R$ {valor.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })
                                 ) : (
                                   <p className="text-muted-foreground">
                                     Venda sem itens detalhados

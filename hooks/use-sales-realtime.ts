@@ -14,6 +14,8 @@ type SaleItem = {
   product_name: string;
   quantity: number;
   price: number;
+  is_weight: boolean;
+  total: number;
 };
 
 /* =========================
@@ -78,7 +80,7 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       const saleIds = salesData.map((s) => s.id);
 
       /* =========================
-         2️⃣ BUSCA ITENS + JOIN EXPLÍCITO
+         2️⃣ BUSCA ITENS (JOIN EXPLÍCITO)
       ========================= */
 
       const { data: itemsData, error: itemsError } = await supabase
@@ -88,9 +90,11 @@ export function useSalesRealtime({ userId }: { userId: string }) {
           sale_id,
           quantity,
           unit_price,
-          product_id,
-          products!sale_items_product_id_fkey (
-            name
+          subtotal,
+          is_weight,
+          products:product_id (
+            name,
+            image_url
           )
         `)
         .in("sale_id", saleIds);
@@ -100,20 +104,32 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       }
 
       /* =========================
-         3️⃣ NORMALIZA + AGRUPA ITENS POR VENDA
+         3️⃣ NORMALIZA ITENS
       ========================= */
 
       const normalizedItems: SaleItem[] = Array.isArray(itemsData)
-        ? itemsData.map((item: any) => ({
-            id: item.id,
-            sale_id: item.sale_id,
-            product_name: item.products?.name ?? "Produto desconhecido",
-            quantity: Number(item.quantity) || 0,
-            price: Number(item.unit_price) || 0,
-          }))
+        ? itemsData.map((item: any) => {
+            const quantity = Number(item.quantity) || 0;
+            const unitPrice = Number(item.unit_price) || 0;
+            const subtotal = Number(item.subtotal) || 0;
+            const isWeight = item.is_weight ?? false;
+
+            return {
+              id: item.id,
+              sale_id: item.sale_id,
+              product_name: item.products?.name ?? "Produto",
+              quantity,
+              price: unitPrice,
+              is_weight: isWeight,
+              total: subtotal, // usa valor salvo no banco
+            };
+          })
         : [];
 
-      // 🔹 AGRUPA POR sale_id
+      /* =========================
+         4️⃣ AGRUPA POR VENDA
+      ========================= */
+
       const itemsBySale: Record<string, SaleItem[]> = normalizedItems.reduce(
         (acc, item) => {
           if (!acc[item.sale_id]) acc[item.sale_id] = [];
@@ -124,7 +140,7 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       );
 
       /* =========================
-         4️⃣ NORMALIZA VENDAS
+         5️⃣ NORMALIZA VENDAS
       ========================= */
 
       const normalizedSales: Sale[] = salesData.map((sale) => ({
@@ -141,7 +157,6 @@ export function useSalesRealtime({ userId }: { userId: string }) {
         payment_method:
           paymentLabelMap[sale.payment_method] ?? "Não informado",
 
-        // ✅ ITENS DETALHADOS COM NOMES CORRETOS
         items: itemsBySale[sale.id] ?? [],
       }));
 
@@ -152,10 +167,6 @@ export function useSalesRealtime({ userId }: { userId: string }) {
     }
 
     loadSales();
-
-    /* =========================
-       🔥 REALTIME
-    ========================= */
 
     const channel = supabase
       .channel("sales-realtime")

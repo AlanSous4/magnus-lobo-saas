@@ -36,12 +36,12 @@ interface Product {
   id: string;
   name: string;
   value: number;
-  quantity: number;
+  quantity: number; // estoque em KG para peso, inteiro para unidade
   image_url?: string | null;
 }
 
 interface CartItem extends Product {
-  cartQuantity: number;
+  cartQuantity: number; // gramas para peso, unidade para normal
 }
 
 interface POSInterfaceProps {
@@ -140,15 +140,25 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     const item = cart.find((i) => i.id === id);
     if (!item) return;
 
+    const isWeight = isWeightProduct(id);
+
     if (q <= 0) {
       setCart(cart.filter((i) => i.id !== id));
-    } else if (q <= item.quantity) {
-      setCart(
-        cart.map((i) =>
-          i.id === id ? { ...i, cartQuantity: q } : i
-        )
-      );
+      return;
     }
+
+    if (isWeight) {
+      const estoqueEmGramas = item.quantity * 1000;
+      if (q > estoqueEmGramas) return;
+    } else {
+      if (q > item.quantity) return;
+    }
+
+    setCart(
+      cart.map((i) =>
+        i.id === id ? { ...i, cartQuantity: q } : i
+      )
+    );
   };
 
   const removeFromCart = (id: string) => {
@@ -168,12 +178,15 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     setShowPayment(true);
   };
 
+  /* =========================
+     PROCESSAMENTO DA VENDA
+  ========================= */
   const processSale = async () => {
     if (!selectedPayment) return;
     setIsProcessing(true);
 
     try {
-      const { data: sale } = await supabase
+      const { data: sale, error: saleError } = await supabase
         .from("sales")
         .insert({
           user_id: userId,
@@ -183,24 +196,42 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         .select()
         .single();
 
+      if (saleError || !sale) {
+        console.error("Erro ao criar venda:", saleError);
+        return;
+      }
+
       for (const item of cart) {
         const isWeight = isWeightProduct(item.id);
+
+        const quantityToSave = isWeight
+          ? item.cartQuantity / 1000 // salva em KG
+          : item.cartQuantity;
+
         const subtotal = isWeight
           ? (item.value / 100) * item.cartQuantity
           : item.value * item.cartQuantity;
 
-        await supabase.from("sale_items").insert({
-          sale_id: sale!.id,
-          product_id: item.id,
-          quantity: item.cartQuantity,
-          unit_price: item.value,
-          subtotal,
-        });
+        const { error: itemError } = await supabase
+          .from("sale_items")
+          .insert({
+            sale_id: sale.id,
+            product_id: item.id,
+            quantity: quantityToSave,
+            unit_price: item.value,
+            subtotal,
+            is_weight: isWeight,
+          });
+
+        if (itemError) {
+          console.error("Erro ao salvar item:", itemError);
+          continue;
+        }
 
         await supabase
           .from("products")
           .update({
-            quantity: item.quantity - item.cartQuantity,
+            quantity: item.quantity - quantityToSave,
             exit_date: new Date().toISOString(),
           })
           .eq("id", item.id);
@@ -219,7 +250,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       setIsProcessing(false);
     }
   };
-
+   
   /* =========================
      RENDER
   ========================= */
