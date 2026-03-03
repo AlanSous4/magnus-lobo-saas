@@ -57,25 +57,26 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
   /* =========================
      FILTRO CENTRAL
-  ========================= */
+  ========================== */
 
   const filteredSales = useMemo(() => {
+    let filtered = typedSales;
+
     if (periodMode === "daily") {
-      return typedSales.filter(
+      filtered = typedSales.filter(
         (s) => new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
       );
-    }
-
-    if (periodMode === "month") {
-      return typedSales.filter(
+    } else if (periodMode === "month") {
+      filtered = typedSales.filter(
         (s) => new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
       );
+    } else {
+      const limitDate = new Date();
+      limitDate.setDate(limitDate.getDate() - days);
+      filtered = typedSales.filter((s) => new Date(s.created_at) >= limitDate);
     }
 
-    const limitDate = new Date();
-    limitDate.setDate(limitDate.getDate() - days);
-
-    return typedSales.filter((s) => new Date(s.created_at) >= limitDate);
+    return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
@@ -85,23 +86,6 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   }));
 
   const metrics: SalesMetrics = calculateSalesMetrics(salesForMetrics, "revenue", groupBy);
-
-  /* =========================
-     🔹 AGRUPA ITENS IGUAIS
-  ========================= */
-
-  function groupItems(items: SaleItem[]) {
-    const map = new Map<string, SaleItem>();
-    items.forEach((item) => {
-      const existing = map.get(item.product_name);
-      if (existing) {
-        existing.quantity += item.quantity;
-      } else {
-        map.set(item.product_name, { ...item });
-      }
-    });
-    return Array.from(map.values());
-  }
 
   /* =========================
      🔹 MAPA DE FORMAS DE PAGAMENTO
@@ -115,12 +99,27 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     va: "Vale Alimentação",
   };
 
-  /* ========================= */
+  /* =========================
+     🔹 LABELS PARA A TABELA
+  ========================== */
+
+  const labelsToRender = useMemo(() => {
+    if (periodMode === "daily") {
+      return [selectedDate].map((d) => new Date(d).toLocaleDateString("pt-BR"));
+    }
+
+    if (periodMode === "month") {
+      return [selectedMonth].map((m) => {
+        const [year, month] = m.split("-");
+        return `${month}/${year}`;
+      });
+    }
+
+    return metrics.labels;
+  }, [metrics.labels, periodMode, selectedDate, selectedMonth]);
 
   if (loading) {
-    return (
-      <p className="text-sm text-muted-foreground">Carregando vendas...</p>
-    );
+    return <p className="text-sm text-muted-foreground">Carregando vendas...</p>;
   }
 
   return (
@@ -209,16 +208,15 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </thead>
 
             <tbody>
-              {metrics.labels.map((label) => {
-                const periodSales = filteredSales.filter(
-                  (s) =>
-                    new Date(s.created_at).toLocaleDateString("pt-BR") === label
-                );
+              {labelsToRender.map((label) => {
+                const periodSales = filteredSales.filter((s) => {
+                  if (periodMode === "daily") return new Date(s.created_at).toISOString().slice(0, 10) === selectedDate;
+                  if (periodMode === "month") return new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth;
+                  return new Date(s.created_at).toLocaleDateString("pt-BR") === label;
+                });
 
                 const revenue = periodSales.reduce((sum, s) => sum + (s.total_value ?? 0), 0);
                 const isOpen = expandedLabel === label;
-
-                const allItems = groupItems(periodSales.flatMap((s) => s.items ?? []));
 
                 return (
                   <Fragment key={label}>
@@ -234,45 +232,39 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                       </td>
                     </tr>
 
-                    {isOpen && (
-                      <tr className="bg-muted/30">
-                        <td colSpan={4} className="p-3">
-                          <div className="space-y-1 text-sm">
-                            {allItems.length > 0 ? (
-                              allItems.map((item) => (
-                                <div
-                                  key={`${label}-${item.product_name}`}
-                                  className="flex justify-between"
-                                >
-                                  <span>
-                                    {item.product_name} ({item.quantity}x)
-                                  </span>
-                                  <span>
-                                    R$ {(item.quantity * item.price).toFixed(2)}
-                                  </span>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-muted-foreground">
-                                Venda sem itens detalhados
-                              </p>
-                            )}
-
-                            {periodSales.map((s) => (
-                              <div
-                                key={`${label}-payment-${s.id}`}
-                                className="flex justify-between font-semibold text-xs mt-1"
-                              >
-                                <span>Pagamento:</span>
+                    {isOpen &&
+                      periodSales.map((sale) => (
+                        <tr key={`expanded-${sale.id}`} className="bg-muted/30">
+                          <td colSpan={4} className="p-3">
+                            <div className="space-y-2 text-sm border-b pb-2">
+                              <div className="flex justify-between font-semibold">
+                                <span>Venda: {sale.id}</span>
                                 <span>
-                                  {paymentLabelMap[s.payment_method ?? ""] ?? s.payment_method ?? "Desconhecido"}
+                                  Pagamento: {paymentLabelMap[sale.payment_method ?? ""] ?? sale.payment_method ?? "Desconhecido"}
                                 </span>
+                                <span>Total: R$ {(sale.total_value ?? 0).toFixed(2)}</span>
                               </div>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
+
+                              {/* Lista de itens com hover laranja apenas na linha expandida */}
+                              <div className="pl-4 space-y-1">
+                                {sale.items && sale.items.length > 0 ? (
+                                  sale.items.map((item) => (
+                                    <div
+                                      key={`${sale.id}-${item.id}`}
+                                      className="flex justify-between px-2 py-1 rounded hover:bg-[rgb(255,237,212)]"
+                                    >
+                                      <span>{item.product_name} ({item.quantity}.UN)</span>
+                                      <span>R$ {(item.price * item.quantity).toFixed(2)}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-muted-foreground">Venda sem itens detalhados</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                   </Fragment>
                 );
               })}
