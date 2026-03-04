@@ -30,8 +30,12 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toISOString().slice(0, 7)
+  );
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
   /* =========================
@@ -43,11 +47,13 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
     if (periodMode === "daily") {
       filtered = typedSales.filter(
-        (s) => new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
+        (s) =>
+          new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
       );
     } else if (periodMode === "month") {
       filtered = typedSales.filter(
-        (s) => new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
+        (s) =>
+          new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
       );
     } else {
       const limitDate = new Date();
@@ -56,7 +62,8 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     }
 
     return filtered.sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
@@ -66,7 +73,11 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     created_at: s.created_at,
   }));
 
-  const metrics: SalesMetrics = calculateSalesMetrics(salesForMetrics, type, groupBy);
+  const metrics: SalesMetrics = calculateSalesMetrics(
+    salesForMetrics,
+    type,
+    groupBy
+  );
 
   const labelsToRender = useMemo(() => {
     if (periodMode === "daily") {
@@ -93,20 +104,32 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     pdf.save("relatorio_vendas.pdf");
   };
 
-  if (loading) return <p className="text-sm text-muted-foreground">Carregando vendas...</p>;
+  if (loading)
+    return (
+      <p className="text-sm text-muted-foreground">Carregando vendas...</p>
+    );
 
   return (
     <Card>
       <CardHeader className="space-y-4">
         <div className="flex justify-between items-center flex-wrap gap-3">
-          <CardTitle>Relatório de {type === "sales" ? "Vendas" : type === "ticket" ? "Ticket Médio" : "Receita"}</CardTitle>
+          <CardTitle>
+            Relatório de{" "}
+            {type === "sales"
+              ? "Vendas"
+              : type === "ticket"
+              ? "Ticket Médio"
+              : "Receita"}
+          </CardTitle>
 
           <div className="flex gap-2 flex-wrap items-center">
             {[30, 60, 90].map((d) => (
               <Button
                 key={d}
                 size="sm"
-                variant={periodMode === "range" && days === d ? "default" : "outline"}
+                variant={
+                  periodMode === "range" && days === d ? "default" : "outline"
+                }
                 onClick={() => {
                   setPeriodMode("range");
                   setDays(d as 30 | 60 | 90);
@@ -192,13 +215,24 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               {labelsToRender.map((label, idx) => {
                 const periodSales = filteredSales.filter((s) => {
                   if (periodMode === "daily")
-                    return new Date(s.created_at).toISOString().slice(0, 10) === selectedDate;
+                    return (
+                      new Date(s.created_at).toISOString().slice(0, 10) ===
+                      selectedDate
+                    );
                   if (periodMode === "month")
-                    return new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth;
-                  return new Date(s.created_at).toLocaleDateString("pt-BR") === label;
+                    return (
+                      new Date(s.created_at).toISOString().slice(0, 7) ===
+                      selectedMonth
+                    );
+                  return (
+                    new Date(s.created_at).toLocaleDateString("pt-BR") === label
+                  );
                 });
 
-                const revenue = periodSales.reduce((sum, s) => sum + (s.total_value ?? 0), 0);
+                const revenue = periodSales.reduce(
+                  (sum, s) => sum + (s.total_value ?? 0),
+                  0
+                );
                 const isOpen = expandedLabel === label;
 
                 return (
@@ -209,8 +243,12 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                     >
                       <td className="p-2">{label}</td>
                       <td className="p-2 text-right">{periodSales.length}</td>
-                      <td className="p-2 text-right">R$ {revenue.toFixed(2)}</td>
-                      <td className="p-2 text-right">R$ {(revenue / (periodSales.length || 1)).toFixed(2)}</td>
+                      <td className="p-2 text-right">
+                        R$ {revenue.toFixed(2)}
+                      </td>
+                      <td className="p-2 text-right">
+                        R$ {(revenue / (periodSales.length || 1)).toFixed(2)}
+                      </td>
                     </tr>
 
                     {isOpen &&
@@ -220,14 +258,21 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                             <div className="space-y-2 text-sm border-b pb-2">
                               <div className="flex justify-between font-semibold">
                                 <span>Venda: {sale.id}</span>
-                                <span>Pagamento: {sale.payment_method ?? "Desconhecido"}</span>
-                                <span>Total: R$ {(sale.total_value ?? 0).toFixed(2)}</span>
+                                <span>
+                                  Pagamento:{" "}
+                                  {sale.payment_method ?? "Desconhecido"}
+                                </span>
+                                <span>
+                                  Total: R$ {(sale.total_value ?? 0).toFixed(2)}
+                                </span>
                               </div>
 
                               <div className="pl-4 space-y-1">
                                 {sale.items.length > 0 ? (
                                   sale.items.map((item) => {
-                                    const valor = item.price * item.quantity;
+                                    // valor correto a exibir no relatório: subtotal pago
+                                    const displayValue = item.total;
+
                                     return (
                                       <div
                                         key={item.id}
@@ -239,12 +284,16 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                                             ? `${item.quantity.toFixed(3)} KG`
                                             : `${item.quantity} UN`}
                                         </span>
-                                        <span className="text-right">R$ {valor.toFixed(2)}</span>
+                                        <span className="text-right">
+                                          R$ {displayValue.toFixed(2)}
+                                        </span>
                                       </div>
                                     );
                                   })
                                 ) : (
-                                  <p className="text-muted-foreground">Venda sem itens detalhados</p>
+                                  <p className="text-muted-foreground">
+                                    Venda sem itens detalhados
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -277,9 +326,15 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               {metrics.labels.map((label, idx) => (
                 <tr key={label}>
                   <td className="border p-2">{label}</td>
-                  <td className="border p-2">{metrics.rows[idx]?.sales ?? 0}</td>
-                  <td className="border p-2">R$ {metrics.rows[idx]?.revenue.toFixed(2)}</td>
-                  <td className="border p-2">R$ {metrics.rows[idx]?.ticket.toFixed(2)}</td>
+                  <td className="border p-2">
+                    {metrics.rows[idx]?.sales ?? 0}
+                  </td>
+                  <td className="border p-2">
+                    R$ {metrics.rows[idx]?.revenue.toFixed(2)}
+                  </td>
+                  <td className="border p-2">
+                    R$ {metrics.rows[idx]?.ticket.toFixed(2)}
+                  </td>
                 </tr>
               ))}
             </tbody>
