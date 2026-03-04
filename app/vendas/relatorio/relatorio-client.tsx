@@ -4,8 +4,6 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { SalesHistory } from "@/components/sales-history";
-import { Button } from "@/components/ui/button";
-import { FileText, Eye } from "lucide-react";
 import { exportSalesPDF } from "@/lib/pdf-utils";
 import type { SalesMetrics, ChartType, GroupBy } from "@/lib/sales-metrics";
 
@@ -61,12 +59,16 @@ export default function RelatorioVendasClient() {
 
   const handleViewPDF = async () => {
     if (!metrics) return;
+
+    // Corrigido: apenas 3 argumentos (como a função espera)
     const pdf = await exportSalesPDF(metrics, type, groupBy);
     window.open(pdf.output("bloburl"), "_blank");
   };
 
   const handleDownloadPDF = async () => {
     if (!metrics) return;
+
+    // Corrigido: apenas 3 argumentos
     const pdf = await exportSalesPDF(metrics, type, groupBy);
     pdf.save("relatorio_vendas.pdf");
   };
@@ -76,17 +78,6 @@ export default function RelatorioVendasClient() {
   return (
     <Suspense fallback={<p className="text-sm text-muted-foreground">Carregando relatório...</p>}>
       <div className="flex flex-col gap-4">
-        <div className="flex gap-2">
-          <Button onClick={handleViewPDF} variant="outline" size="sm">
-            <Eye className="mr-2 h-4 w-4" />
-            Visualizar PDF
-          </Button>
-          <Button onClick={handleDownloadPDF} variant="default" size="sm">
-            <FileText className="mr-2 h-4 w-4" />
-            Baixar PDF
-          </Button>
-        </div>
-
         {loadingMetrics ? (
           <p className="text-sm text-muted-foreground">Carregando vendas...</p>
         ) : (
