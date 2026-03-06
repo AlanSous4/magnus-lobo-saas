@@ -2,30 +2,30 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase/client"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
+  PieChart,
+  Pie,
   Cell,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
 } from "recharts"
+import { Button } from "@/components/ui/button"
 
 interface SalesByPayment {
   payment_method: string
   total: number
 }
 
-const COLORS: Record<string, string> = {
-  Pix: "#4ade80",
-  Crédito: "#3b82f6",
-  Débito: "#8b5cf6",
-  Dinheiro: "#22c55e",
-  VR: "#f59e0b",
-  VA: "#fbbf24",
-}
+const COLORS = [
+  "#22c55e", // pix
+  "#3b82f6", // crédito
+  "#f59e0b", // débito
+  "#ef4444", // dinheiro
+  "#8b5cf6", // vr
+  "#06b6d4", // va
+]
 
 const labels: Record<string, string> = {
   pix: "Pix",
@@ -38,79 +38,115 @@ const labels: Record<string, string> = {
 
 export function SalesByPaymentChart() {
   const [data, setData] = useState<SalesByPayment[]>([])
-  const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState<number>(30)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data, error } = await supabase.rpc("vendas_por_pagamento", {
-        periodo: 30,
-      })
+  const fetchData = async (days: number) => {
+    setLoading(true)
 
-      if (error) {
-        console.error("Erro ao buscar vendas:", error)
-        setLoading(false)
-        return
-      }
+    const { data, error } = await supabase.rpc("vendas_por_pagamento", {
+      periodo: days,
+    })
 
-      const formatted =
-        data?.map((item: SalesByPayment) => ({
-          payment_method:
-            labels[item.payment_method] || item.payment_method,
-          total: Number(item.total),
-        })) || []
-
-      setData(formatted)
+    if (error) {
+      console.error("Erro ao buscar vendas:", error)
       setLoading(false)
+      return
     }
 
-    fetchData()
-  }, [])
+    const formatted =
+      data?.map((item: SalesByPayment) => ({
+        ...item,
+        payment_method: labels[item.payment_method] || item.payment_method,
+      })) || []
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-65 text-sm text-muted-foreground">
-        Carregando gráfico...
-      </div>
-    )
+    setData(formatted)
+    setLoading(false)
   }
 
+  useEffect(() => {
+    fetchData(period)
+  }, [period])
+
   return (
-    <div className="w-full h-65 sm:h-75">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          layout="vertical"
-          margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
+    <Card>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardTitle>Vendas por forma de pagamento</CardTitle>
 
-          <XAxis
-            type="number"
-            tickFormatter={(value) => `R$ ${value}`}
-          />
+        {/* 🔹 Filtros de período */}
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant={period === 1 ? "default" : "outline"}
+            onClick={() => setPeriod(1)}
+          >
+            Hoje
+          </Button>
 
-          <YAxis
-            type="category"
-            dataKey="payment_method"
-            width={80}
-          />
+          <Button
+            size="sm"
+            variant={period === 7 ? "default" : "outline"}
+            onClick={() => setPeriod(7)}
+          >
+            7 dias
+          </Button>
 
-          <Tooltip
-            formatter={(value: number) =>
-              `R$ ${value.toFixed(2)}`
-            }
-          />
+          <Button
+            size="sm"
+            variant={period === 30 ? "default" : "outline"}
+            onClick={() => setPeriod(30)}
+          >
+            30 dias
+          </Button>
 
-          <Bar dataKey="total" radius={[6, 6, 6, 6]}>
-            {data.map((entry, index) => (
-              <Cell
-                key={index}
-                fill={COLORS[entry.payment_method] || "#8884d8"}
+          <Button
+            size="sm"
+            variant={period === 90 ? "default" : "outline"}
+            onClick={() => setPeriod(90)}
+          >
+            90 dias
+          </Button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="h-70 sm:h-80">
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+            Carregando gráfico...
+          </div>
+        ) : data.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+            Nenhuma venda encontrada
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="total"
+                nameKey="payment_method"
+                outerRadius={100}
+                label
+              >
+                {data.map((_, index) => (
+                  <Cell
+                    key={index}
+                    fill={COLORS[index % COLORS.length]}
+                  />
+                ))}
+              </Pie>
+
+              <Tooltip
+                formatter={(value: number) =>
+                  `R$ ${value.toFixed(2)}`
+                }
               />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </CardContent>
+    </Card>
   )
 }
