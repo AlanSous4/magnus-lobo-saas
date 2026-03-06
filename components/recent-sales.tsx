@@ -19,6 +19,7 @@ const paymentMethodLabels: Record<string, string> = {
   vr: "VR",
   va: "VA",
   cash: "Dinheiro",
+  pix: "Pix",
 }
 
 export function RecentSales({ sales }: RecentSalesProps) {
@@ -32,7 +33,7 @@ export function RecentSales({ sales }: RecentSalesProps) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="space-y-3 min-w-[320px]">
+      <div className="space-y-3 min-w-80">
         {sales.map((sale) => (
           <div
             key={sale.id}

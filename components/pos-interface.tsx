@@ -16,6 +16,7 @@ import {
   Check,
   X,
   ArrowLeft,
+  QrCode,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -49,7 +50,7 @@ interface POSInterfaceProps {
   userId: string;
 }
 
-type PaymentMethod = "credit" | "debit" | "vr" | "va" | "cash";
+type PaymentMethod = "credit" | "debit" | "vr" | "va" | "cash" | "pix";
 
 /* =========================
    PRODUTOS POR PESO (IDS)
@@ -67,6 +68,7 @@ const paymentMethods = [
   { id: "vr" as PaymentMethod, label: "VR", icon: UtensilsCrossed },
   { id: "va" as PaymentMethod, label: "VA", icon: Coffee },
   { id: "cash" as PaymentMethod, label: "Dinheiro", icon: Wallet },
+  { id: "pix" as PaymentMethod, label: "Pix", icon: QrCode }, // ✅ novo
 ];
 
 /* =========================
