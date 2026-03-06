@@ -5,6 +5,7 @@ import { Package, ShoppingCart, AlertCircle } from "lucide-react"
 import { RecentSales } from "@/components/recent-sales"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { SalesByPaymentChart } from "@/components/sales-by-payment-chart"
 
 // 🔹 Métricas centralizadas
 import { getDashboardMetrics } from "@/lib/dashboard-metrics"
@@ -18,15 +19,10 @@ export const metadata = {
   viewport: {
     width: "device-width",
     initialScale: 1,
-    themeColor: "#ffffff", // cor do layout / PWA
+    themeColor: "#ffffff",
   },
 }
 
-/**
- * DashboardPage agora trata refresh token expirado:
- * - Verifica sessão atual do usuário
- * - Redireciona para /login se não houver sessão válida
- */
 export default async function DashboardPage() {
   const supabase = await createClient()
 
@@ -36,21 +32,20 @@ export default async function DashboardPage() {
     error,
   } = await supabase.auth.getUser()
 
-  // Se usuário não existir ou token inválido, redireciona para login
   if (!user || error?.message?.includes("Refresh Token Not Found")) {
     redirect("/login")
   }
 
-  // 🔹 MÉTRICAS DO DASHBOARD
+  // 🔹 MÉTRICAS
   const metrics = await getDashboardMetrics(user.id)
 
-  // 🔹 DADOS AUXILIARES
+  // 🔹 PRODUTOS
   const { data: products } = await supabase
     .from("products")
     .select("*")
     .eq("user_id", user.id)
 
-  // 🔹 FILTRO: SOMENTE VENDAS DO DIA ATUAL
+  // 🔹 VENDAS DO DIA
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
 
@@ -85,6 +80,7 @@ export default async function DashboardPage() {
   return (
     <div className="h-screen overflow-hidden flex flex-col">
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+
         {/* Header */}
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -95,7 +91,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* 🔹 Cards */}
+        {/* 🔹 Cards de métricas */}
         <DashboardCards
           productsCount={metrics.productsCount}
           salesCount={metrics.salesCount}
@@ -103,7 +99,7 @@ export default async function DashboardPage() {
           averageTicket={metrics.averageTicket}
         />
 
-        {/* 🔹 ALERTA: ESTOQUE BAIXO */}
+        {/* 🔹 ALERTA ESTOQUE */}
         {lowStockProducts > 0 && (
           <Card className="border-orange-200 bg-orange-50">
             <CardContent className="pt-4">
@@ -115,7 +111,7 @@ export default async function DashboardPage() {
           </Card>
         )}
 
-        {/* 🔹 ALERTA: VALIDADE PRÓXIMA */}
+        {/* 🔹 ALERTA VALIDADE */}
         {expiringSoon > 0 && (
           <Card className="border-orange-200 bg-orange-50">
             <CardHeader>
@@ -139,7 +135,9 @@ export default async function DashboardPage() {
         )}
 
         {/* 🔹 GRID INFERIOR */}
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+
+          {/* Vendas Recentes */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base sm:text-lg">
@@ -151,13 +149,28 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
+          {/* 📊 GRÁFICO PAGAMENTOS */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg">
+                Formas de Pagamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SalesByPaymentChart />
+            </CardContent>
+          </Card>
+
+          {/* Ações rápidas */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base sm:text-lg">
                 Ações Rápidas
               </CardTitle>
             </CardHeader>
+
             <CardContent className="space-y-3">
+
               <Button asChild className="w-full justify-start" size="lg">
                 <Link href="/vendas">
                   <ShoppingCart className="mr-2 h-5 w-5" />
@@ -176,8 +189,10 @@ export default async function DashboardPage() {
                   Gerenciar Produtos
                 </Link>
               </Button>
+
             </CardContent>
           </Card>
+
         </div>
       </div>
     </div>
