@@ -75,7 +75,7 @@ export function SalesByPaymentChart() {
 
         {/* 🔹 Filtros de período */}
         <div className="flex gap-2 flex-wrap">
-          <Button
+          <Button className="cursor-pointer"
             size="sm"
             variant={period === 1 ? "default" : "outline"}
             onClick={() => setPeriod(1)}
@@ -83,7 +83,7 @@ export function SalesByPaymentChart() {
             Hoje
           </Button>
 
-          <Button
+          <Button className="cursor-pointer"
             size="sm"
             variant={period === 7 ? "default" : "outline"}
             onClick={() => setPeriod(7)}
@@ -91,7 +91,7 @@ export function SalesByPaymentChart() {
             7 dias
           </Button>
 
-          <Button
+          <Button className="cursor-pointer"
             size="sm"
             variant={period === 30 ? "default" : "outline"}
             onClick={() => setPeriod(30)}
@@ -99,7 +99,7 @@ export function SalesByPaymentChart() {
             30 dias
           </Button>
 
-          <Button
+          <Button className="cursor-pointer"
             size="sm"
             variant={period === 90 ? "default" : "outline"}
             onClick={() => setPeriod(90)}
