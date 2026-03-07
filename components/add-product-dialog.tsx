@@ -69,7 +69,7 @@ export function AddProductDialog({ userId }: AddProductDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="cursor-pointer">
           <Plus className="mr-2 h-4 w-4" />
           Novo Produto
         </Button>
