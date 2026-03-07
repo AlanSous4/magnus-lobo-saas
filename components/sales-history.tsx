@@ -125,6 +125,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           <div className="flex gap-2 flex-wrap items-center">
             {[30, 60, 90].map((d) => (
               <Button
+                className="cursor-pointer"
                 key={d}
                 size="sm"
                 variant={
@@ -140,6 +141,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             ))}
 
             <Button
+              className="cursor-pointer"
               size="sm"
               variant={periodMode === "daily" ? "default" : "outline"}
               onClick={() => setPeriodMode("daily")}
@@ -156,6 +158,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             )}
 
             <Button
+              className="cursor-pointer"
               size="sm"
               variant={periodMode === "month" ? "default" : "outline"}
               onClick={() => setPeriodMode("month")}
@@ -173,10 +176,10 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           </div>
 
           <div className="flex gap-2 flex-wrap items-center">
-            <Button size="sm" variant="outline" onClick={handleViewPDF}>
+            <Button className="cursor-pointer" size="sm" variant="outline" onClick={handleViewPDF}>
               <Eye className="mr-2 h-4 w-4" /> Visualizar PDF
             </Button>
-            <Button size="sm" variant="default" onClick={handleDownloadPDF}>
+            <Button className="cursor-pointer" size="sm" variant="default" onClick={handleDownloadPDF}>
               <FileText className="mr-2 h-4 w-4" /> Baixar PDF
             </Button>
           </div>
