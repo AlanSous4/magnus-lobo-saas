@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { SalesHistory } from "@/components/sales-history";
 import { exportSalesPDF } from "@/lib/pdf-utils";
 import type { SalesMetrics, ChartType, GroupBy } from "@/lib/sales-metrics";
+import { AppBackButton } from "@/components/app-back-button";
 
 export default function RelatorioVendasClient() {
   const searchParams = useSearchParams();
@@ -19,9 +20,13 @@ export default function RelatorioVendasClient() {
 
   useEffect(() => {
     async function loadUser() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (user) setUserId(user.id);
     }
+
     loadUser();
   }, []);
 
@@ -39,13 +44,16 @@ export default function RelatorioVendasClient() {
 
         if (error) throw error;
 
-        const sales = salesData?.map((s) => ({
-          total_amount: Number(s.total_amount),
-          created_at: s.created_at,
-        })) || [];
+        const sales =
+          salesData?.map((s) => ({
+            total_amount: Number(s.total_amount),
+            created_at: s.created_at,
+          })) || [];
 
         const { calculateSalesMetrics } = await import("@/lib/sales-metrics");
+
         const computedMetrics = calculateSalesMetrics(sales, type, groupBy);
+
         setMetrics(computedMetrics);
       } catch (err) {
         console.error("Erro ao carregar métricas:", err);
@@ -60,7 +68,6 @@ export default function RelatorioVendasClient() {
   const handleViewPDF = async () => {
     if (!metrics) return;
 
-    // Corrigido: apenas 3 argumentos (como a função espera)
     const pdf = await exportSalesPDF(metrics, type, groupBy);
     window.open(pdf.output("bloburl"), "_blank");
   };
@@ -68,21 +75,46 @@ export default function RelatorioVendasClient() {
   const handleDownloadPDF = async () => {
     if (!metrics) return;
 
-    // Corrigido: apenas 3 argumentos
     const pdf = await exportSalesPDF(metrics, type, groupBy);
     pdf.save("relatorio_vendas.pdf");
   };
 
-  if (!userId) return <p className="text-sm text-muted-foreground">Carregando usuário...</p>;
+  if (!userId)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Carregando usuário...
+      </p>
+    );
 
   return (
-    <Suspense fallback={<p className="text-sm text-muted-foreground">Carregando relatório...</p>}>
+    <Suspense
+      fallback={
+        <p className="text-sm text-muted-foreground">
+          Carregando relatório...
+        </p>
+      }
+    >
       <div className="flex flex-col gap-4">
+
+        {/* Botão aparece apenas no modo APP */}
+        <AppBackButton />
+
         {loadingMetrics ? (
-          <p className="text-sm text-muted-foreground">Carregando vendas...</p>
+          <p className="text-sm text-muted-foreground">
+            Carregando vendas...
+          </p>
+        ) : metrics ? (
+          <SalesHistory
+            type={type}
+            groupBy={groupBy}
+            userId={userId}
+          />
         ) : (
-          metrics && <SalesHistory type={type} groupBy={groupBy} userId={userId} />
+          <p className="text-sm text-muted-foreground">
+            Nenhum dado encontrado.
+          </p>
         )}
+
       </div>
     </Suspense>
   );
