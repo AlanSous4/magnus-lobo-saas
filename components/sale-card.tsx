@@ -12,13 +12,17 @@ type Props = {
 };
 
 export const SaleCard = memo(function SaleCard({ sale }: Props) {
+  const imageUrl = (sale as any).image_url;
+  const productName = (sale as any).product_name ?? "Produto";
+  const quantity = (sale as any).quantity ?? 0;
+
   return (
     <Card className="border">
       <CardContent className="space-y-3 pt-4">
-        {sale.image_url ? (
+        {imageUrl ? (
           <img
-            src={sale.image_url}
-            alt={sale.product_name}
+            src={imageUrl}
+            alt={productName}
             className="w-full h-36 object-contain bg-white rounded"
           />
         ) : (
@@ -27,12 +31,13 @@ export const SaleCard = memo(function SaleCard({ sale }: Props) {
           </div>
         )}
 
-        <div className="font-semibold">{sale.product_name}</div>
+        <div className="font-semibold">{productName}</div>
 
         <div className="flex justify-between text-sm">
-          <Badge>Qtd: {sale.quantity}</Badge>
+          <Badge>Qtd: {quantity}</Badge>
+
           <span className="font-bold text-green-600">
-            {sale.total_value !== null
+            {sale.total_value !== null && sale.total_value !== undefined
               ? `R$ ${sale.total_value.toFixed(2)}`
               : "Valor não informado"}
           </span>
