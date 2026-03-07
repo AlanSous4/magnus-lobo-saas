@@ -28,6 +28,7 @@ const paymentLabelMap: Record<string, string> = {
   vr: "Vale Refeição",
   va: "Vale Alimentação",
   cash: "Dinheiro",
+  pix: "Pix",
 };
 
 /* =========================
