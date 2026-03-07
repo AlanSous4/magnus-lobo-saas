@@ -356,7 +356,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                     <Button
                       size="icon"
                       variant="outline"
-                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7"
+                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7 cursor-pointer"
                       onClick={() =>
                         updateQuantity(
                           item.id,
@@ -381,7 +381,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                     <Button
                       size="icon"
                       variant="outline"
-                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7"
+                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7 cursor-pointer"
                       onClick={() =>
                         updateQuantity(
                           item.id,
@@ -416,7 +416,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </div>
 
           <Button
-            className="w-full h-12 text-lg"
+            className="w-full h-12 text-lg cursor-pointer"
             onClick={handleCheckout}
             disabled={cart.length === 0}
           >
@@ -441,7 +441,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                 <Button
                   key={m.id}
                   variant={selectedPayment === m.id ? "default" : "outline"}
-                  className="h-20 flex flex-col gap-2"
+                  className="h-20 flex flex-col gap-2 cursor-pointer"
                   onClick={() => setSelectedPayment(m.id)}
                 >
                   <Icon className="h-6 w-6" />
@@ -452,10 +452,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPayment(false)}>
+            <Button className="cursor-pointer" variant="outline" onClick={() => setShowPayment(false)}>
               Cancelar
             </Button>
-            <Button
+            <Button className="cursor-pointer"
               onClick={processSale}
               disabled={!selectedPayment || isProcessing}
             >
