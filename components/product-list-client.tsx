@@ -20,6 +20,7 @@ export function ProductListClient({
 }: Props) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
 
+  // realtime do supabase
   useProductsRealtime({
     userId,
 
