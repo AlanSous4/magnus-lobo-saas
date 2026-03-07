@@ -165,7 +165,7 @@ export function NavSidebar() {
           )}
           <Button
             variant="ghost"
-            className="w-full justify-start text-destructive hover:bg-destructive/10"
+            className="w-full justify-start text-destructive hover:bg-destructive/10 cursor-pointer"
             onClick={handleLogout}
           >
             <LogOut className="mr-2 h-4 w-4" />
