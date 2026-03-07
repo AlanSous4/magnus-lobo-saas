@@ -105,8 +105,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedPayment, setSelectedPayment] =
-    useState<PaymentMethod | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(
+    null
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -123,10 +124,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     const isWeight = isWeightProduct(product.id);
 
     if (existing) {
-      updateQuantity(
-        product.id,
-        existing.cartQuantity + (isWeight ? 100 : 1)
-      );
+      updateQuantity(product.id, existing.cartQuantity + (isWeight ? 100 : 1));
     } else {
       setCart([
         ...cart,
@@ -156,11 +154,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       if (q > item.quantity) return;
     }
 
-    setCart(
-      cart.map((i) =>
-        i.id === id ? { ...i, cartQuantity: q } : i
-      )
-    );
+    setCart(cart.map((i) => (i.id === id ? { ...i, cartQuantity: q } : i)));
   };
 
   const removeFromCart = (id: string) => {
@@ -214,16 +208,14 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           ? (item.value / 100) * item.cartQuantity
           : item.value * item.cartQuantity;
 
-        const { error: itemError } = await supabase
-          .from("sale_items")
-          .insert({
-            sale_id: sale.id,
-            product_id: item.id,
-            quantity: quantityToSave,
-            unit_price: item.value,
-            subtotal,
-            is_weight: isWeight,
-          });
+        const { error: itemError } = await supabase.from("sale_items").insert({
+          sale_id: sale.id,
+          product_id: item.id,
+          quantity: quantityToSave,
+          unit_price: item.value,
+          subtotal,
+          is_weight: isWeight,
+        });
 
         if (itemError) {
           console.error("Erro ao salvar item:", itemError);
@@ -252,7 +244,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       setIsProcessing(false);
     }
   };
-   
+
   /* =========================
      RENDER
   ========================= */
@@ -364,7 +356,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                     <Button
                       size="icon"
                       variant="outline"
-                      className="h-7 w-7"
+                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7"
                       onClick={() =>
                         updateQuantity(
                           item.id,
@@ -383,13 +375,13 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                       onChange={(e) =>
                         updateQuantity(item.id, Number(e.target.value))
                       }
-                      className="w-14 h-7 text-center px-1"
+                      className="w-14 h-7 md:h-14 lg:h-7 text-center px-1"
                     />
 
                     <Button
                       size="icon"
                       variant="outline"
-                      className="h-7 w-7"
+                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7"
                       onClick={() =>
                         updateQuantity(
                           item.id,
@@ -403,10 +395,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7 text-destructive"
+                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7 text-destructive"
                       onClick={() => removeFromCart(item.id)}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-4 w-4 md:h-6 md:w-6 lg:h-4 lg:w-4" />
                     </Button>
                   </div>
                 </div>
@@ -439,9 +431,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Forma de Pagamento</DialogTitle>
-            <DialogDescription>
-              Total: R$ {total.toFixed(2)}
-            </DialogDescription>
+            <DialogDescription>Total: R$ {total.toFixed(2)}</DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-3 py-4">
@@ -450,9 +440,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               return (
                 <Button
                   key={m.id}
-                  variant={
-                    selectedPayment === m.id ? "default" : "outline"
-                  }
+                  variant={selectedPayment === m.id ? "default" : "outline"}
                   className="h-20 flex flex-col gap-2"
                   onClick={() => setSelectedPayment(m.id)}
                 >
@@ -464,10 +452,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowPayment(false)}
-            >
+            <Button variant="outline" onClick={() => setShowPayment(false)}>
               Cancelar
             </Button>
             <Button
