@@ -23,42 +23,70 @@ export type SalesHistoryProps = {
 
 type PeriodMode = "range" | "daily" | "month";
 
+/* =========================
+   TIMEZONE FIX
+========================= */
+
+function getLocalDate(date: string | Date) {
+  return new Date(date).toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
+}
+
+function getLocalMonth(date: string | Date) {
+  return getLocalDate(date).slice(0, 7);
+}
+
+function formatBR(date: string) {
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
-  const typedSales: Sale[] = sales;
+
+  /* =========================
+     NORMALIZAÇÃO DE DADOS
+  ========================= */
+
+  const typedSales: Sale[] = useMemo(() => {
+    return sales.map((s: any) => ({
+      ...s,
+      total_value: s.total_value ?? s.total_amount ?? 0,
+      items: s.items ?? [],
+    }));
+  }, [sales]);
 
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
 
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  );
+  const [selectedDate, setSelectedDate] = useState(getLocalDate(new Date()));
+  const [selectedMonth, setSelectedMonth] = useState(getLocalMonth(new Date()));
+
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
   /* =========================
-     FILTRO CENTRAL
-  ========================== */
+     FILTRO
+  ========================= */
 
   const filteredSales = useMemo(() => {
     let filtered = typedSales;
 
     if (periodMode === "daily") {
       filtered = typedSales.filter(
-        (s) =>
-          new Date(s.created_at).toISOString().slice(0, 10) === selectedDate
+        (s) => getLocalDate(s.created_at) === selectedDate
       );
     } else if (periodMode === "month") {
       filtered = typedSales.filter(
-        (s) =>
-          new Date(s.created_at).toISOString().slice(0, 7) === selectedMonth
+        (s) => getLocalMonth(s.created_at) === selectedMonth
       );
     } else {
       const limitDate = new Date();
       limitDate.setDate(limitDate.getDate() - days);
-      filtered = typedSales.filter((s) => new Date(s.created_at) >= limitDate);
+
+      filtered = typedSales.filter(
+        (s) => new Date(s.created_at) >= limitDate
+      );
     }
 
     return filtered.sort(
@@ -67,10 +95,13 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     );
   }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
+  /* =========================
+     MÉTRICAS
+  ========================= */
+
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
-    id: s.id,
-    total_amount: s.total_value ?? 0,
     created_at: s.created_at,
+    total_value: s.total_value ?? 0,
   }));
 
   const metrics: SalesMetrics = calculateSalesMetrics(
@@ -79,24 +110,31 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     groupBy
   );
 
+  /* =========================
+     ORDEM CORRETA (HOJE → ATRÁS)
+  ========================= */
+
   const labelsToRender = useMemo(() => {
     if (periodMode === "daily") {
-      return [selectedDate].map((d) => new Date(d).toLocaleDateString("pt-BR"));
+      return [formatBR(selectedDate)];
     }
 
     if (periodMode === "month") {
-      return [selectedMonth].map((m) => {
-        const [year, month] = m.split("-");
-        return `${month}/${year}`;
-      });
+      const [year, month] = selectedMonth.split("-");
+      return [`${month}/${year}`];
     }
 
-    return metrics.labels;
+    return [...metrics.labels].reverse();
   }, [metrics.labels, periodMode, selectedDate, selectedMonth]);
+
+  /* =========================
+     PDF
+  ========================= */
 
   const handleViewPDF = async () => {
     const pdf = await exportSalesPDF(metrics, type, groupBy);
-    window.open(pdf.output("bloburl"), "_blank");
+    const blobUrl = pdf.output("bloburl");
+    window.open(blobUrl);
   };
 
   const handleDownloadPDF = async () => {
@@ -148,6 +186,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             >
               Diário
             </Button>
+
             {periodMode === "daily" && (
               <input
                 type="date"
@@ -165,6 +204,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             >
               Mês
             </Button>
+
             {periodMode === "month" && (
               <input
                 type="month"
@@ -176,10 +216,21 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           </div>
 
           <div className="flex gap-2 flex-wrap items-center">
-            <Button className="cursor-pointer" size="sm" variant="outline" onClick={handleViewPDF}>
+            <Button
+              className="cursor-pointer"
+              size="sm"
+              variant="outline"
+              onClick={handleViewPDF}
+            >
               <Eye className="mr-2 h-4 w-4" /> Visualizar PDF
             </Button>
-            <Button className="cursor-pointer" size="sm" variant="default" onClick={handleDownloadPDF}>
+
+            <Button
+              className="cursor-pointer"
+              size="sm"
+              variant="default"
+              onClick={handleDownloadPDF}
+            >
               <FileText className="mr-2 h-4 w-4" /> Baixar PDF
             </Button>
           </div>
@@ -203,7 +254,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           </div>
         </div>
 
-        {/* TABELA DE VENDAS */}
+        {/* TABELA */}
         <div className="overflow-auto border rounded-lg">
           <table className="w-full text-sm">
             <thead className="bg-muted">
@@ -214,28 +265,26 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                 <th className="p-2 text-right">Ticket Médio</th>
               </tr>
             </thead>
+
             <tbody>
-              {labelsToRender.map((label, idx) => {
+              {labelsToRender.map((label) => {
                 const periodSales = filteredSales.filter((s) => {
+                  const saleDateBR = formatBR(getLocalDate(s.created_at));
+
                   if (periodMode === "daily")
-                    return (
-                      new Date(s.created_at).toISOString().slice(0, 10) ===
-                      selectedDate
-                    );
+                    return getLocalDate(s.created_at) === selectedDate;
+
                   if (periodMode === "month")
-                    return (
-                      new Date(s.created_at).toISOString().slice(0, 7) ===
-                      selectedMonth
-                    );
-                  return (
-                    new Date(s.created_at).toLocaleDateString("pt-BR") === label
-                  );
+                    return getLocalMonth(s.created_at) === selectedMonth;
+
+                  return saleDateBR === label;
                 });
 
                 const revenue = periodSales.reduce(
                   (sum, s) => sum + (s.total_value ?? 0),
                   0
                 );
+
                 const isOpen = expandedLabel === label;
 
                 return (
@@ -272,27 +321,24 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
                               <div className="pl-4 space-y-1">
                                 {sale.items.length > 0 ? (
-                                  sale.items.map((item) => {
-                                    // valor correto a exibir no relatório: subtotal pago
-                                    const displayValue = item.total;
+                                  sale.items.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="grid grid-cols-3 items-center px-2 py-1 rounded hover:bg-[rgb(255,237,212)] transition-colors"
+                                    >
+                                      <span>{item.product_name}</span>
 
-                                    return (
-                                      <div
-                                        key={item.id}
-                                        className="grid grid-cols-3 items-center px-2 py-1 rounded hover:bg-[rgb(255,237,212)] transition-colors"
-                                      >
-                                        <span>{item.product_name}</span>
-                                        <span className="text-center">
-                                          {item.is_weight
-                                            ? `${item.quantity.toFixed(3)} KG`
-                                            : `${item.quantity} UN`}
-                                        </span>
-                                        <span className="text-right">
-                                          R$ {displayValue.toFixed(2)}
-                                        </span>
-                                      </div>
-                                    );
-                                  })
+                                      <span className="text-center">
+                                        {item.is_weight
+                                          ? `${item.quantity.toFixed(3)} KG`
+                                          : `${item.quantity} UN`}
+                                      </span>
+
+                                      <span className="text-right">
+                                        R$ {item.total.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))
                                 ) : (
                                   <p className="text-muted-foreground">
                                     Venda sem itens detalhados
@@ -306,40 +352,6 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                   </Fragment>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* GRÁFICO OCULTO PARA PDF */}
-        <div
-          id="sales-chart"
-          className="fixed top-0 left-0 opacity-0 pointer-events-none z-50"
-          style={{ width: "1200px", height: "600px" }}
-        >
-          <table className="w-full border-collapse border border-gray-300 text-sm">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="border p-2">Período</th>
-                <th className="border p-2">Vendas</th>
-                <th className="border p-2">Receita</th>
-                <th className="border p-2">Ticket Médio</th>
-              </tr>
-            </thead>
-            <tbody>
-              {metrics.labels.map((label, idx) => (
-                <tr key={label}>
-                  <td className="border p-2">{label}</td>
-                  <td className="border p-2">
-                    {metrics.rows[idx]?.sales ?? 0}
-                  </td>
-                  <td className="border p-2">
-                    R$ {metrics.rows[idx]?.revenue.toFixed(2)}
-                  </td>
-                  <td className="border p-2">
-                    R$ {metrics.rows[idx]?.ticket.toFixed(2)}
-                  </td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>

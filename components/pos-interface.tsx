@@ -31,18 +31,19 @@ import {
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 /* =========================
-   TIPOS
+TIPOS
 ========================= */
+
 interface Product {
   id: string;
   name: string;
   value: number;
-  quantity: number; // estoque em KG para peso, inteiro para unidade
+  quantity: number;
   image_url?: string | null;
 }
 
 interface CartItem extends Product {
-  cartQuantity: number; // gramas para peso, unidade para normal
+  cartQuantity: number;
 }
 
 interface POSInterfaceProps {
@@ -53,8 +54,9 @@ interface POSInterfaceProps {
 type PaymentMethod = "credit" | "debit" | "vr" | "va" | "cash" | "pix";
 
 /* =========================
-   PRODUTOS POR PESO (IDS)
+PRODUTOS POR PESO
 ========================= */
+
 const WEIGHT_PRODUCT_IDS = [
   "b8a6c2ca-623c-41a2-bfec-9fa27ce7c6cc",
   "193b8a3a-d2a7-485d-bb31-59157002eea6",
@@ -68,12 +70,27 @@ const paymentMethods = [
   { id: "vr" as PaymentMethod, label: "VR", icon: UtensilsCrossed },
   { id: "va" as PaymentMethod, label: "VA", icon: Coffee },
   { id: "cash" as PaymentMethod, label: "Dinheiro", icon: Wallet },
-  { id: "pix" as PaymentMethod, label: "Pix", icon: QrCode }, // ✅ novo
+  { id: "pix" as PaymentMethod, label: "Pix", icon: QrCode },
 ];
 
 /* =========================
-   BACK BUTTON PWA
+DATA CORRETA BRASIL
 ========================= */
+
+function getBrazilISOString() {
+  const now = new Date();
+
+  const brazil = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
+
+  return brazil.toISOString();
+}
+
+/* =========================
+BOTÃO VOLTAR PWA
+========================= */
+
 function BackButtonApp() {
   const [isPWA, setIsPWA] = useState(false);
   const router = useRouter();
@@ -82,6 +99,7 @@ function BackButtonApp() {
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
+
     setIsPWA(standalone);
   }, []);
 
@@ -99,15 +117,15 @@ function BackButtonApp() {
 }
 
 /* =========================
-   COMPONENTE PRINCIPAL
+COMPONENTE PRINCIPAL
 ========================= */
+
 export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(
-    null
-  );
+  const [selectedPayment, setSelectedPayment] =
+    useState<PaymentMethod | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -126,13 +144,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     if (existing) {
       updateQuantity(product.id, existing.cartQuantity + (isWeight ? 100 : 1));
     } else {
-      setCart([
-        ...cart,
-        {
-          ...product,
-          cartQuantity: isWeight ? 100 : 1,
-        },
-      ]);
+      setCart([...cart, { ...product, cartQuantity: isWeight ? 100 : 1 }]);
     }
   };
 
@@ -163,9 +175,11 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
   const total = cart.reduce((sum, item) => {
     const isWeight = isWeightProduct(item.id);
+
     const subtotal = isWeight
       ? (item.value / 100) * item.cartQuantity
       : item.value * item.cartQuantity;
+
     return sum + subtotal;
   }, 0);
 
@@ -175,25 +189,28 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   };
 
   /* =========================
-     PROCESSAMENTO DA VENDA
+  PROCESSAR VENDA
   ========================= */
+
   const processSale = async () => {
     if (!selectedPayment) return;
+
     setIsProcessing(true);
 
     try {
-      const { data: sale, error: saleError } = await supabase
+      const { data: sale, error } = await supabase
         .from("sales")
         .insert({
           user_id: userId,
           total_amount: total,
           payment_method: selectedPayment,
+          created_at: getBrazilISOString(),
         })
         .select()
         .single();
 
-      if (saleError || !sale) {
-        console.error("Erro ao criar venda:", saleError);
+      if (error || !sale) {
+        console.error("Erro ao criar venda:", error);
         return;
       }
 
@@ -201,14 +218,14 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         const isWeight = isWeightProduct(item.id);
 
         const quantityToSave = isWeight
-          ? item.cartQuantity / 1000 // salva em KG
+          ? item.cartQuantity / 1000
           : item.cartQuantity;
 
         const subtotal = isWeight
           ? (item.value / 100) * item.cartQuantity
           : item.value * item.cartQuantity;
 
-        const { error: itemError } = await supabase.from("sale_items").insert({
+        await supabase.from("sale_items").insert({
           sale_id: sale.id,
           product_id: item.id,
           quantity: quantityToSave,
@@ -216,11 +233,6 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           subtotal,
           is_weight: isWeight,
         });
-
-        if (itemError) {
-          console.error("Erro ao salvar item:", itemError);
-          continue;
-        }
 
         await supabase
           .from("products")
@@ -245,46 +257,44 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     }
   };
 
-  /* =========================
-     RENDER
-  ========================= */
-  return (
+  /* ========================= RENDER ========================= */ return (
     <div className="h-screen flex overflow-hidden">
-      {/* COLUNA ESQUERDA */}
+      {" "}
+      {/* COLUNA PRODUTOS */}{" "}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* CABEÇALHO COM BOTÃO VOLTAR */}
+        {" "}
         <div className="p-4 border-b bg-background shrink-0 flex items-center justify-between">
+          {" "}
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5 text-orange-600" />
-            PDV - Ponto de Venda
-          </h1>
-
-          {/* 🔹 Botão Voltar PWA */}
-          <BackButtonApp />
-        </div>
-
-        {/* INPUT DE BUSCA */}
+            {" "}
+            <ShoppingCart className="h-5 w-5 text-orange-600" /> PDV - Ponto de
+            Venda{" "}
+          </h1>{" "}
+          <BackButtonApp />{" "}
+        </div>{" "}
         <Input
           className="mt-3 px-2 py-1"
           placeholder="Buscar produtos..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-        />
-
-        {/* LISTA DE PRODUTOS */}
+        />{" "}
         <div className="flex-1 min-h-0">
+          {" "}
           <ScrollArea className="h-full p-3">
+            {" "}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {" "}
               {filteredProducts.map((p) => {
                 const isWeight = isWeightProduct(p.id);
-
                 return (
                   <Card
                     key={p.id}
                     onClick={() => addToCart(p)}
                     className="cursor-pointer"
                   >
+                    {" "}
                     <div className="h-20 bg-muted flex items-center justify-center relative">
+                      {" "}
                       {p.image_url ? (
                         <img
                           src={p.image_url}
@@ -292,32 +302,33 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                         />
                       ) : (
                         <span className="text-xs">Sem imagem</span>
-                      )}
-
+                      )}{" "}
                       {isWeight && (
                         <Badge className="absolute top-1 right-1 text-[10px]">
-                          Venda por peso
+                          {" "}
+                          Venda por peso{" "}
                         </Badge>
-                      )}
-                    </div>
-
+                      )}{" "}
+                    </div>{" "}
                     <CardContent className="p-2">
-                      <p className="text-sm line-clamp-2">{p.name}</p>
+                      {" "}
+                      <p className="text-sm line-clamp-2">{p.name}</p>{" "}
                       <div className="flex justify-between mt-1 items-center">
+                        {" "}
                         <span className="font-bold text-orange-600">
-                          R$ {p.value.toFixed(2)}
-                        </span>
-                        <Badge>{p.quantity}</Badge>
-                      </div>
-                    </CardContent>
+                          {" "}
+                          R$ {p.value.toFixed(2)}{" "}
+                        </span>{" "}
+                        <Badge>{p.quantity}</Badge>{" "}
+                      </div>{" "}
+                    </CardContent>{" "}
                   </Card>
                 );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
+              })}{" "}
+            </div>{" "}
+          </ScrollArea>{" "}
+        </div>{" "}
       </div>
-
       {/* CARRINHO */}
       <aside className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t lg:static lg:w-96 lg:h-screen lg:border-l lg:border-t-0 flex flex-col min-h-0">
         <div className="flex items-center gap-2 px-4 py-3 border-b font-semibold">
@@ -425,7 +436,6 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </Button>
         </div>
       </aside>
-
       {/* DIALOGS */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
         <DialogContent>
@@ -452,10 +462,15 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </div>
 
           <DialogFooter>
-            <Button className="cursor-pointer" variant="outline" onClick={() => setShowPayment(false)}>
+            <Button
+              className="cursor-pointer"
+              variant="outline"
+              onClick={() => setShowPayment(false)}
+            >
               Cancelar
             </Button>
-            <Button className="cursor-pointer"
+            <Button
+              className="cursor-pointer"
               onClick={processSale}
               disabled={!selectedPayment || isProcessing}
             >
@@ -464,7 +479,6 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <Dialog open={showSuccess}>
         <DialogContent>
           <VisuallyHidden>
