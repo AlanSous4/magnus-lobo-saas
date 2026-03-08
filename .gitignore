@@ -25,3 +25,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Ignorar service worker gerado automaticamente
+sw.js
+
+# Mas manter o sw.js manual dentro de public/
+!public/sw.js
