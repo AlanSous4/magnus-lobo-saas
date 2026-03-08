@@ -1,3 +1,5 @@
+"use client";
+
 import jsPDF from "jspdf";
 import type { SalesMetrics } from "@/lib/sales-metrics";
 import * as htmlToImage from "html-to-image";
@@ -29,6 +31,7 @@ async function chartToPng(elementId: string): Promise<string | null> {
     return null;
   }
 
+  // html-to-image requer que o elemento esteja renderizado, não use display:none
   return htmlToImage.toPng(node, {
     pixelRatio: 2,
     backgroundColor: "transparent",
@@ -71,7 +74,6 @@ function drawFooter(
 
   pdf.text(`Gerado em ${now}`, 14, footerY);
   pdf.text(`CNPJ: ${CNPJ_FIXO}`, pageWidth / 2, footerY, { align: "center" });
-
   pdf.text(
     `Usuário: ${user} | Período: ${period}`,
     pageWidth - 14,
@@ -98,9 +100,7 @@ export async function exportSalesPDF(
   } = await supabase.auth.getUser();
 
   const userName =
-    user?.user_metadata?.name ||
-    user?.email ||
-    "Usuário não identificado";
+    user?.user_metadata?.name || user?.email || "Usuário não identificado";
 
   const periodLabel = groupBy === "day" ? "Diário" : "Mensal";
 
@@ -109,7 +109,6 @@ export async function exportSalesPDF(
   drawWatermark(pdf, logo);
 
   pdf.setFontSize(16);
-
   pdf.text(
     type === "sales"
       ? "Relatório de Vendas"
@@ -132,39 +131,25 @@ export async function exportSalesPDF(
 
   pdf.setFontSize(10);
   pdf.text(`Total de vendas: ${metrics.summary.totalSales}`, 14, yCursor);
-
   yCursor += 6;
-  pdf.text(
-    `Receita total: R$ ${metrics.summary.totalRevenue.toFixed(2)}`,
-    14,
-    yCursor
-  );
-
+  pdf.text(`Receita total: R$ ${metrics.summary.totalRevenue.toFixed(2)}`, 14, yCursor);
   yCursor += 6;
-  pdf.text(
-    `Ticket médio: R$ ${metrics.summary.averageTicket.toFixed(2)}`,
-    14,
-    yCursor
-  );
+  pdf.text(`Ticket médio: R$ ${metrics.summary.averageTicket.toFixed(2)}`, 14, yCursor);
 
   yCursor += 12;
 
   pdf.setFontSize(11);
   pdf.text("Detalhamento por período", 14, yCursor);
-
   yCursor += 8;
 
   pdf.setFontSize(10);
-
   pdf.text("Período", 14, yCursor);
   pdf.text("Vendas", 70, yCursor);
   pdf.text("Receita", 100, yCursor);
   pdf.text("Ticket Médio", 150, yCursor);
-
   yCursor += 4;
 
   pdf.line(14, yCursor, 195, yCursor);
-
   yCursor += 6;
 
   pdf.setFontSize(9);
@@ -172,10 +157,8 @@ export async function exportSalesPDF(
   metrics.rows.forEach((row) => {
     if (yCursor > 280) {
       drawFooter(pdf, { user: userName, period: periodLabel });
-
       pdf.addPage();
       drawWatermark(pdf, logo);
-
       yCursor = 20;
     }
 
@@ -189,13 +172,11 @@ export async function exportSalesPDF(
 
   drawFooter(pdf, { user: userName, period: periodLabel });
 
-  /* ---------- Página 2 (Gráfico opcional) ---------- */
-
-  const chartImage = await chartToPng("sales-chart");
+  /* ---------- Página 2 (Gráfico invisível no front, mas capturado para PDF) ---------- */
+  const chartImage = await chartToPng("sales-chart-pdf");
 
   if (chartImage) {
     pdf.addPage();
-
     drawWatermark(pdf, logo);
 
     const pageWidth = pdf.internal.pageSize.getWidth();

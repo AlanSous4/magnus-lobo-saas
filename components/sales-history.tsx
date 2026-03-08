@@ -1,5 +1,6 @@
 "use client";
 
+import { SalesChart } from "@/components/sales-chart";
 import { useMemo, useState, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,9 +85,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
       const limitDate = new Date();
       limitDate.setDate(limitDate.getDate() - days);
 
-      filtered = typedSales.filter(
-        (s) => new Date(s.created_at) >= limitDate
-      );
+      filtered = typedSales.filter((s) => new Date(s.created_at) >= limitDate);
     }
 
     return filtered.sort(
@@ -253,7 +252,6 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
           </div>
         </div>
-
         {/* TABELA */}
         <div className="overflow-auto border rounded-lg">
           <table className="w-full text-sm">
@@ -354,6 +352,36 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
               })}
             </tbody>
           </table>
+        </div>
+        {/* GRÁFICO - Invisível no front */}
+        <div
+          className="border rounded-lg p-4 bg-white"
+          style={{ display: "none" }}
+        >
+          <SalesChart
+            sales={salesForMetrics}
+            type={type}
+            initialGroupBy={groupBy}
+            chartId="sales-chart"
+          />
+        </div>
+        { // GRÁFICO INVISÍVEL PARA PDF
+  }
+        <div
+          style={{
+            position: "absolute",
+            left: "-9999px", // fora da tela
+            top: 0,
+            width: "900px",
+            height: "400px",
+          }}
+        >
+          <SalesChart
+            sales={salesForMetrics}
+            type={type}
+            initialGroupBy={groupBy}
+            chartId="sales-chart-pdf" // id único para PDF
+          />
         </div>
       </CardContent>
     </Card>
