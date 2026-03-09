@@ -44,9 +44,10 @@ export default function RelatorioVendasClient() {
 
         if (error) throw error;
 
+        // Conversão segura para o formato esperado por calculateSalesMetrics
         const sales =
           salesData?.map((s) => ({
-            total_amount: Number(s.total_amount),
+            total_value: Number(s.total_amount),
             created_at: s.created_at,
           })) || [];
 
