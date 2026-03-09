@@ -1,7 +1,7 @@
 export type Sale = {
   created_at: string
   total_value: number
-  payment_method?: string
+  payment_method?: string | null
 }
 
 export type ChartType = "sales" | "revenue" | "ticket"
@@ -25,6 +25,7 @@ export type SalesMetrics = {
   paymentTotals: {
     method: string
     total: number
+    count: number
   }[]
 
   chartData: {
@@ -111,13 +112,28 @@ export function calculateSalesMetrics(
           : values.total,
     }))
     .sort((a, b) => {
-      const [d1, m1, y1] = a.period.split("/")
-      const [d2, m2, y2] = b.period.split("/")
 
-      const dateA = new Date(`${y1}-${m1}-${d1}`)
-      const dateB = new Date(`${y2}-${m2}-${d2}`)
+      const partsA = a.period.split("/")
+      const partsB = b.period.split("/")
+
+      if (partsA.length === 3) {
+        const [d1, m1, y1] = partsA
+        const [d2, m2, y2] = partsB
+
+        const dateA = new Date(`${y1}-${m1}-${d1}`)
+        const dateB = new Date(`${y2}-${m2}-${d2}`)
+
+        return dateA.getTime() - dateB.getTime()
+      }
+
+      const [m1, y1] = partsA
+      const [m2, y2] = partsB
+
+      const dateA = new Date(`${y1}-${m1}-01`)
+      const dateB = new Date(`${y2}-${m2}-01`)
 
       return dateA.getTime() - dateB.getTime()
+
     })
 
   const totalSales = rows.reduce((acc, r) => acc + r.sales, 0)
@@ -147,24 +163,34 @@ export function calculateSalesMetrics(
      TOTAIS POR PAGAMENTO
   ========================= */
 
-  const paymentMap: Record<string, number> = {}
+  const paymentMap: Record<
+    string,
+    { total: number; count: number }
+  > = {}
 
   sales.forEach((sale) => {
 
     const method = sale.payment_method || "Outros"
 
     if (!paymentMap[method]) {
-      paymentMap[method] = 0
+      paymentMap[method] = {
+        total: 0,
+        count: 0,
+      }
     }
 
-    paymentMap[method] += Number(sale.total_value)
+    paymentMap[method].total += Number(sale.total_value)
+    paymentMap[method].count += 1
 
   })
 
-  const paymentTotals = Object.entries(paymentMap).map(([method, total]) => ({
-    method,
-    total,
-  }))
+  const paymentTotals = Object.entries(paymentMap).map(
+    ([method, values]) => ({
+      method,
+      total: values.total,
+      count: values.count,
+    })
+  )
 
   /* =========================
      RETORNO FINAL

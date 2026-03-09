@@ -70,9 +70,7 @@ function drawFooter(
   pdf.setTextColor(120);
 
   pdf.text(`Gerado em ${now}`, 14, footerY);
-  pdf.text(`CNPJ: ${CNPJ_FIXO}`, pageWidth / 2, footerY, {
-    align: "center",
-  });
+  pdf.text(`CNPJ: ${CNPJ_FIXO}`, pageWidth / 2, footerY, { align: "center" });
   pdf.text(
     `Usuário: ${user} | Período: ${period}`,
     pageWidth - 14,
@@ -98,9 +96,7 @@ export async function exportSalesPDF(
   } = await supabase.auth.getUser();
 
   const userName =
-    user?.user_metadata?.name ||
-    user?.email ||
-    "Usuário não identificado";
+    user?.user_metadata?.name || user?.email || "Usuário não identificado";
 
   const periodLabel = groupBy === "day" ? "Diário" : "Mensal";
 
@@ -134,51 +130,57 @@ export async function exportSalesPDF(
   pdf.text(`Total de vendas: ${metrics.summary.totalSales}`, 14, yCursor);
 
   yCursor += 6;
-  pdf.text(
-    `Receita total: R$ ${metrics.summary.totalRevenue.toFixed(2)}`,
-    14,
-    yCursor
-  );
+  pdf.text(`Receita total: R$ ${metrics.summary.totalRevenue.toFixed(2)}`, 14, yCursor);
 
   yCursor += 6;
-  pdf.text(
-    `Ticket médio: R$ ${metrics.summary.averageTicket.toFixed(2)}`,
-    14,
-    yCursor
-  );
+  pdf.text(`Ticket médio: R$ ${metrics.summary.averageTicket.toFixed(2)}`, 14, yCursor);
 
   /* --------------------------------------------------
-   * Resumo por forma de pagamento
-   * -------------------------------------------------- */
+ * Resumo por forma de pagamento com valor centralizado (sem "1 venda")
+ * -------------------------------------------------- */
 
-  if (metrics.paymentTotals && metrics.paymentTotals.length > 0) {
-    yCursor += 12;
+if (metrics.paymentTotals && metrics.paymentTotals.length > 0) {
+  yCursor += 12;
 
-    pdf.setFontSize(12);
-    pdf.text("Resumo por forma de pagamento", 14, yCursor);
+  pdf.setFontSize(12);
+  pdf.text("Resumo por forma de pagamento", 14, yCursor);
 
-    yCursor += 8;
-    pdf.setFontSize(10);
+  yCursor += 6;
+  pdf.setFontSize(10);
 
-    metrics.paymentTotals.forEach((p) => {
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const marginLeft = 14;
+  const valueX = pageWidth / 2; // valor centralizado
 
-      if (yCursor > 280) {
-        drawFooter(pdf, { user: userName, period: periodLabel });
-        pdf.addPage();
-        drawWatermark(pdf, logo);
-        yCursor = 20;
-      }
+  metrics.paymentTotals.forEach((p) => {
+    if (yCursor > 280) {
+      drawFooter(pdf, { user: userName, period: periodLabel });
+      pdf.addPage();
+      drawWatermark(pdf, logo);
+      yCursor = 20;
+    }
 
-      pdf.text(
-        `${p.method}: R$ ${p.total.toFixed(2)}`,
-        14,
-        yCursor
-      );
+    const methodText = p.method; // apenas o nome do método
+    const valueText = `R$ ${p.total.toFixed(2)}`;
 
-      yCursor += 6;
-    });
-  }
+    // Desenhar o texto à esquerda
+    pdf.text(methodText, marginLeft, yCursor);
 
+    // Desenhar o valor centralizado
+    pdf.text(valueText, valueX, yCursor, { align: "center" });
+
+    // Calcular e desenhar pontos
+    const methodWidth = pdf.getTextWidth(methodText);
+    const valueWidth = pdf.getTextWidth(valueText);
+    const dotsWidth = valueX - marginLeft - methodWidth - valueWidth / 2 - 2;
+    const dotsCount = Math.floor(dotsWidth / pdf.getTextWidth("."));
+    const dots = ".".repeat(dotsCount > 0 ? dotsCount : 2);
+
+    pdf.text(dots, marginLeft + methodWidth + 1, yCursor);
+
+    yCursor += 6;
+  });
+}
   /* --------------------------------------------------
    * Tabela do relatório
    * -------------------------------------------------- */
@@ -203,7 +205,6 @@ export async function exportSalesPDF(
   pdf.setFontSize(9);
 
   metrics.rows.forEach((row) => {
-
     if (yCursor > 280) {
       drawFooter(pdf, { user: userName, period: periodLabel });
       pdf.addPage();
@@ -221,34 +222,25 @@ export async function exportSalesPDF(
 
   drawFooter(pdf, { user: userName, period: periodLabel });
 
- /* --------------------------------------------------
- * Página FINAL: gráfico
- * -------------------------------------------------- */
+  /* --------------------------------------------------
+   * Página FINAL: gráfico
+   * -------------------------------------------------- */
 
-const chartImage = await chartToPng("sales-chart");
+  const chartImage = await chartToPng("sales-chart");
 
-if (chartImage) {
+  if (chartImage) {
+    pdf.addPage();
+    drawWatermark(pdf, logo);
 
-  pdf.addPage();
-  drawWatermark(pdf, logo);
+    const pageWidth = pdf.internal.pageSize.getWidth();
 
-  const pageWidth = pdf.internal.pageSize.getWidth();
+    pdf.setFontSize(14);
+    pdf.text("Gráfico de Desempenho", 14, 20);
 
-  pdf.setFontSize(14);
-  pdf.text("Gráfico de Desempenho", 14, 20);
+    pdf.addImage(chartImage, "PNG", 14, 30, pageWidth - 28, 140);
 
-  pdf.addImage(
-    chartImage,
-    "PNG",
-    14,
-    30,
-    pageWidth - 28,
-    140
-  );
+    drawFooter(pdf, { user: userName, period: periodLabel });
+  }
 
-  drawFooter(pdf, { user: userName, period: periodLabel });
-
-}
-
-return pdf;
+  return pdf;
 }
