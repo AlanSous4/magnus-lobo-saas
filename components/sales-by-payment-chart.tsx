@@ -46,8 +46,13 @@ export function SalesByPaymentChart() {
 
     const { data, error } = await supabase.rpc("vendas_por_pagamento", {
       periodo: days,
+      
     })
 
+    // 👇 COLOQUE O LOG AQUI
+  console.log("Resultado RPC vendas_por_pagamento:", data)
+
+    
     if (error) {
       console.error("Erro ao buscar vendas:", error)
       setLoading(false)
