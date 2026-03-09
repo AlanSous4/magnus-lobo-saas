@@ -43,6 +43,18 @@ function formatBR(date: string) {
   return `${day}/${month}/${year}`;
 }
 
+/* =========================
+   NOVO: FORMATA HORA
+========================= */
+
+function formatHour(date: string | Date) {
+  return new Date(date).toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
 
@@ -252,6 +264,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
           </div>
         </div>
+
         {/* TABELA */}
         <div className="overflow-auto border rounded-lg">
           <table className="w-full text-sm">
@@ -307,11 +320,18 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                           <td colSpan={4} className="p-3">
                             <div className="space-y-2 text-sm border-b pb-2">
                               <div className="flex justify-between font-semibold">
-                                <span>Venda: {sale.id}</span>
+                                <span className="flex items-center gap-6">
+                                  Venda #{sale.id.slice(0, 6)}
+                                  <span className="text-muted-foreground text-xs">
+                                    🕒 {formatHour(sale.created_at)}
+                                  </span>
+                                </span>
+
                                 <span>
                                   Pagamento:{" "}
                                   {sale.payment_method ?? "Desconhecido"}
                                 </span>
+
                                 <span>
                                   Total: R$ {(sale.total_value ?? 0).toFixed(2)}
                                 </span>
@@ -353,24 +373,12 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </tbody>
           </table>
         </div>
-        {/* GRÁFICO - Invisível no front */}
-        <div
-          className="border rounded-lg p-4 bg-white"
-          style={{ display: "none" }}
-        >
-          <SalesChart
-            sales={salesForMetrics}
-            type={type}
-            initialGroupBy={groupBy}
-            chartId="sales-chart"
-          />
-        </div>
-        { // GRÁFICO INVISÍVEL PARA PDF
-  }
+
+        {/* GRÁFICO INVISÍVEL PARA PDF */}
         <div
           style={{
             position: "absolute",
-            left: "-9999px", // fora da tela
+            left: "-9999px",
             top: 0,
             width: "900px",
             height: "400px",
@@ -380,7 +388,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             sales={salesForMetrics}
             type={type}
             initialGroupBy={groupBy}
-            chartId="sales-chart-pdf" // id único para PDF
+            chartId="sales-chart-pdf"
           />
         </div>
       </CardContent>
