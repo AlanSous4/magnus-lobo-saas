@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { SalesHistory } from "@/components/sales-history";
-import { exportSalesPDF } from "@/lib/pdf-utils";
+import { exportSalesPDF } from "@/components/pdf-export";
 import type { SalesMetrics, ChartType, GroupBy } from "@/lib/sales-metrics";
 import { AppBackButton } from "@/components/app-back-button";
 

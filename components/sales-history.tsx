@@ -13,7 +13,7 @@ import {
 
 import { useSalesRealtime } from "@/hooks/use-sales-realtime";
 import type { Sale } from "@/types/sale";
-import { exportSalesPDF } from "@/lib/pdf-utils";
+import { exportSalesPDF } from "@/components/pdf-export";
 import { Eye, FileText } from "lucide-react";
 
 export type SalesHistoryProps = {
@@ -113,6 +113,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
     created_at: s.created_at,
     total_value: s.total_value ?? 0,
+    payment_method: s.payment_method ?? undefined,
   }));
 
   const metrics: SalesMetrics = calculateSalesMetrics(

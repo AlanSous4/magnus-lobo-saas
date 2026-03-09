@@ -1,6 +1,7 @@
 export type Sale = {
   created_at: string
   total_value: number
+  payment_method?: string
 }
 
 export type ChartType = "sales" | "revenue" | "ticket"
@@ -14,15 +15,23 @@ export type SalesMetrics = {
     ticket: number
     value: number
   }[]
+
   summary: {
     totalSales: number
     totalRevenue: number
     averageTicket: number
   }
+
+  paymentTotals: {
+    method: string
+    total: number
+  }[]
+
   chartData: {
     date: string
     value: number
   }[]
+
   total: number
   average: number
   labels: string[]
@@ -134,9 +143,37 @@ export function calculateSalesMetrics(
 
   const labels = rows.map((r) => r.period)
 
+  /* =========================
+     TOTAIS POR PAGAMENTO
+  ========================= */
+
+  const paymentMap: Record<string, number> = {}
+
+  sales.forEach((sale) => {
+
+    const method = sale.payment_method || "Outros"
+
+    if (!paymentMap[method]) {
+      paymentMap[method] = 0
+    }
+
+    paymentMap[method] += Number(sale.total_value)
+
+  })
+
+  const paymentTotals = Object.entries(paymentMap).map(([method, total]) => ({
+    method,
+    total,
+  }))
+
+  /* =========================
+     RETORNO FINAL
+  ========================= */
+
   return {
     rows,
     summary,
+    paymentTotals,
     chartData: rows.map((r) => ({
       date: r.period,
       value: r.value,

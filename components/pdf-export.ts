@@ -21,9 +21,13 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-async function chartToPng(elementId: string): Promise<string> {
+async function chartToPng(elementId: string): Promise<string | null> {
   const node = document.getElementById(elementId);
-  if (!node) throw new Error("Gráfico não encontrado");
+
+  if (!node) {
+    console.warn("Gráfico não encontrado, PDF será gerado sem gráfico");
+    return null;
+  }
 
   return htmlToImage.toPng(node, {
     pixelRatio: 2,
@@ -143,12 +147,50 @@ export async function exportSalesPDF(
     yCursor
   );
 
+  /* --------------------------------------------------
+   * Resumo por forma de pagamento
+   * -------------------------------------------------- */
+
+  if (metrics.paymentTotals && metrics.paymentTotals.length > 0) {
+    yCursor += 12;
+
+    pdf.setFontSize(12);
+    pdf.text("Resumo por forma de pagamento", 14, yCursor);
+
+    yCursor += 8;
+    pdf.setFontSize(10);
+
+    metrics.paymentTotals.forEach((p) => {
+
+      if (yCursor > 280) {
+        drawFooter(pdf, { user: userName, period: periodLabel });
+        pdf.addPage();
+        drawWatermark(pdf, logo);
+        yCursor = 20;
+      }
+
+      pdf.text(
+        `${p.method}: R$ ${p.total.toFixed(2)}`,
+        14,
+        yCursor
+      );
+
+      yCursor += 6;
+    });
+  }
+
+  /* --------------------------------------------------
+   * Tabela do relatório
+   * -------------------------------------------------- */
+
   yCursor += 12;
+
   pdf.setFontSize(11);
   pdf.text("Detalhamento por período", 14, yCursor);
 
   yCursor += 8;
   pdf.setFontSize(10);
+
   pdf.text("Período", 14, yCursor);
   pdf.text("Vendas", 70, yCursor);
   pdf.text("Receita", 100, yCursor);
@@ -161,6 +203,7 @@ export async function exportSalesPDF(
   pdf.setFontSize(9);
 
   metrics.rows.forEach((row) => {
+
     if (yCursor > 280) {
       drawFooter(pdf, { user: userName, period: periodLabel });
       pdf.addPage();
@@ -176,17 +219,19 @@ export async function exportSalesPDF(
     yCursor += 6;
   });
 
-  // Rodapé da ÚLTIMA página do relatório
   drawFooter(pdf, { user: userName, period: periodLabel });
 
-  /* --------------------------------------------------
-   * Página FINAL: gráfico (sempre após o relatório)
-   * -------------------------------------------------- */
+ /* --------------------------------------------------
+ * Página FINAL: gráfico
+ * -------------------------------------------------- */
+
+const chartImage = await chartToPng("sales-chart");
+
+if (chartImage) {
 
   pdf.addPage();
   drawWatermark(pdf, logo);
 
-  const chartImage = await chartToPng("sales-chart");
   const pageWidth = pdf.internal.pageSize.getWidth();
 
   pdf.setFontSize(14);
@@ -203,5 +248,7 @@ export async function exportSalesPDF(
 
   drawFooter(pdf, { user: userName, period: periodLabel });
 
-  return pdf;
+}
+
+return pdf;
 }
