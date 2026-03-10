@@ -7,11 +7,19 @@ import { Package, AlertTriangle } from "lucide-react";
 const ESTOQUE_CRITICO = 5;
 const DIAS_PARA_VENCER = 7;
 
+/* --------------------------------------------------
+ * 🔹 Converte data do banco para horário LOCAL
+ * evitando erro de timezone (UTC → -1 dia)
+ * -------------------------------------------------- */
+function parseLocalDate(date: string) {
+  return new Date(date + "T00:00:00");
+}
+
 function isNearExpiration(expiresAt: string | null, days = 7) {
   if (!expiresAt) return false;
 
   const today = new Date();
-  const expiration = new Date(expiresAt);
+  const expiration = parseLocalDate(expiresAt);
 
   const diffDays =
     (expiration.getTime() - today.getTime()) /

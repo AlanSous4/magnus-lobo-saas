@@ -20,6 +20,12 @@ type ProductFilter =
   | "expiring-soon"
   | "expired";
 
+/* 🔧 Corrige timezone de datas */
+function parseSafeDate(date: string | null) {
+  if (!date) return null;
+  return new Date(date + "T12:00:00");
+}
+
 export function ProductList({
   products,
   estoqueCritico,
@@ -44,19 +50,21 @@ export function ProductList({
     qtd <= estoqueCritico;
 
   const isExpiringSoon = (date: string | null) => {
-    if (!date) return false;
+    const safeDate = parseSafeDate(date);
+    if (!safeDate) return false;
 
     const diff =
-      (new Date(date).getTime() - Date.now()) /
+      (safeDate.getTime() - Date.now()) /
       (1000 * 60 * 60 * 24);
 
     return diff > 0 && diff <= diasParaVencer;
   };
 
   const isExpired = (date: string | null) => {
-    if (!date) return false;
+    const safeDate = parseSafeDate(date);
+    if (!safeDate) return false;
 
-    return new Date(date) < new Date();
+    return safeDate.getTime() < Date.now();
   };
 
   /* =========================

@@ -18,22 +18,31 @@ type Props = {
   onImageUpdate: (id: string, url: string) => void;
 };
 
+/* 🔧 Corrige timezone de datas */
+function parseSafeDate(date: string | null) {
+  if (!date) return null;
+  return new Date(date + "T12:00:00");
+}
+
 function ProductCardComponent({
   product,
   estoqueCritico,
   diasParaVencer,
   onImageUpdate,
 }: Props) {
+
+  const safeExpiration = parseSafeDate(product.expiration_date);
+
   const isLowStock = product.quantity <= estoqueCritico;
 
   const isExpired =
-    product.expiration_date &&
-    new Date(product.expiration_date) < new Date();
+    safeExpiration &&
+    safeExpiration.getTime() < Date.now();
 
   const isExpiringSoon =
-    product.expiration_date &&
+    safeExpiration &&
     !isExpired &&
-    (new Date(product.expiration_date).getTime() - Date.now()) /
+    (safeExpiration.getTime() - Date.now()) /
       (1000 * 60 * 60 * 24) <=
       diasParaVencer;
 
@@ -85,7 +94,7 @@ function ProductCardComponent({
           </Badge>
         </div>
 
-        {product.expiration_date && (
+        {safeExpiration && (
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="h-4 w-4" />
             Validade:
@@ -98,7 +107,7 @@ function ProductCardComponent({
                   : "outline"
               }
             >
-              {new Date(product.expiration_date).toLocaleDateString("pt-BR")}
+              {safeExpiration.toLocaleDateString("pt-BR")}
               {isExpired && <AlertCircle className="ml-1 h-3 w-3" />}
             </Badge>
           </div>

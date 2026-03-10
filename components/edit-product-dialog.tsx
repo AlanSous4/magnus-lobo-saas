@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pencil } from "lucide-react";
-import { supabase } from "@/lib/supabase/client"; // ✅ instância única
+import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 interface Product {
@@ -29,6 +29,13 @@ interface EditProductDialogProps {
   product: Product;
 }
 
+/* 🔧 Remove timezone da data para usar no input type=date */
+function formatDateForInput(date: string | null) {
+  if (!date) return "";
+
+  return date.split("T")[0];
+}
+
 export function EditProductDialog({ product }: EditProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,7 +46,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
     name: product.name,
     value: product.value.toString(),
     quantity: product.quantity.toString(),
-    expiration_date: product.expiration_date || "",
+    expiration_date: formatDateForInput(product.expiration_date),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,6 +84,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
+
       <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Editar Produto</DialogTitle>
@@ -131,12 +139,16 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
               type="date"
               value={formData.expiration_date}
               className="cursor-pointer"
-              onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, expiration_date: e.target.value })
+              }
             />
           </div>
 
           {error && (
-            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
           )}
 
           <div className="flex justify-end gap-3 pt-4">
@@ -149,6 +161,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
             >
               Cancelar
             </Button>
+
             <Button className="cursor-pointer" type="submit" disabled={isLoading}>
               {isLoading ? "Salvando..." : "Salvar Alterações"}
             </Button>
