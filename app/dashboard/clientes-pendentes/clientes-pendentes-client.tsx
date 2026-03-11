@@ -37,7 +37,6 @@ type PendenteItem = {
 };
 
 export default function ClientesPendentesClient() {
-
   const [cliente, setCliente] = useState("");
   const [data, setData] = useState("");
 
@@ -47,39 +46,32 @@ export default function ClientesPendentesClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [pendentes, setPendentes] = useState<Pendente[]>([]);
-  const [pendenteItens, setPendenteItens] = useState<Record<string, PendenteItem[]>>({});
+  const [pendenteItens, setPendenteItens] = useState<
+    Record<string, PendenteItem[]>
+  >({});
 
   const [openPendencia, setOpenPendencia] = useState<string | null>(null);
 
   const [total, setTotal] = useState(0);
 
-  /* ---------------------------
-     Buscar produtos
-  --------------------------- */
+  /* Buscar produtos */
 
   useEffect(() => {
-
     const fetchProducts = async () => {
-
       const { data } = await supabase
         .from("products")
         .select("id,name,value")
         .order("name");
 
       if (data) setProducts(data);
-
     };
 
     fetchProducts();
-
   }, []);
 
-  /* ---------------------------
-     Buscar pendências
-  --------------------------- */
+  /* Buscar pendências */
 
   const fetchPendencias = async () => {
-
     const { data } = await supabase
       .from("clientes_pendentes")
       .select("*")
@@ -87,19 +79,15 @@ export default function ClientesPendentesClient() {
       .order("created_at", { ascending: false });
 
     if (data) setPendentes(data);
-
   };
 
   useEffect(() => {
     fetchPendencias();
   }, []);
 
-  /* ---------------------------
-     Filtrar produtos
-  --------------------------- */
+  /* Filtrar produtos */
 
   useEffect(() => {
-
     if (!search) {
       setFilteredProducts([]);
       return;
@@ -110,15 +98,11 @@ export default function ClientesPendentesClient() {
     );
 
     setFilteredProducts(result);
-
   }, [search, products]);
 
-  /* ---------------------------
-     Adicionar produto
-  --------------------------- */
+  /* Adicionar produto */
 
   const addProduct = (product: Product) => {
-
     const exists = items.find((i) => i.product_id === product.id);
 
     if (exists) {
@@ -137,59 +121,39 @@ export default function ClientesPendentesClient() {
     setItems((prev) => [...prev, newItem]);
     setSearch("");
     setFilteredProducts([]);
-
   };
 
-  /* ---------------------------
-     Atualizar quantidade
-  --------------------------- */
+  /* Atualizar quantidade */
 
   const updateQuantity = (productId: string, quantity: number) => {
-
     setItems((prev) =>
       prev.map((item) => {
-
         if (item.product_id !== productId) return item;
 
         const subtotal = quantity * item.unit_price;
 
         return { ...item, quantity, subtotal };
-
       })
     );
-
   };
 
-  /* ---------------------------
-     Remover item
-  --------------------------- */
+  /* Remover item */
 
   const removeItem = (productId: string) => {
-
-    setItems((prev) =>
-      prev.filter((item) => item.product_id !== productId)
-    );
-
+    setItems((prev) => prev.filter((item) => item.product_id !== productId));
   };
 
-  /* ---------------------------
-     Calcular total
-  --------------------------- */
+  /* Calcular total */
 
   useEffect(() => {
-
     const t = items.reduce((acc, item) => acc + item.subtotal, 0);
 
     setTotal(t);
-
   }, [items]);
 
-  /* ---------------------------
-     Salvar pendência
-  --------------------------- */
+  /* Salvar pendência */
 
   const savePendencia = async () => {
-
     if (!cliente || !data || items.length === 0) {
       alert("Preencha os campos.");
       return;
@@ -227,55 +191,44 @@ export default function ClientesPendentesClient() {
     setTotal(0);
 
     fetchPendencias();
-
   };
 
-  /* ---------------------------
-     Abrir / fechar itens
-  --------------------------- */
+  /* Abrir / fechar itens */
 
   const togglePendencia = async (id: string) => {
-
     if (openPendencia === id) {
       setOpenPendencia(null);
       return;
     }
 
     if (!pendenteItens[id]) {
-
       const { data } = await supabase
         .from("clientes_pendentes_itens")
         .select("*")
         .eq("pendente_id", id);
 
       if (data) {
-
         setPendenteItens((prev) => ({
           ...prev,
           [id]: data,
         }));
-
       }
-
     }
 
     setOpenPendencia(id);
-
   };
 
-  /* ---------------------------
-     Converter venda
-  --------------------------- */
+  /* Converter venda */
 
   const converterVenda = async (p: Pendente) => {
 
     const itens = pendenteItens[p.id] || [];
-
+  
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
-    const { data: sale } = await supabase
+  
+    const { data: sale, error } = await supabase
       .from("sales")
       .insert({
         user_id: user?.id,
@@ -284,9 +237,15 @@ export default function ClientesPendentesClient() {
       })
       .select()
       .single();
-
+  
+    if (error || !sale) {
+      console.error("Erro ao criar venda:", error);
+      alert("Erro ao registrar venda.");
+      return;
+    }
+  
     if (itens.length > 0) {
-
+  
       const saleItems = itens.map((i) => ({
         sale_id: sale.id,
         product_name: i.product_name,
@@ -294,43 +253,42 @@ export default function ClientesPendentesClient() {
         unit_price: i.unit_price,
         subtotal: i.subtotal,
       }));
-
-      await supabase.from("sale_items").insert(saleItems);
-
+  
+      const { error: itemError } = await supabase
+        .from("sale_items")
+        .insert(saleItems);
+  
+      if (itemError) {
+        console.error("Erro ao inserir itens:", itemError);
+      }
+  
     }
-
-    await supabase
+  
+    const { error: updateError } = await supabase
       .from("clientes_pendentes")
       .update({ pago: true })
       .eq("id", p.id);
-
+  
+    if (updateError) {
+      console.error("Erro ao atualizar pendência:", updateError);
+    }
+  
     fetchPendencias();
-
+  
   };
 
   return (
-
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
-
-      <h1 className="text-3xl font-bold">
-        Clientes Pendentes
-      </h1>
-
-      {/* NOVA PENDÊNCIA */}
+      <h1 className="text-3xl font-bold">Clientes Pendentes</h1>
 
       <div className="bg-white border rounded-xl shadow-sm">
-
         <div className="border-b px-6 py-4 font-semibold text-lg">
           Novo Cliente Pendente
         </div>
 
         <div className="p-6 space-y-6">
-
           <div className="grid md:grid-cols-3 gap-4 items-center">
-
-            <label className="text-sm font-medium">
-              Nome do Cliente:
-            </label>
+            <label className="text-sm font-medium">Nome do Cliente:</label>
 
             <Input
               className="md:col-span-2"
@@ -339,15 +297,18 @@ export default function ClientesPendentesClient() {
               placeholder="Ex: João Silva"
             />
 
+            <label className="text-sm font-medium">Data de Retirada:</label>
+
+            <Input
+              type="date"
+              className="md:col-span-2"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+            />
           </div>
 
-          {/* BUSCA PRODUTO */}
-
           <div className="space-y-2 relative">
-
-            <h3 className="font-semibold">
-              Adicionar Itens
-            </h3>
+            <h3 className="font-semibold">Adicionar Itens</h3>
 
             <Input
               value={search}
@@ -356,54 +317,37 @@ export default function ClientesPendentesClient() {
             />
 
             {filteredProducts.length > 0 && (
-
               <div className="absolute bg-white border rounded w-full max-h-40 overflow-auto z-10">
-
                 {filteredProducts.map((p) => (
-
                   <div
                     key={p.id}
                     onClick={() => addProduct(p)}
                     className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex justify-between"
                   >
-
                     <span>{p.name}</span>
 
                     <span className="text-sm text-muted-foreground">
                       R$ {p.value.toFixed(2)}
                     </span>
-
                   </div>
-
                 ))}
-
               </div>
-
             )}
-
           </div>
 
-          {/* ITENS */}
-
           <div className="border rounded-lg overflow-hidden">
-
             {items.map((item) => (
-
               <div
                 key={item.product_id}
                 className="grid grid-cols-5 items-center px-4 py-3 border-t"
               >
-
                 <span>{item.product_name}</span>
 
                 <Input
                   type="number"
                   value={item.quantity}
                   onChange={(e) =>
-                    updateQuantity(
-                      item.product_id,
-                      Number(e.target.value)
-                    )
+                    updateQuantity(item.product_id, Number(e.target.value))
                   }
                 />
 
@@ -415,21 +359,15 @@ export default function ClientesPendentesClient() {
 
                 <Button
                   variant="destructive"
-                  onClick={() =>
-                    removeItem(item.product_id)
-                  }
+                  onClick={() => removeItem(item.product_id)}
                 >
                   🗑
                 </Button>
-
               </div>
-
             ))}
-
           </div>
 
           <div className="flex justify-between items-center">
-
             <div className="text-xl font-bold">
               Total: R$ {total.toFixed(2)}
             </div>
@@ -440,52 +378,33 @@ export default function ClientesPendentesClient() {
             >
               Salvar Pendência
             </Button>
-
           </div>
-
         </div>
-
       </div>
 
-      {/* LISTA */}
-
       <div className="space-y-2">
-
-        <h2 className="text-lg font-semibold">
-          Pendências
-        </h2>
+        <h2 className="text-lg font-semibold">Pendências</h2>
 
         {pendentes.map((p) => (
-
           <div key={p.id} className="border rounded-lg overflow-hidden">
-
             <div
               onClick={() => togglePendencia(p.id)}
               className={`p-4 flex justify-between items-center cursor-pointer ${
                 p.pago ? "bg-green-50" : ""
               }`}
             >
-
               <div>
-
-                <p className="font-semibold">
-                  {p.cliente_nome}
-                </p>
+                <p className="font-semibold">{p.cliente_nome}</p>
 
                 <p className="text-sm text-muted-foreground">
                   {new Date(p.data_retirada).toLocaleDateString("pt-BR")}
                 </p>
-
               </div>
 
               <div className="flex items-center gap-4">
-
-                <span className="font-bold">
-                  R$ {p.total.toFixed(2)}
-                </span>
+                <span className="font-bold">R$ {p.total.toFixed(2)}</span>
 
                 {!p.pago && (
-
                   <Button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -493,54 +412,38 @@ export default function ClientesPendentesClient() {
                     }}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    Converter Venda
+                    Receber Pagamento
                   </Button>
-
                 )}
 
                 {p.pago && (
-                  <span className="text-green-600 font-semibold">
-                    Pago
-                  </span>
+                  <span className="text-green-600 font-semibold">Pago</span>
                 )}
-
               </div>
-
             </div>
 
-            {openPendencia === p.id && pendenteItens[p.id] && (
-
+            <div
+              className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                openPendencia === p.id
+                  ? "max-h-96 opacity-100"
+                  : "max-h-0 opacity-0"
+              }`}
+            >
               <div className="border-t bg-gray-50 p-4 space-y-2">
-
-                {pendenteItens[p.id].map((i) => (
-
-                  <div
-                    key={i.id}
-                    className="flex justify-between text-sm"
-                  >
-
+                {pendenteItens[p.id]?.map((i) => (
+                  <div key={i.id} className="flex justify-between text-sm">
                     <span>
                       {i.product_name} x{i.quantity}
                     </span>
 
-                    <span>
-                      R$ {i.subtotal.toFixed(2)}
-                    </span>
-
+                    <span>R$ {i.subtotal.toFixed(2)}</span>
                   </div>
-
                 ))}
-
               </div>
-
-            )}
-
+            </div>
           </div>
-
         ))}
-
       </div>
-
     </div>
   );
 }
