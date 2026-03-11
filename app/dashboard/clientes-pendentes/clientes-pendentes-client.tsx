@@ -38,7 +38,6 @@ type PendenteItem = {
 };
 
 export default function ClientesPendentesClient() {
-
   const [cliente, setCliente] = useState("");
   const [data, setData] = useState("");
 
@@ -48,31 +47,31 @@ export default function ClientesPendentesClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [pendentes, setPendentes] = useState<Pendente[]>([]);
-  const [pendenteItens, setPendenteItens] = useState<Record<string, PendenteItem[]>>({});
+  const [pendenteItens, setPendenteItens] = useState<
+    Record<string, PendenteItem[]>
+  >({});
 
   const [openPendencia, setOpenPendencia] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  const calcularTotalItens = (lista: Item[]) => {
+    return lista.reduce((acc, item) => acc + item.subtotal, 0);
+  };
+
   useEffect(() => {
-
     const fetchProducts = async () => {
-
       const { data } = await supabase
         .from("products")
         .select("id,name,value")
         .order("name");
 
       if (data) setProducts(data);
-
     };
 
     fetchProducts();
-
   }, []);
 
   const fetchPendencias = async () => {
-
     const { data } = await supabase
       .from("clientes_pendentes")
       .select("*")
@@ -80,7 +79,6 @@ export default function ClientesPendentesClient() {
       .order("created_at", { ascending: false });
 
     if (data) setPendentes(data);
-
   };
 
   useEffect(() => {
@@ -88,7 +86,6 @@ export default function ClientesPendentesClient() {
   }, []);
 
   useEffect(() => {
-
     if (!search) {
       setFilteredProducts([]);
       return;
@@ -99,11 +96,9 @@ export default function ClientesPendentesClient() {
     );
 
     setFilteredProducts(result);
-
   }, [search, products]);
 
   const addProduct = (product: Product) => {
-
     const exists = items.find((i) => i.product_id === product.id);
 
     if (exists) {
@@ -123,47 +118,33 @@ export default function ClientesPendentesClient() {
 
     setSearch("");
     setFilteredProducts([]);
-
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
+    if (quantity < 1) quantity = 1;
 
     setItems((prev) =>
       prev.map((item) => {
-
         if (item.product_id !== productId) return item;
 
         const subtotal = quantity * item.unit_price;
 
         return { ...item, quantity, subtotal };
-
       })
     );
-
   };
 
   const removeItem = (productId: string) => {
-
-    setItems((prev) =>
-      prev.filter((item) => item.product_id !== productId)
-    );
-
+    setItems((prev) => prev.filter((item) => item.product_id !== productId));
   };
 
-  useEffect(() => {
-
-    const t = items.reduce((acc, item) => acc + item.subtotal, 0);
-
-    setTotal(t);
-
-  }, [items]);
-
   const savePendencia = async () => {
-
     if (!cliente || !data || items.length === 0) {
       alert("Preencha os campos.");
       return;
     }
+
+    const total = calcularTotalItens(items);
 
     const {
       data: { user },
@@ -189,24 +170,22 @@ export default function ClientesPendentesClient() {
       subtotal: i.subtotal,
     }));
 
-    await supabase
-      .from("clientes_pendentes_itens")
-      .insert(itens);
+    await supabase.from("clientes_pendentes_itens").insert(itens);
 
     setCliente("");
     setData("");
     setItems([]);
-    setTotal(0);
 
     setPendenteItens({});
     setOpenPendencia(null);
-    fetchPendencias();
 
+    fetchPendencias();
   };
 
   const updatePendencia = async () => {
-
     if (!editingId) return;
+
+    const total = calcularTotalItens(items);
 
     await supabase
       .from("clientes_pendentes")
@@ -231,24 +210,24 @@ export default function ClientesPendentesClient() {
       subtotal: i.subtotal,
     }));
 
-    await supabase
-      .from("clientes_pendentes_itens")
-      .insert(novosItens);
+    await supabase.from("clientes_pendentes_itens").insert(novosItens);
+
+    // ✅ ATUALIZA O TOTAL LOCALMENTE
+    setPendentes((prev) =>
+      prev.map((p) => (p.id === editingId ? { ...p, total } : p))
+    );
 
     setEditingId(null);
     setCliente("");
     setData("");
     setItems([]);
-    setTotal(0);
 
     setPendenteItens({});
     setOpenPendencia(null);
+
     fetchPendencias();
-
   };
-
   const editarPendencia = async (p: Pendente) => {
-
     const { data: itens } = await supabase
       .from("clientes_pendentes_itens")
       .select("*")
@@ -274,11 +253,9 @@ export default function ClientesPendentesClient() {
       top: 0,
       behavior: "smooth",
     });
-
   };
 
   const togglePendencia = async (id: string) => {
-
     if (openPendencia === id) {
       setOpenPendencia(null);
       return;
@@ -290,31 +267,25 @@ export default function ClientesPendentesClient() {
       .eq("pendente_id", id);
 
     if (data) {
-
       setPendenteItens((prev) => ({
         ...prev,
         [id]: data,
       }));
-
     }
 
     setOpenPendencia(id);
-
   };
 
   const converterVenda = async (p: Pendente) => {
-
     let itens = pendenteItens[p.id];
 
     if (!itens) {
-
       const { data } = await supabase
         .from("clientes_pendentes_itens")
         .select("*")
         .eq("pendente_id", p.id);
 
       itens = data || [];
-
     }
 
     const {
@@ -332,7 +303,6 @@ export default function ClientesPendentesClient() {
       .single();
 
     if (itens.length > 0) {
-
       const saleItems = itens.map((i) => ({
         sale_id: sale.id,
         product_name: i.product_name,
@@ -341,10 +311,7 @@ export default function ClientesPendentesClient() {
         subtotal: i.subtotal,
       }));
 
-      await supabase
-        .from("sale_items")
-        .insert(saleItems);
-
+      await supabase.from("sale_items").insert(saleItems);
     }
 
     await supabase
@@ -354,46 +321,33 @@ export default function ClientesPendentesClient() {
 
     setPendenteItens({});
     setOpenPendencia(null);
-    fetchPendencias();
 
+    fetchPendencias();
   };
 
   const removerPendencia = async (p: Pendente) => {
-
     if (!confirm(`Deseja remover a pendência de ${p.cliente_nome}?`)) return;
 
-    await supabase
-      .from("clientes_pendentes")
-      .delete()
-      .eq("id", p.id);
+    await supabase.from("clientes_pendentes").delete().eq("id", p.id);
 
     setPendenteItens({});
     setOpenPendencia(null);
-    fetchPendencias();
 
+    fetchPendencias();
   };
 
   return (
-
     <div className="max-w-5xl space-y-6 pb-20">
-
-      <h1 className="text-3xl font-bold">
-        Clientes Pendentes
-      </h1>
+      <h1 className="text-3xl font-bold">Clientes Pendentes</h1>
 
       <div className="bg-white border rounded-xl shadow-sm">
-
         <div className="border-b px-6 py-4 font-semibold text-lg">
           {editingId ? "Editar Pendência" : "Novo Cliente Pendente"}
         </div>
 
         <div className="p-6 space-y-6">
-
           <div className="grid md:grid-cols-3 gap-4 items-center">
-
-            <label className="text-sm font-medium">
-              Nome do Cliente:
-            </label>
+            <label className="text-sm font-medium">Nome do Cliente:</label>
 
             <Input
               className="md:col-span-2"
@@ -402,9 +356,7 @@ export default function ClientesPendentesClient() {
               placeholder="Ex: João Silva"
             />
 
-            <label className="text-sm font-medium">
-              Data de Retirada:
-            </label>
+            <label className="text-sm font-medium">Data de Retirada:</label>
 
             <Input
               type="date"
@@ -412,7 +364,6 @@ export default function ClientesPendentesClient() {
               value={data}
               onChange={(e) => setData(e.target.value)}
             />
-
           </div>
 
           <Input
@@ -422,7 +373,6 @@ export default function ClientesPendentesClient() {
           />
 
           {filteredProducts.map((p) => (
-
             <div
               key={p.id}
               onClick={() => addProduct(p)}
@@ -430,16 +380,11 @@ export default function ClientesPendentesClient() {
             >
               {p.name} - R$ {p.value.toFixed(2)}
             </div>
-
           ))}
 
           {items.map((item) => (
-
             <div key={item.product_id} className="flex gap-3">
-
-              <span className="w-40">
-                {item.product_name}
-              </span>
+              <span className="w-40">{item.product_name}</span>
 
               <Input
                 type="number"
@@ -449,9 +394,7 @@ export default function ClientesPendentesClient() {
                 }
               />
 
-              <span>
-                R$ {item.subtotal.toFixed(2)}
-              </span>
+              <span>R$ {item.subtotal.toFixed(2)}</span>
 
               <Button
                 variant="destructive"
@@ -459,73 +402,58 @@ export default function ClientesPendentesClient() {
               >
                 🗑
               </Button>
-
             </div>
-
           ))}
 
           <div className="flex justify-between">
+            <b>Total: R$ {calcularTotalItens(items).toFixed(2)}</b>
 
-            <b>
-              Total: R$ {total.toFixed(2)}
-            </b>
-
-            <Button
-              onClick={
-                editingId
-                  ? updatePendencia
-                  : savePendencia
-              }
-            >
-              {editingId
-                ? "Atualizar Pendência"
-                : "Salvar Pendência"}
+            <Button onClick={editingId ? updatePendencia : savePendencia}>
+              {editingId ? "Atualizar Pendência" : "Salvar Pendência"}
             </Button>
-
           </div>
-
         </div>
-
       </div>
 
-      <h2 className="text-lg font-semibold">
-        Pendências
-      </h2>
+      <h2 className="text-lg font-semibold">Pendências</h2>
 
       {pendentes.map((p) => (
-
         <div key={p.id} className="border rounded-lg">
-
           <div
-            onClick={() => togglePendencia(p.id)}
             className={`p-4 flex justify-between cursor-pointer ${
               p.pago ? "bg-green-50" : ""
             }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePendencia(p.id);
+            }}
           >
-
             <div>
-
-              <p className="font-semibold">
-                {p.cliente_nome}
-              </p>
+              <p className="font-semibold">{p.cliente_nome}</p>
 
               <p className="text-sm text-muted-foreground">
-                {new Date(p.data_retirada)
-                  .toLocaleDateString("pt-BR")}
+                {new Date(p.data_retirada).toLocaleDateString("pt-BR")}
               </p>
-
             </div>
 
             <div className="flex gap-2 items-center">
-
               <b>
-                R$ {p.total.toFixed(2)}
+                <b>
+                  R${" "}
+                  {(editingId === p.id
+                    ? calcularTotalItens(items)
+                    : pendenteItens[p.id]
+                    ? pendenteItens[p.id].reduce(
+                        (acc, item) => acc + Number(item.subtotal),
+                        0
+                      )
+                    : p.total
+                  ).toFixed(2)}
+                </b>
               </b>
 
               {!p.pago && (
-
                 <>
-
                   <Button
                     variant="outline"
                     onClick={(e) => {
@@ -556,77 +484,16 @@ export default function ClientesPendentesClient() {
                   >
                     🗑
                   </Button>
-
                 </>
-
               )}
 
               {p.pago && (
-                <span className="text-green-600 font-semibold">
-                  Pago
-                </span>
+                <span className="text-green-600 font-semibold">Pago</span>
               )}
-
             </div>
-
           </div>
-
-          {openPendencia === p.id && (
-
-            <div className="bg-gray-50 p-4 space-y-2">
-
-              {/* CABEÇALHO PDV */}
-
-              <div className="flex text-xs font-semibold text-gray-500 border-b pb-1">
-
-                <span className="w-1/2">
-                  Produto
-                </span>
-
-                <span className="w-1/4 text-center">
-                  QTD
-                </span>
-
-                <span className="w-1/4 text-right">
-                  Total
-                </span>
-
-              </div>
-
-              {pendenteItens[p.id]?.map((i) => (
-
-                <div
-                  key={i.id}
-                  className="flex items-center"
-                >
-
-                  <span className="w-1/2">
-                    {i.product_name}
-                  </span>
-
-                  <span className="w-1/4 text-center">
-                    {i.quantity} UN
-                  </span>
-
-                  <span className="w-1/4 text-right">
-                    {i.subtotal.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </span>
-
-                </div>
-
-              ))}
-
-            </div>
-
-          )}
-
         </div>
-
       ))}
-
     </div>
   );
 }
