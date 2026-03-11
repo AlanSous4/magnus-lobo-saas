@@ -278,7 +278,7 @@ export default function ClientesPendentesClient() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+    <div className="max-w-5xl space-y-6 pb-20">
       <h1 className="text-3xl font-bold">Clientes Pendentes</h1>
 
       <div className="bg-white border rounded-xl shadow-sm">
