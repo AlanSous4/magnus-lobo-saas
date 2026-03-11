@@ -24,9 +24,20 @@ type Pendente = {
   cliente_nome: string;
   total: number;
   data_retirada: string;
+  pago?: boolean;
+};
+
+type PendenteItem = {
+  id: string;
+  pendente_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
 };
 
 export default function ClientesPendentesClient() {
+
   const [cliente, setCliente] = useState("");
   const [data, setData] = useState("");
 
@@ -36,6 +47,9 @@ export default function ClientesPendentesClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [pendentes, setPendentes] = useState<Pendente[]>([]);
+  const [pendenteItens, setPendenteItens] = useState<Record<string, PendenteItem[]>>({});
+
+  const [openPendencia, setOpenPendencia] = useState<string | null>(null);
 
   const [total, setTotal] = useState(0);
 
@@ -44,16 +58,20 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   useEffect(() => {
+
     const fetchProducts = async () => {
+
       const { data } = await supabase
         .from("products")
         .select("id,name,value")
         .order("name");
 
       if (data) setProducts(data);
+
     };
 
     fetchProducts();
+
   }, []);
 
   /* ---------------------------
@@ -61,12 +79,15 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   const fetchPendencias = async () => {
+
     const { data } = await supabase
       .from("clientes_pendentes")
       .select("*")
+      .order("pago", { ascending: true })
       .order("created_at", { ascending: false });
 
     if (data) setPendentes(data);
+
   };
 
   useEffect(() => {
@@ -78,6 +99,7 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   useEffect(() => {
+
     if (!search) {
       setFilteredProducts([]);
       return;
@@ -88,6 +110,7 @@ export default function ClientesPendentesClient() {
     );
 
     setFilteredProducts(result);
+
   }, [search, products]);
 
   /* ---------------------------
@@ -95,6 +118,7 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   const addProduct = (product: Product) => {
+
     const exists = items.find((i) => i.product_id === product.id);
 
     if (exists) {
@@ -113,6 +137,7 @@ export default function ClientesPendentesClient() {
     setItems((prev) => [...prev, newItem]);
     setSearch("");
     setFilteredProducts([]);
+
   };
 
   /* ---------------------------
@@ -120,15 +145,19 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   const updateQuantity = (productId: string, quantity: number) => {
+
     setItems((prev) =>
       prev.map((item) => {
+
         if (item.product_id !== productId) return item;
 
         const subtotal = quantity * item.unit_price;
 
         return { ...item, quantity, subtotal };
+
       })
     );
+
   };
 
   /* ---------------------------
@@ -136,9 +165,11 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   const removeItem = (productId: string) => {
+
     setItems((prev) =>
       prev.filter((item) => item.product_id !== productId)
     );
+
   };
 
   /* ---------------------------
@@ -146,8 +177,11 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   useEffect(() => {
+
     const t = items.reduce((acc, item) => acc + item.subtotal, 0);
+
     setTotal(t);
+
   }, [items]);
 
   /* ---------------------------
@@ -155,6 +189,7 @@ export default function ClientesPendentesClient() {
   --------------------------- */
 
   const savePendencia = async () => {
+
     if (!cliente || !data || items.length === 0) {
       alert("Preencha os campos.");
       return;
@@ -164,7 +199,7 @@ export default function ClientesPendentesClient() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { data: pendente, error } = await supabase
+    const { data: pendente } = await supabase
       .from("clientes_pendentes")
       .insert({
         cliente_nome: cliente,
@@ -174,11 +209,6 @@ export default function ClientesPendentesClient() {
       })
       .select()
       .single();
-
-    if (error) {
-      console.error(error);
-      return;
-    }
 
     const itens = items.map((i) => ({
       pendente_id: pendente.id,
@@ -197,26 +227,104 @@ export default function ClientesPendentesClient() {
     setTotal(0);
 
     fetchPendencias();
+
+  };
+
+  /* ---------------------------
+     Abrir / fechar itens
+  --------------------------- */
+
+  const togglePendencia = async (id: string) => {
+
+    if (openPendencia === id) {
+      setOpenPendencia(null);
+      return;
+    }
+
+    if (!pendenteItens[id]) {
+
+      const { data } = await supabase
+        .from("clientes_pendentes_itens")
+        .select("*")
+        .eq("pendente_id", id);
+
+      if (data) {
+
+        setPendenteItens((prev) => ({
+          ...prev,
+          [id]: data,
+        }));
+
+      }
+
+    }
+
+    setOpenPendencia(id);
+
+  };
+
+  /* ---------------------------
+     Converter venda
+  --------------------------- */
+
+  const converterVenda = async (p: Pendente) => {
+
+    const itens = pendenteItens[p.id] || [];
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { data: sale } = await supabase
+      .from("sales")
+      .insert({
+        user_id: user?.id,
+        total_value: p.total,
+        payment_method: "fiado",
+      })
+      .select()
+      .single();
+
+    if (itens.length > 0) {
+
+      const saleItems = itens.map((i) => ({
+        sale_id: sale.id,
+        product_name: i.product_name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        subtotal: i.subtotal,
+      }));
+
+      await supabase.from("sale_items").insert(saleItems);
+
+    }
+
+    await supabase
+      .from("clientes_pendentes")
+      .update({ pago: true })
+      .eq("id", p.id);
+
+    fetchPendencias();
+
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+
+    <div className="max-w-5xl mx-auto space-y-6 pb-20">
 
       <h1 className="text-3xl font-bold">
         Clientes Pendentes
       </h1>
 
-      <div className="bg-white border rounded-xl shadow-sm">
+      {/* NOVA PENDÊNCIA */}
 
-        {/* HEADER */}
+      <div className="bg-white border rounded-xl shadow-sm">
 
         <div className="border-b px-6 py-4 font-semibold text-lg">
           Novo Cliente Pendente
         </div>
 
         <div className="p-6 space-y-6">
-
-          {/* CLIENTE */}
 
           <div className="grid md:grid-cols-3 gap-4 items-center">
 
@@ -233,7 +341,7 @@ export default function ClientesPendentesClient() {
 
           </div>
 
-          {/* BUSCA */}
+          {/* BUSCA PRODUTO */}
 
           <div className="space-y-2 relative">
 
@@ -275,19 +383,9 @@ export default function ClientesPendentesClient() {
 
           </div>
 
-          {/* TABELA */}
+          {/* ITENS */}
 
           <div className="border rounded-lg overflow-hidden">
-
-            <div className="grid grid-cols-5 bg-gray-50 px-4 py-2 text-sm font-semibold">
-
-              <span>Produto</span>
-              <span>Qtd</span>
-              <span>Valor Unitário</span>
-              <span>Subtotal</span>
-              <span></span>
-
-            </div>
 
             {items.map((item) => (
 
@@ -330,45 +428,11 @@ export default function ClientesPendentesClient() {
 
           </div>
 
-          {/* DATA + TOTAL */}
-
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-            <div className="flex items-center gap-3">
-
-              <span className="text-sm font-medium">
-                Data da Retirada:
-              </span>
-
-              <Input
-                type="date"
-                value={data}
-                onChange={(e) => setData(e.target.value)}
-                className="w-45"
-              />
-
-            </div>
+          <div className="flex justify-between items-center">
 
             <div className="text-xl font-bold">
               Total: R$ {total.toFixed(2)}
             </div>
-
-          </div>
-
-          {/* BOTÕES */}
-
-          <div className="flex justify-end gap-3 pt-4 border-t">
-
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCliente("");
-                setItems([]);
-                setTotal(0);
-              }}
-            >
-              Cancelar
-            </Button>
 
             <Button
               onClick={savePendencia}
@@ -393,26 +457,83 @@ export default function ClientesPendentesClient() {
 
         {pendentes.map((p) => (
 
-          <div
-            key={p.id}
-            className="border rounded-lg p-4 flex justify-between items-center"
-          >
+          <div key={p.id} className="border rounded-lg overflow-hidden">
 
-            <div>
+            <div
+              onClick={() => togglePendencia(p.id)}
+              className={`p-4 flex justify-between items-center cursor-pointer ${
+                p.pago ? "bg-green-50" : ""
+              }`}
+            >
 
-              <p className="font-semibold">
-                {p.cliente_nome}
-              </p>
+              <div>
 
-              <p className="text-sm text-muted-foreground">
-                {new Date(p.data_retirada).toLocaleDateString("pt-BR")}
-              </p>
+                <p className="font-semibold">
+                  {p.cliente_nome}
+                </p>
+
+                <p className="text-sm text-muted-foreground">
+                  {new Date(p.data_retirada).toLocaleDateString("pt-BR")}
+                </p>
+
+              </div>
+
+              <div className="flex items-center gap-4">
+
+                <span className="font-bold">
+                  R$ {p.total.toFixed(2)}
+                </span>
+
+                {!p.pago && (
+
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      converterVenda(p);
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    Converter Venda
+                  </Button>
+
+                )}
+
+                {p.pago && (
+                  <span className="text-green-600 font-semibold">
+                    Pago
+                  </span>
+                )}
+
+              </div>
 
             </div>
 
-            <div className="font-bold">
-              R$ {p.total.toFixed(2)}
-            </div>
+            {openPendencia === p.id && pendenteItens[p.id] && (
+
+              <div className="border-t bg-gray-50 p-4 space-y-2">
+
+                {pendenteItens[p.id].map((i) => (
+
+                  <div
+                    key={i.id}
+                    className="flex justify-between text-sm"
+                  >
+
+                    <span>
+                      {i.product_name} x{i.quantity}
+                    </span>
+
+                    <span>
+                      R$ {i.subtotal.toFixed(2)}
+                    </span>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+            )}
 
           </div>
 
