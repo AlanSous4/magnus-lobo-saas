@@ -54,8 +54,6 @@ export default function ClientesPendentesClient() {
   const [total, setTotal] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  /* Buscar produtos */
-
   useEffect(() => {
 
     const fetchProducts = async () => {
@@ -73,8 +71,6 @@ export default function ClientesPendentesClient() {
 
   }, []);
 
-  /* Buscar pendências */
-
   const fetchPendencias = async () => {
 
     const { data } = await supabase
@@ -91,8 +87,6 @@ export default function ClientesPendentesClient() {
     fetchPendencias();
   }, []);
 
-  /* Filtrar produtos */
-
   useEffect(() => {
 
     if (!search) {
@@ -107,8 +101,6 @@ export default function ClientesPendentesClient() {
     setFilteredProducts(result);
 
   }, [search, products]);
-
-  /* Adicionar produto */
 
   const addProduct = (product: Product) => {
 
@@ -158,8 +150,6 @@ export default function ClientesPendentesClient() {
 
   };
 
-  /* Calcular total */
-
   useEffect(() => {
 
     const t = items.reduce((acc, item) => acc + item.subtotal, 0);
@@ -167,8 +157,6 @@ export default function ClientesPendentesClient() {
     setTotal(t);
 
   }, [items]);
-
-  /* Salvar pendência */
 
   const savePendencia = async () => {
 
@@ -210,11 +198,11 @@ export default function ClientesPendentesClient() {
     setItems([]);
     setTotal(0);
 
+    setPendenteItens({});
+    setOpenPendencia(null);
     fetchPendencias();
 
   };
-
-  /* Atualizar pendência */
 
   const updatePendencia = async () => {
 
@@ -253,11 +241,11 @@ export default function ClientesPendentesClient() {
     setItems([]);
     setTotal(0);
 
+    setPendenteItens({});
+    setOpenPendencia(null);
     fetchPendencias();
 
   };
-
-  /* Editar pendência */
 
   const editarPendencia = async (p: Pendente) => {
 
@@ -289,8 +277,6 @@ export default function ClientesPendentesClient() {
 
   };
 
-  /* Abrir itens */
-
   const togglePendencia = async (id: string) => {
 
     if (openPendencia === id) {
@@ -315,8 +301,6 @@ export default function ClientesPendentesClient() {
     setOpenPendencia(id);
 
   };
-
-  /* Converter venda */
 
   const converterVenda = async (p: Pendente) => {
 
@@ -368,6 +352,8 @@ export default function ClientesPendentesClient() {
       .update({ pago: true })
       .eq("id", p.id);
 
+    setPendenteItens({});
+    setOpenPendencia(null);
     fetchPendencias();
 
   };
@@ -381,6 +367,8 @@ export default function ClientesPendentesClient() {
       .delete()
       .eq("id", p.id);
 
+    setPendenteItens({});
+    setOpenPendencia(null);
     fetchPendencias();
 
   };
@@ -392,8 +380,6 @@ export default function ClientesPendentesClient() {
       <h1 className="text-3xl font-bold">
         Clientes Pendentes
       </h1>
-
-      {/* FORMULÁRIO */}
 
       <div className="bg-white border rounded-xl shadow-sm">
 
@@ -429,8 +415,6 @@ export default function ClientesPendentesClient() {
 
           </div>
 
-          {/* busca produto */}
-
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -448,8 +432,6 @@ export default function ClientesPendentesClient() {
             </div>
 
           ))}
-
-          {/* itens */}
 
           {items.map((item) => (
 
@@ -505,8 +487,6 @@ export default function ClientesPendentesClient() {
         </div>
 
       </div>
-
-      {/* LISTA */}
 
       <h2 className="text-lg font-semibold">
         Pendências
@@ -595,21 +575,44 @@ export default function ClientesPendentesClient() {
 
             <div className="bg-gray-50 p-4 space-y-2">
 
+              {/* CABEÇALHO PDV */}
+
+              <div className="flex text-xs font-semibold text-gray-500 border-b pb-1">
+
+                <span className="w-1/2">
+                  Produto
+                </span>
+
+                <span className="w-1/4 text-center">
+                  QTD
+                </span>
+
+                <span className="w-1/4 text-right">
+                  Total
+                </span>
+
+              </div>
+
               {pendenteItens[p.id]?.map((i) => (
 
                 <div
                   key={i.id}
-                  className="flex justify-between"
+                  className="flex items-center"
                 >
 
-                  <span>{i.product_name}</span>
-
-                  <span>
-                    {i.quantity} x R$ {i.unit_price}
+                  <span className="w-1/2">
+                    {i.product_name}
                   </span>
 
-                  <span>
-                    R$ {i.subtotal}
+                  <span className="w-1/4 text-center">
+                    {i.quantity} UN
+                  </span>
+
+                  <span className="w-1/4 text-right">
+                    {i.subtotal.toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}
                   </span>
 
                 </div>
