@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 type Product = {
   id: string;
@@ -72,13 +73,35 @@ export default function ClientesPendentesClient() {
   }, []);
 
   const fetchPendencias = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("clientes_pendentes")
-      .select("*")
+      .select(
+        `
+        *,
+        clientes_pendentes_itens (*)
+      `
+      )
       .order("pago", { ascending: true })
       .order("created_at", { ascending: false });
 
-    if (data) setPendentes(data);
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    if (!data) return;
+
+    setPendentes(data);
+
+    const itensMap: Record<string, PendenteItem[]> = {};
+
+    data.forEach((p) => {
+      if (p.clientes_pendentes_itens) {
+        itensMap[p.id] = p.clientes_pendentes_itens;
+      }
+    });
+
+    setPendenteItens(itensMap);
   };
 
   useEffect(() => {
@@ -98,6 +121,29 @@ export default function ClientesPendentesClient() {
     setFilteredProducts(result);
   }, [search, products]);
 
+  const excluirPendencia = async (id: string) => {
+    const confirmar = confirm("Deseja excluir esta pendência?");
+
+    if (!confirmar) return;
+
+    try {
+      // remove itens primeiro
+      await supabase
+        .from("clientes_pendentes_itens")
+        .delete()
+        .eq("pendente_id", id);
+
+      // remove pendência
+      await supabase.from("clientes_pendentes").delete().eq("id", id);
+
+      // atualiza tela
+      setPendentes((prev) => prev.filter((p) => p.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao excluir pendência");
+    }
+  };
+
   const addProduct = (product: Product) => {
     const exists = items.find((i) => i.product_id === product.id);
 
@@ -115,7 +161,6 @@ export default function ClientesPendentesClient() {
     };
 
     setItems((prev) => [...prev, newItem]);
-
     setSearch("");
     setFilteredProducts([]);
   };
@@ -175,7 +220,6 @@ export default function ClientesPendentesClient() {
     setCliente("");
     setData("");
     setItems([]);
-
     setPendenteItens({});
     setOpenPendencia(null);
 
@@ -212,7 +256,6 @@ export default function ClientesPendentesClient() {
 
     await supabase.from("clientes_pendentes_itens").insert(novosItens);
 
-    // ✅ ATUALIZA O TOTAL LOCALMENTE
     setPendentes((prev) =>
       prev.map((p) => (p.id === editingId ? { ...p, total } : p))
     );
@@ -221,12 +264,12 @@ export default function ClientesPendentesClient() {
     setCliente("");
     setData("");
     setItems([]);
-
     setPendenteItens({});
     setOpenPendencia(null);
 
     fetchPendencias();
   };
+
   const editarPendencia = async (p: Pendente) => {
     const { data: itens } = await supabase
       .from("clientes_pendentes_itens")
@@ -255,90 +298,19 @@ export default function ClientesPendentesClient() {
     });
   };
 
-  const togglePendencia = async (id: string) => {
+  const togglePendencia = (id: string) => {
     if (openPendencia === id) {
       setOpenPendencia(null);
-      return;
+    } else {
+      setOpenPendencia(id);
     }
-
-    const { data } = await supabase
-      .from("clientes_pendentes_itens")
-      .select("*")
-      .eq("pendente_id", id);
-
-    if (data) {
-      setPendenteItens((prev) => ({
-        ...prev,
-        [id]: data,
-      }));
-    }
-
-    setOpenPendencia(id);
-  };
-
-  const converterVenda = async (p: Pendente) => {
-    let itens = pendenteItens[p.id];
-
-    if (!itens) {
-      const { data } = await supabase
-        .from("clientes_pendentes_itens")
-        .select("*")
-        .eq("pendente_id", p.id);
-
-      itens = data || [];
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const { data: sale } = await supabase
-      .from("sales")
-      .insert({
-        user_id: user?.id,
-        total_value: p.total,
-        payment_method: "fiado",
-      })
-      .select()
-      .single();
-
-    if (itens.length > 0) {
-      const saleItems = itens.map((i) => ({
-        sale_id: sale.id,
-        product_name: i.product_name,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        subtotal: i.subtotal,
-      }));
-
-      await supabase.from("sale_items").insert(saleItems);
-    }
-
-    await supabase
-      .from("clientes_pendentes")
-      .update({ pago: true })
-      .eq("id", p.id);
-
-    setPendenteItens({});
-    setOpenPendencia(null);
-
-    fetchPendencias();
-  };
-
-  const removerPendencia = async (p: Pendente) => {
-    if (!confirm(`Deseja remover a pendência de ${p.cliente_nome}?`)) return;
-
-    await supabase.from("clientes_pendentes").delete().eq("id", p.id);
-
-    setPendenteItens({});
-    setOpenPendencia(null);
-
-    fetchPendencias();
   };
 
   return (
     <div className="max-w-5xl space-y-6 pb-20">
       <h1 className="text-3xl font-bold">Clientes Pendentes</h1>
+
+      {/* FORMULÁRIO */}
 
       <div className="bg-white border rounded-xl shadow-sm">
         <div className="border-b px-6 py-4 font-semibold text-lg">
@@ -396,7 +368,7 @@ export default function ClientesPendentesClient() {
 
               <span>R$ {item.subtotal.toFixed(2)}</span>
 
-              <Button
+              <Button className="cursor-pointer flex items-center gap-1 hover:bg-red-700"
                 variant="destructive"
                 onClick={() => removeItem(item.product_id)}
               >
@@ -408,90 +380,102 @@ export default function ClientesPendentesClient() {
           <div className="flex justify-between">
             <b>Total: R$ {calcularTotalItens(items).toFixed(2)}</b>
 
-            <Button onClick={editingId ? updatePendencia : savePendencia}>
+            <Button className="cursor-pointer" onClick={editingId ? updatePendencia : savePendencia}>
               {editingId ? "Atualizar Pendência" : "Salvar Pendência"}
             </Button>
           </div>
         </div>
       </div>
 
+      {/* LISTA */}
+
       <h2 className="text-lg font-semibold">Pendências</h2>
 
       {pendentes.map((p) => (
-        <div key={p.id} className="border rounded-lg">
+        <div key={p.id} className="border rounded-lg overflow-hidden">
+          {/* LINHA PRINCIPAL */}
           <div
-            className={`p-4 flex justify-between cursor-pointer ${
-              p.pago ? "bg-green-50" : ""
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              togglePendencia(p.id);
-            }}
+            className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50"
+            onClick={() => togglePendencia(p.id)}
           >
             <div>
               <p className="font-semibold">{p.cliente_nome}</p>
 
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-500">
                 {new Date(p.data_retirada).toLocaleDateString("pt-BR")}
               </p>
             </div>
 
-            <div className="flex gap-2 items-center">
-              <b>
-                <b>
-                  R${" "}
-                  {(editingId === p.id
-                    ? calcularTotalItens(items)
-                    : pendenteItens[p.id]
-                    ? pendenteItens[p.id].reduce(
-                        (acc, item) => acc + Number(item.subtotal),
-                        0
-                      )
-                    : p.total
-                  ).toFixed(2)}
-                </b>
+            <div className="flex items-center gap-4">
+              <b className="text-base">
+                R${" "}
+                {pendenteItens[p.id]
+                  ? pendenteItens[p.id]
+                      .reduce((acc, item) => acc + Number(item.subtotal), 0)
+                      .toFixed(2)
+                  : Number(p.total).toFixed(2)}
               </b>
 
-              {!p.pago && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      editarPendencia(p);
-                    }}
-                  >
-                    Editar
-                  </Button>
+              {/* BOTÕES */}
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={() => editarPendencia(p)}
+                >
+                  Editar
+                </Button>
 
-                  <Button
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      converterVenda(p);
-                    }}
-                  >
-                    Receber
-                  </Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                >
+                  Receber
+                </Button>
 
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removerPendencia(p);
-                    }}
-                  >
-                    🗑
-                  </Button>
-                </>
-              )}
-
-              {p.pago && (
-                <span className="text-green-600 font-semibold">Pago</span>
-              )}
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="cursor-pointer flex items-center gap-1"
+                  onClick={() => excluirPendencia(p.id)}
+                >
+                  <Trash2 size={16} />
+                  Excluir
+                </Button>
+              </div>
             </div>
           </div>
+
+          {/* LINHA EXPANSIVA */}
+          {openPendencia === p.id && pendenteItens[p.id] && (
+            <div className="border-t bg-gray-50">
+              {/* CABEÇALHO */}
+              <div className="grid grid-cols-3 text-sm font-semibold text-gray-600 px-4 py-2 border-b">
+                <div>Produto</div>
+                <div className="text-center">QTD</div>
+                <div className="text-right">Total</div>
+              </div>
+
+              {/* ITENS */}
+              <div className="divide-y">
+                {pendenteItens[p.id].map((item) => (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-3 px-4 py-2 text-sm"
+                  >
+                    <div>{item.product_name}</div>
+
+                    <div className="text-center">{item.quantity} UN</div>
+
+                    <div className="text-right">
+                      R$ {Number(item.subtotal).toFixed(2)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
