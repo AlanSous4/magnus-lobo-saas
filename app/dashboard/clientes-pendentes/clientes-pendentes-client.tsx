@@ -55,6 +55,11 @@ export default function ClientesPendentesClient() {
   const [openPendencia, setOpenPendencia] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState("dinheiro");
+  const [pendenciaSelecionada, setPendenciaSelecionada] =
+    useState<Pendente | null>(null);
+
   const calcularTotalItens = (lista: Item[]) => {
     return lista.reduce((acc, item) => acc + item.subtotal, 0);
   };
@@ -146,6 +151,70 @@ export default function ClientesPendentesClient() {
     } catch (error) {
       console.error(error);
       alert("Erro ao excluir pendência");
+    }
+  };
+
+  const receberPendencia = async (p: Pendente, payment: string) => {
+    try {
+      const itens = pendenteItens[p.id];
+
+      if (!itens || itens.length === 0) {
+        alert("Pendência sem itens");
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("Usuário não autenticado");
+        return;
+      }
+
+      // cria venda
+      const { data: venda, error: vendaError } = await supabase
+        .from("sales")
+        .insert({
+          total_amount: p.total,
+          total_value: p.total,
+          payment_method: payment,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (vendaError) {
+        console.error("ERRO VENDA:", JSON.stringify(vendaError, null, 2));
+        alert("Erro ao criar venda");
+        return;
+      }
+
+      // cria itens da venda
+      const saleItems = itens.map((item) => ({
+        sale_id: venda.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+      }));
+
+      await supabase.from("sale_items").insert(saleItems);
+
+      // marca como pago
+      await supabase
+        .from("clientes_pendentes")
+        .update({ pago: true })
+        .eq("id", p.id);
+
+      // atualiza tela
+      setPendentes((prev) =>
+        prev.map((pend) => (pend.id === p.id ? { ...pend, pago: true } : pend))
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao receber pagamento");
     }
   };
 
@@ -408,7 +477,8 @@ export default function ClientesPendentesClient() {
         <div key={p.id} className="border rounded-lg overflow-hidden">
           {/* LINHA PRINCIPAL */}
           <div
-            className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50"
+            className={`p-4 flex justify-between items-center cursor-pointer 
+            ${p.pago ? "bg-green-100 hover:bg-green-200" : "hover:bg-gray-50"}`}
             onClick={() => togglePendencia(p.id)}
           >
             <div>
@@ -443,6 +513,10 @@ export default function ClientesPendentesClient() {
                 <Button
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                  onClick={() => {
+                    setPendenciaSelecionada(p);
+                    setShowPaymentModal(true);
+                  }}
                 >
                   Receber
                 </Button>
@@ -491,6 +565,103 @@ export default function ClientesPendentesClient() {
           )}
         </div>
       ))}
+
+      {showPaymentModal && pendenciaSelecionada && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-96 space-y-4 shadow-lg">
+            <h2 className="text-xl font-bold">Receber pagamento</h2>
+
+            <p>
+              Cliente: <b>{pendenciaSelecionada.cliente_nome}</b>
+            </p>
+
+            <p>
+              Valor: <b>R$ {Number(pendenciaSelecionada.total).toFixed(2)}</b>
+            </p>
+
+            <div className="space-y-2">
+              <label className="flex gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="cash"
+                  checked={selectedPayment === "cash"}
+                  onChange={(e) => setSelectedPayment(e.target.value)}
+                />
+                Dinheiro
+              </label>
+
+              <label className="flex gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="pix"
+                  checked={selectedPayment === "pix"}
+                  onChange={(e) => setSelectedPayment(e.target.value)}
+                />
+                Pix
+              </label>
+
+              <label className="flex gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="credit"
+                  checked={selectedPayment === "credit"}
+                  onChange={(e) => setSelectedPayment(e.target.value)}
+                />
+                Crédito
+              </label>
+
+              <label className="flex gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="debit"
+                  checked={selectedPayment === "debit"}
+                  onChange={(e) => setSelectedPayment(e.target.value)}
+                />
+                Débito
+              </label>
+
+              <label className="flex gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="vr"
+                  checked={selectedPayment === "vr"}
+                  onChange={(e) => setSelectedPayment(e.target.value)}
+                />
+                VR
+              </label>
+
+              <label className="flex gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="va"
+                  checked={selectedPayment === "va"}
+                  onChange={(e) => setSelectedPayment(e.target.value)}
+                />
+                VA
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowPaymentModal(false)}
+              >
+                Cancelar
+              </Button>
+
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  receberPendencia(pendenciaSelecionada, selectedPayment);
+                  setShowPaymentModal(false);
+                }}
+              >
+                Confirmar pagamento
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
