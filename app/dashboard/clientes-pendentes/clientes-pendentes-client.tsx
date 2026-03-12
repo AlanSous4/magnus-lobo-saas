@@ -60,6 +60,11 @@ export default function ClientesPendentesClient() {
   };
 
   useEffect(() => {
+    const hoje = new Date().toISOString().split("T")[0];
+    setData(hoje);
+  }, []);
+
+  useEffect(() => {
     const fetchProducts = async () => {
       const { data } = await supabase
         .from("products")
@@ -279,7 +284,11 @@ export default function ClientesPendentesClient() {
     if (!itens) return;
 
     setCliente(p.cliente_nome);
-    setData(p.data_retirada);
+
+    // remove timezone que causa -1 dia
+    const dataFormatada = p.data_retirada.split("T")[0];
+    setData(dataFormatada);
+
     setEditingId(p.id);
 
     const mapped = itens.map((i) => ({
@@ -368,7 +377,8 @@ export default function ClientesPendentesClient() {
 
               <span>R$ {item.subtotal.toFixed(2)}</span>
 
-              <Button className="cursor-pointer flex items-center gap-1 hover:bg-red-700"
+              <Button
+                className="cursor-pointer flex items-center gap-1 hover:bg-red-700"
                 variant="destructive"
                 onClick={() => removeItem(item.product_id)}
               >
@@ -380,7 +390,10 @@ export default function ClientesPendentesClient() {
           <div className="flex justify-between">
             <b>Total: R$ {calcularTotalItens(items).toFixed(2)}</b>
 
-            <Button className="cursor-pointer" onClick={editingId ? updatePendencia : savePendencia}>
+            <Button
+              className="cursor-pointer"
+              onClick={editingId ? updatePendencia : savePendencia}
+            >
               {editingId ? "Atualizar Pendência" : "Salvar Pendência"}
             </Button>
           </div>
@@ -402,7 +415,7 @@ export default function ClientesPendentesClient() {
               <p className="font-semibold">{p.cliente_nome}</p>
 
               <p className="text-sm text-gray-500">
-                {new Date(p.data_retirada).toLocaleDateString("pt-BR")}
+                {p.data_retirada.split("-").reverse().join("/")}
               </p>
             </div>
 
