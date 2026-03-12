@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 
 type Product = {
   id: string;
@@ -48,6 +49,9 @@ export default function ClientesPendentesClient() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [pendentes, setPendentes] = useState<Pendente[]>([]);
+  const [pendenciasTemporarias, setPendenciasTemporarias] = useState<
+    Record<string, number>
+  >({});
   const [pendenteItens, setPendenteItens] = useState<
     Record<string, PendenteItem[]>
   >({});
@@ -115,7 +119,30 @@ export default function ClientesPendentesClient() {
   };
 
   useEffect(() => {
-    fetchPendencias();
+    fetchPendencias();    
+  }, []);
+
+  /* AUTO REFRESH DAS PENDÊNCIAS PAGAS */
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPendenciasTemporarias((prev) => {
+        const now = Date.now();
+        const atualizado: Record<string, number> = {};
+
+        Object.entries(prev).forEach(([id, time]) => {
+          if (now - time < 60000) {
+            atualizado[id] = time;
+          }
+        });
+
+        return atualizado;
+      });
+
+      fetchPendencias();
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -208,10 +235,31 @@ export default function ClientesPendentesClient() {
         .update({ pago: true })
         .eq("id", p.id);
 
-      // atualiza tela
-      setPendentes((prev) =>
-        prev.map((pend) => (pend.id === p.id ? { ...pend, pago: true } : pend))
-      );
+        setPendenciasTemporarias((prev) => ({
+          ...prev,
+          [p.id]: Date.now(),
+        }));
+
+      // ATUALIZA NA TELA IMEDIATAMENTE
+      setPendentes((prev) => {
+        const updated = prev.map((pend) =>
+          pend.id === p.id ? { ...pend, pago: true } : pend
+        );
+      
+        // mantém pendentes no topo e pagos no final
+        return updated.sort((a, b) => {
+          if (a.pago === b.pago) return 0;
+          return a.pago ? 1 : -1;
+        });
+      });
+
+      // registra momento do pagamento
+      setPendenciasTemporarias((prev) => ({
+        ...prev,
+        [p.id]: Date.now(),
+      }));
+
+      
     } catch (error) {
       console.error(error);
       alert("Erro ao receber pagamento");
@@ -384,6 +432,21 @@ export default function ClientesPendentesClient() {
     }
   };
 
+  const pendentesVisiveis = pendentes.filter((p) => {
+    if (!p.pago) return true;
+  
+    const pagoTime = pendenciasTemporarias[p.id];
+  
+    // se acabou de pagar e ainda não registrou tempo
+    if (!pagoTime) return true;
+  
+    const tempo = Date.now() - pagoTime;
+  
+    if (tempo > 60000) return false;
+  
+    return true;
+  });
+
   return (
     <div className="max-w-5xl space-y-6 pb-20">
       <h1 className="text-3xl font-bold">Clientes Pendentes</h1>
@@ -473,7 +536,7 @@ export default function ClientesPendentesClient() {
 
       <h2 className="text-lg font-semibold">Pendências</h2>
 
-      {pendentes.map((p) => (
+      {pendentesVisiveis.map((p) => (
         <div key={p.id} className="border rounded-lg overflow-hidden">
           {/* LINHA PRINCIPAL */}
           <div
@@ -482,7 +545,16 @@ export default function ClientesPendentesClient() {
             onClick={() => togglePendencia(p.id)}
           >
             <div>
-              <p className="font-semibold">{p.cliente_nome}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold">{p.cliente_nome}</p>
+
+                {p.pago && (
+                  <span className="flex items-center gap-1 text-xs bg-green-600 text-white px-2 py-1 rounded">
+                    <CheckCircle size={14} />
+                    Pago
+                  </span>
+                )}
+              </div>
 
               <p className="text-sm text-gray-500">
                 {p.data_retirada.split("-").reverse().join("/")}
@@ -501,35 +573,39 @@ export default function ClientesPendentesClient() {
 
               {/* BOTÕES */}
               <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => editarPendencia(p)}
-                >
-                  Editar
-                </Button>
+                {!p.pago && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={() => editarPendencia(p)}
+                    >
+                      Editar
+                    </Button>
 
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white cursor-pointer"
-                  onClick={() => {
-                    setPendenciaSelecionada(p);
-                    setShowPaymentModal(true);
-                  }}
-                >
-                  Receber
-                </Button>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                      onClick={() => {
+                        setPendenciaSelecionada(p);
+                        setShowPaymentModal(true);
+                      }}
+                    >
+                      Receber
+                    </Button>
 
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="cursor-pointer flex items-center gap-1"
-                  onClick={() => excluirPendencia(p.id)}
-                >
-                  <Trash2 size={16} />
-                  Excluir
-                </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="cursor-pointer flex items-center gap-1"
+                      onClick={() => excluirPendencia(p.id)}
+                    >
+                      <Trash2 size={16} />
+                      Excluir
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
