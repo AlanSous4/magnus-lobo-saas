@@ -69,9 +69,19 @@ export default function ClientesPendentesClient() {
   };
 
   useEffect(() => {
-    const hoje = new Date().toISOString().split("T")[0];
-    setData(hoje);
+    const salvo = localStorage.getItem("pendencias_pagas_timer");
+    if (salvo) {
+      try {
+        setPendenciasTemporarias(JSON.parse(salvo));
+      } catch (e) {
+        console.error("Erro ao carregar cache de pagamentos", e);
+      }
+    }
+    
+    // Inicia data de hoje
+    setData(new Date().toISOString().split("T")[0]);
   }, []);
+
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -89,40 +99,57 @@ export default function ClientesPendentesClient() {
   const fetchPendencias = async () => {
     const { data, error } = await supabase
       .from("clientes_pendentes")
-      .select(
-        `
+      .select(`
         *,
         clientes_pendentes_itens (*)
-      `
-      )
-      .order("pago", { ascending: true })
+      `)
+      // FILTRO CRÍTICO:
+      // 1. Traz o que NÃO está pago (pago.eq.false)
+      // 2. OU traz o que ESTÁ pago mas o ID consta no seu localStorage (id.in.([...]))
+      .or(`pago.eq.false,id.in.(${Object.keys(pendenciasTemporarias).length > 0 
+        ? Object.keys(pendenciasTemporarias).map(id => `"${id}"`).join(',') 
+        : '"00000000-0000-0000-0000-000000000000"'})`)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error(error);
       return;
     }
+    // ... resto da função
 
     if (!data) return;
 
+    // Atualiza a lista de pendentes
     setPendentes(data);
 
     const itensMap: Record<string, PendenteItem[]> = {};
-
-    data.forEach((p) => {
+    data.forEach((p: any) => {
       if (p.clientes_pendentes_itens) {
         itensMap[p.id] = p.clientes_pendentes_itens;
       }
+      
+      // LOGICA CRITICA: Se o banco diz que está PAGO, mas não temos o timer no localStorage
+      // (ex: página recarregada após o pagamento), precisamos decidir se mostramos ou não.
+      // Para evitar que "volte", se o banco diz que está pago e não há timer, 
+      // o useMemo filtrará automaticamente se não houver registro no pendenciasTemporarias.
     });
 
     setPendenteItens(itensMap);
   };
 
   useEffect(() => {
-    fetchPendencias();    
+    const salvo = localStorage.getItem("pendencias_pagas_timer");
+    if (salvo) {
+      try {
+        setPendenciasTemporarias(JSON.parse(salvo));
+      } catch (e) {
+        console.error("Erro ao carregar cache", e);
+      }
+    }
+    fetchPendencias();
   }, []);
 
-  /* AUTO REFRESH DAS PENDÊNCIAS PAGAS - APENAS LIMPEZA DE ESTADO */
+  /* AUTO REFRESH DAS PENDÊNCIAS PAGAS COM PERSISTÊNCIA */
   useEffect(() => {
     const interval = setInterval(() => {
       setPendenciasTemporarias((prev) => {
@@ -134,16 +161,16 @@ export default function ClientesPendentesClient() {
           if (now - time < 60000) {
             atualizado[id] = time;
           } else {
-            houveMudanca = true; // Alguém expirou
+            houveMudanca = true;
           }
         });
 
-        // Só atualiza o estado se algo realmente mudou para evitar re-renders infinitos
-        return houveMudanca ? atualizado : prev;
+        if (houveMudanca) {
+          localStorage.setItem("pendencias_pagas_timer", JSON.stringify(atualizado));
+          return atualizado;
+        }
+        return prev;
       });
-      
-      // IMPORTANTE: Removi o fetchPendencias() daqui. 
-      // Buscar no banco a cada 1 segundo quebra a lógica visual.
     }, 1000);
 
     return () => clearInterval(interval);
@@ -187,87 +214,65 @@ export default function ClientesPendentesClient() {
 
   const receberPendencia = async (p: Pendente, payment: string) => {
     try {
+      console.log("Iniciando pagamento para ID:", p.id); // Debug no console
+
       const itens = pendenteItens[p.id];
-
-      if (!itens || itens.length === 0) {
-        alert("Pendência sem itens");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !itens) {
+        console.error("Usuário ou itens não encontrados");
         return;
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // 1. MARCA COMO PAGO NO BANCO (A PARTE QUE ESTÁ FALHANDO)
+      const { error: updateError } = await supabase
+        .from("clientes_pendentes")
+        .update({ pago: true }) // Certifique-se que o nome da coluna é 'pago'
+        .eq("id", p.id);
 
-      if (!user) {
-        alert("Usuário não autenticado");
-        return;
+      if (updateError) {
+        console.error("Erro ao atualizar status de pago:", updateError);
+        alert("Erro no banco: " + updateError.message);
+        return; // Para aqui se der erro
       }
 
-      // cria venda
-      const { data: venda, error: vendaError } = await supabase
-        .from("sales")
-        .insert({
-          total_amount: p.total,
-          total_value: p.total,
-          payment_method: payment,
-          user_id: user.id,
-        })
-        .select()
-        .single();
+      // 2. CRIA A VENDA (Histórico)
+      const { data: venda, error: vErr } = await supabase.from("sales").insert({
+        total_amount: p.total, 
+        total_value: p.total, 
+        payment_method: payment, 
+        user_id: user.id
+      }).select().single();
 
-      if (vendaError) {
-        console.error("ERRO VENDA:", JSON.stringify(vendaError, null, 2));
-        alert("Erro ao criar venda");
-        return;
-      }
+      if (vErr) throw vErr;
 
-      // cria itens da venda
-      const saleItems = itens.map((item) => ({
-        sale_id: venda.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        subtotal: item.subtotal,
+      // 3. CRIA ITENS DA VENDA
+      const saleItems = itens.map(i => ({
+        sale_id: venda.id, 
+        product_id: i.product_id, 
+        product_name: i.product_name,
+        quantity: i.quantity, 
+        unit_price: i.unit_price, 
+        subtotal: i.subtotal
       }));
-
       await supabase.from("sale_items").insert(saleItems);
 
-      // marca como pago no banco
-      await supabase
-        .from("clientes_pendentes")
-        .update({ pago: true })
-        .eq("id", p.id)
-
-        // 1. Registra o tempo EXATO do pagamento para o contador de 60s
-      setPendenciasTemporarias((prev) => ({
-        ...prev,
-        [p.id]: Date.now(),
-      }));
-
-      // ATUALIZA NA TELA IMEDIATAMENTE
-      setPendentes((prev) => {
-        const updated = prev.map((pend) =>
-          pend.id === p.id ? { ...pend, pago: true } : pend
-        );
-      
-        // mantém pendentes no topo e pagos no final
-        return updated.sort((a, b) => {
-          if (a.pago === b.pago) return 0;
-          return a.pago ? 1 : -1;
-        });
+      // 4. PERSISTÊNCIA NO NAVEGADOR (Timer de 60s)
+      const agora = Date.now();
+      setPendenciasTemporarias(prev => {
+        const novo = { ...prev, [p.id]: agora };
+        localStorage.setItem("pendencias_pagas_timer", JSON.stringify(novo));
+        return novo;
       });
 
-      // registra momento do pagamento
-      setPendenciasTemporarias((prev) => ({
-        ...prev,
-        [p.id]: Date.now(),
-      }));
-
+      console.log("Pagamento concluído com sucesso no banco e local!");
+      setShowPaymentModal(false);
       
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao receber pagamento");
+      // 5. ATUALIZA A LISTA DO BANCO PARA CONFIRMAR
+      fetchPendencias();
+
+    } catch (error) { 
+      console.error("Erro geral:", error); 
+      alert("Erro ao processar pagamento"); 
     }
   };
 
@@ -322,16 +327,21 @@ export default function ClientesPendentesClient() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { data: pendente } = await supabase
+    const { data: pendente, error: pErr } = await supabase
       .from("clientes_pendentes")
       .insert({
         cliente_nome: cliente,
         total,
         data_retirada: data,
-        user_id: user?.id,
+        user_id: user?.id, // Garante que pegamos o ID do usuário logado
       })
       .select()
       .single();
+
+    if (pErr) {
+      alert("Erro ao criar pendência principal");
+      return;
+    }
 
     const itens = items.map((i) => ({
       pendente_id: pendente.id,
@@ -344,10 +354,11 @@ export default function ClientesPendentesClient() {
 
     await supabase.from("clientes_pendentes_itens").insert(itens);
 
+    // Reset completo dos estados de entrada
     setCliente("");
-    setData("");
+    setData(new Date().toISOString().split("T")[0]);
     setItems([]);
-    setPendenteItens({});
+    setSearch("");
     setOpenPendencia(null);
 
     fetchPendencias();
@@ -437,21 +448,30 @@ export default function ClientesPendentesClient() {
     }
   };
 
-  // Melhora na performance: Filtro e Ordenação memorizados
   const pendentesVisiveis = useMemo(() => {
     const agora = Date.now();
+    
+    // LOG DE DEBUG - Abra o F12 e veja se isso aparece
+    console.log("Pendências vindas do banco:", pendentes.length);
+
     return pendentes
       .filter((p) => {
-        if (!p.pago) return true; // Se não está pago, mostra sempre
-        const pagoTime = pendenciasTemporarias[p.id];
+        // Se NÃO está pago, mostra sempre
+        if (p.pago === false || p.pago === null) return true;
 
-        // Se está pago mas NÃO tem tempo registrado ou o tempo acabou, esconde.
-        if (!pagoTime) return false;
+        // Se ESTÁ pago, verificamos o cronômetro
+        const tempoPagamento = pendenciasTemporarias[p.id];
+        
+        if (tempoPagamento) {
+          const segundosPassados = (agora - tempoPagamento) / 1000;
+          // Se passou menos de 60 segundos, mantém na tela
+          return segundosPassados < 60;
+        }
 
-        const tempoDecorrido = agora - pagoTime;
-        return tempoDecorrido < 60000;
+        // Se está pago e NÃO tem tempo registrado (ou expirou), ESCONDE
+        return false;
       })
-      .sort((a, b) => Number(a.pago) - Number(b.pago)); // Pagos vão para o fim da lista
+      .sort((a, b) => Number(a.pago) - Number(b.pago));
   }, [pendentes, pendenciasTemporarias]);
 
   return (
@@ -570,8 +590,8 @@ export default function ClientesPendentesClient() {
         <div className="grid gap-3">
           {pendentesVisiveis.map((p) => {
             const totalEfetivo = pendenteItens[p.id]
-              ? pendenteItens[p.id].reduce((acc, item) => acc + Number(item.subtotal), 0)
-              : Number(p.total);
+            ? pendenteItens[p.id].reduce((acc, item) => acc + Number(item.subtotal), 0)
+            : Number(p.total);
 
             return (
               <div
