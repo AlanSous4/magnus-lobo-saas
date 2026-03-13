@@ -152,26 +152,26 @@ export default function ClientesPendentesClient() {
   /* AUTO REFRESH DAS PENDÊNCIAS PAGAS COM PERSISTÊNCIA */
   useEffect(() => {
     const interval = setInterval(() => {
+      const agora = Date.now();
       setPendenciasTemporarias((prev) => {
-        const now = Date.now();
-        const atualizado: Record<string, number> = {};
-        let houveMudanca = false;
+        const novoStorage: Record<string, number> = {};
+        let mudou = false;
 
-        Object.entries(prev).forEach(([id, time]) => {
-          if (now - time < 60000) {
-            atualizado[id] = time;
+        Object.entries(prev).forEach(([id, timestamp]) => {
+          if (agora - timestamp < 60000) {
+            novoStorage[id] = timestamp;
           } else {
-            houveMudanca = true;
+            mudou = true; // Alguém expirou!
           }
         });
 
-        if (houveMudanca) {
-          localStorage.setItem("pendencias_pagas_timer", JSON.stringify(atualizado));
-          return atualizado;
+        if (mudou) {
+          localStorage.setItem("pendencias_pagas_timer", JSON.stringify(novoStorage));
+          return novoStorage;
         }
         return prev;
       });
-    }, 1000);
+    }, 1000); // Roda a cada 1 segundo
 
     return () => clearInterval(interval);
   }, []);
@@ -451,26 +451,24 @@ export default function ClientesPendentesClient() {
   const pendentesVisiveis = useMemo(() => {
     const agora = Date.now();
     
-    // LOG DE DEBUG - Abra o F12 e veja se isso aparece
-    console.log("Pendências vindas do banco:", pendentes.length);
-
     return pendentes
       .filter((p) => {
-        // Se NÃO está pago, mostra sempre
-        if (p.pago === false || p.pago === null) return true;
+        // 1. Se NÃO está pago no banco, mostra sempre
+        if (p.pago === false) return true;
 
-        // Se ESTÁ pago, verificamos o cronômetro
+        // 2. Se ESTÁ pago no banco, verifica se ele ainda está no nosso cronômetro de 60s
         const tempoPagamento = pendenciasTemporarias[p.id];
         
         if (tempoPagamento) {
-          const segundosPassados = (agora - tempoPagamento) / 1000;
-          // Se passou menos de 60 segundos, mantém na tela
-          return segundosPassados < 60;
+          const diferencaGeral = agora - tempoPagamento;
+          // Retorna verdadeiro se passou menos de 60.000 milissegundos (60 segundos)
+          return diferencaGeral < 60000;
         }
 
-        // Se está pago e NÃO tem tempo registrado (ou expirou), ESCONDE
+        // 3. Se está pago e não tem tempo registrado ou já passou de 60s, esconde
         return false;
       })
+      // Ordena para que os pagos (que ainda estão visíveis) fiquem no final da lista
       .sort((a, b) => Number(a.pago) - Number(b.pago));
   }, [pendentes, pendenciasTemporarias]);
 
