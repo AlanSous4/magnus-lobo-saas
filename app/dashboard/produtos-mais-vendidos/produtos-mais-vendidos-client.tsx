@@ -47,55 +47,62 @@ export default function ProdutosMaisVendidosClient() {
   }
 
   async function fetchVendasPorProduto(nome: string) {
+    // 1. Definir a data de início baseada no período selecionado
+    const dataInicio = new Date();
+    if (periodo === "0") {
+      // Se for hoje, pegamos desde o primeiro segundo do dia (00:00:00)
+      dataInicio.setHours(0, 0, 0, 0);
+    } else {
+      // Se forem dias (7, 30, 90), subtraímos da data atual
+      dataInicio.setDate(dataInicio.getDate() - parseInt(periodo));
+    }
+  
+    // 2. Buscar itens filtrando por NOME e por DATA (via join com a tabela sales)
     const { data: items, error: itemsError } = await supabase
       .from("sale_items")
       .select(`
         sale_id,
         quantity,
         unit_price,
-        product_id,
-        products!inner(name)
+        products!inner(name),
+        sales!inner(id, payment_method, created_at)
       `)
-      .eq("products.name", nome);
-
-    if (itemsError || !items) return;
-
-    const saleIds = Array.from(new Set(items.map(i => i.sale_id)));
-    const { data: sales, error: salesError } = await supabase
-      .from("sales")
-      .select("id, payment_method, created_at")
-      .in("id", saleIds);
-
-    if (salesError || !sales) return;
-
-    const salesMap = Object.fromEntries((sales as any[]).map(sale => [sale.id, sale]));
+      .eq("products.name", nome)
+      .gte("sales.created_at", dataInicio.toISOString()); // O FILTRO QUE FALTAVA
+  
+    if (itemsError || !items) {
+      console.error("Erro ao buscar detalhes:", itemsError);
+      return;
+    }
+  
+    // 3. Organizar os dados para o estado
     const vendasMap: Record<string, Venda> = {};
-
+  
     (items as any[]).forEach(item => {
-      const vendaId = item.sale_id;
-      const saleData = salesMap[vendaId];
-      const paymentRaw = saleData?.payment_method;
+      const saleData = item.sales;
+      const vendaId = saleData.id;
+      const paymentRaw = saleData.payment_method;
       const payment = paymentLabelMap[paymentRaw] || paymentRaw || "Desconhecido";
-
+  
       if (!vendasMap[vendaId]) {
         vendasMap[vendaId] = {
           venda_id: vendaId,
-          data_venda: saleData?.created_at || new Date().toISOString(),
+          data_venda: saleData.created_at,
           payment_method: payment,
           items: [],
           total: 0,
         };
       }
-
+  
       vendasMap[vendaId].items.push({
-        nome: item.products?.name || "Produto desconhecido",
+        nome: item.products?.name || "Produto",
         quantidade: item.quantity,
         valor: item.unit_price,
       });
-
+  
       vendasMap[vendaId].total += item.unit_price * item.quantity;
     });
-
+  
     setProdutoSelecionado(nome);
     setVendasProduto(Object.values(vendasMap));
   }
