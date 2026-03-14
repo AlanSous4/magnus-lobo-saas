@@ -10,6 +10,7 @@ type Product = {
   id: string;
   name: string;
   value: number;
+  is_weight?: boolean;
 };
 
 type Item = {
@@ -18,6 +19,7 @@ type Item = {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  is_weight: boolean;
 };
 
 type Pendente = {
@@ -37,7 +39,18 @@ type PendenteItem = {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  is_weight: boolean; // ADICIONE ESTA LINHA
 };
+
+/* =========================
+   FUNÇÃO DE MOEDA (R$)
+========================= */
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
 
 export default function ClientesPendentesClient() {
   const [cliente, setCliente] = useState("");
@@ -77,17 +90,16 @@ export default function ClientesPendentesClient() {
         console.error("Erro ao carregar cache de pagamentos", e);
       }
     }
-    
+
     // Inicia data de hoje
     setData(new Date().toISOString().split("T")[0]);
   }, []);
-
 
   useEffect(() => {
     const fetchProducts = async () => {
       const { data } = await supabase
         .from("products")
-        .select("id,name,value")
+        .select("id,name,value,is_weight")
         .order("name");
 
       if (data) setProducts(data);
@@ -99,16 +111,24 @@ export default function ClientesPendentesClient() {
   const fetchPendencias = async () => {
     const { data, error } = await supabase
       .from("clientes_pendentes")
-      .select(`
+      .select(
+        `
         *,
         clientes_pendentes_itens (*)
-      `)
+      `
+      )
       // FILTRO CRÍTICO:
       // 1. Traz o que NÃO está pago (pago.eq.false)
       // 2. OU traz o que ESTÁ pago mas o ID consta no seu localStorage (id.in.([...]))
-      .or(`pago.eq.false,id.in.(${Object.keys(pendenciasTemporarias).length > 0 
-        ? Object.keys(pendenciasTemporarias).map(id => `"${id}"`).join(',') 
-        : '"00000000-0000-0000-0000-000000000000"'})`)
+      .or(
+        `pago.eq.false,id.in.(${
+          Object.keys(pendenciasTemporarias).length > 0
+            ? Object.keys(pendenciasTemporarias)
+                .map((id) => `"${id}"`)
+                .join(",")
+            : '"00000000-0000-0000-0000-000000000000"'
+        })`
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -127,10 +147,10 @@ export default function ClientesPendentesClient() {
       if (p.clientes_pendentes_itens) {
         itensMap[p.id] = p.clientes_pendentes_itens;
       }
-      
+
       // LOGICA CRITICA: Se o banco diz que está PAGO, mas não temos o timer no localStorage
       // (ex: página recarregada após o pagamento), precisamos decidir se mostramos ou não.
-      // Para evitar que "volte", se o banco diz que está pago e não há timer, 
+      // Para evitar que "volte", se o banco diz que está pago e não há timer,
       // o useMemo filtrará automaticamente se não houver registro no pendenciasTemporarias.
     });
 
@@ -166,7 +186,10 @@ export default function ClientesPendentesClient() {
         });
 
         if (mudou) {
-          localStorage.setItem("pendencias_pagas_timer", JSON.stringify(novoStorage));
+          localStorage.setItem(
+            "pendencias_pagas_timer",
+            JSON.stringify(novoStorage)
+          );
           return novoStorage;
         }
         return prev;
@@ -217,7 +240,9 @@ export default function ClientesPendentesClient() {
       console.log("Iniciando pagamento para ID:", p.id); // Debug no console
 
       const itens = pendenteItens[p.id];
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user || !itens) {
         console.error("Usuário ou itens não encontrados");
         return;
@@ -236,29 +261,33 @@ export default function ClientesPendentesClient() {
       }
 
       // 2. CRIA A VENDA (Histórico)
-      const { data: venda, error: vErr } = await supabase.from("sales").insert({
-        total_amount: p.total, 
-        total_value: p.total, 
-        payment_method: payment, 
-        user_id: user.id
-      }).select().single();
+      const { data: venda, error: vErr } = await supabase
+        .from("sales")
+        .insert({
+          total_amount: p.total,
+          total_value: p.total,
+          payment_method: payment,
+          user_id: user.id,
+        })
+        .select()
+        .single();
 
       if (vErr) throw vErr;
 
       // 3. CRIA ITENS DA VENDA
-      const saleItems = itens.map(i => ({
-        sale_id: venda.id, 
-        product_id: i.product_id, 
+      const saleItems = itens.map((i) => ({
+        sale_id: venda.id,
+        product_id: i.product_id,
         product_name: i.product_name,
-        quantity: i.quantity, 
-        unit_price: i.unit_price, 
-        subtotal: i.subtotal
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        subtotal: i.subtotal,
       }));
       await supabase.from("sale_items").insert(saleItems);
 
       // 4. PERSISTÊNCIA NO NAVEGADOR (Timer de 60s)
       const agora = Date.now();
-      setPendenciasTemporarias(prev => {
+      setPendenciasTemporarias((prev) => {
         const novo = { ...prev, [p.id]: agora };
         localStorage.setItem("pendencias_pagas_timer", JSON.stringify(novo));
         return novo;
@@ -266,13 +295,12 @@ export default function ClientesPendentesClient() {
 
       console.log("Pagamento concluído com sucesso no banco e local!");
       setShowPaymentModal(false);
-      
+
       // 5. ATUALIZA A LISTA DO BANCO PARA CONFIRMAR
       fetchPendencias();
-
-    } catch (error) { 
-      console.error("Erro geral:", error); 
-      alert("Erro ao processar pagamento"); 
+    } catch (error) {
+      console.error("Erro geral:", error);
+      alert("Erro ao processar pagamento");
     }
   };
 
@@ -280,16 +308,27 @@ export default function ClientesPendentesClient() {
     const exists = items.find((i) => i.product_id === product.id);
 
     if (exists) {
-      updateQuantity(product.id, exists.quantity + 1);
+      // Aumenta 100g ou 1 unidade
+      const increment = product.is_weight ? 100 : 1;
+      updateQuantity(product.id, exists.quantity + increment);
       return;
     }
+
+    // Lógica idêntica ao seu PDV: peso inicia com 100
+    const initialQty = product.is_weight ? 100 : 1;
+
+    // Cálculo do subtotal igual ao seu PDV: (valor / 100) * quantidade
+    const initialSubtotal = product.is_weight
+      ? (product.value / 100) * initialQty
+      : product.value * initialQty;
 
     const newItem: Item = {
       product_id: product.id,
       product_name: product.name,
-      quantity: 1,
+      quantity: initialQty,
       unit_price: product.value,
-      subtotal: product.value,
+      subtotal: initialSubtotal,
+      is_weight: !!product.is_weight, // Usa a informação TRUE que vem do seu banco
     };
 
     setItems((prev) => [...prev, newItem]);
@@ -297,16 +336,19 @@ export default function ClientesPendentesClient() {
     setFilteredProducts([]);
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity < 1) quantity = 1;
+  const updateQuantity = (productId: string, q: number) => {
+    if (q <= 0) return;
 
     setItems((prev) =>
       prev.map((item) => {
         if (item.product_id !== productId) return item;
 
-        const subtotal = quantity * item.unit_price;
+        // Lógica de cálculo do PDV
+        const subtotal = item.is_weight
+          ? (item.unit_price / 100) * q
+          : item.unit_price * q;
 
-        return { ...item, quantity, subtotal };
+        return { ...item, quantity: q, subtotal: Number(subtotal.toFixed(2)) };
       })
     );
   };
@@ -347,9 +389,10 @@ export default function ClientesPendentesClient() {
       pendente_id: pendente.id,
       product_id: i.product_id,
       product_name: i.product_name,
-      quantity: i.quantity,
+      quantity: i.is_weight ? i.quantity / 1000 : i.quantity,
       unit_price: i.unit_price,
       subtotal: i.subtotal,
+      is_weight: i.is_weight, // ADICIONE ESTA LINHA
     }));
 
     await supabase.from("clientes_pendentes_itens").insert(itens);
@@ -387,9 +430,10 @@ export default function ClientesPendentesClient() {
       pendente_id: editingId,
       product_id: i.product_id,
       product_name: i.product_name,
-      quantity: i.quantity,
+      quantity: i.is_weight ? i.quantity / 1000 : i.quantity,
       unit_price: i.unit_price,
       subtotal: i.subtotal,
+      is_weight: i.is_weight, // ADICIONE ESTA LINHA
     }));
 
     await supabase.from("clientes_pendentes_itens").insert(novosItens);
@@ -409,28 +453,39 @@ export default function ClientesPendentesClient() {
   };
 
   const editarPendencia = async (p: Pendente) => {
-    const { data: itens } = await supabase
+    // CORREÇÃO AQUI: Select simples, pois já estamos na tabela de itens
+    const { data: itens, error } = await supabase
       .from("clientes_pendentes_itens")
-      .select("*")
+      .select("*") 
       .eq("pendente_id", p.id);
 
-    if (!itens) return;
+    if (error || !itens) {
+      console.error("Erro ao buscar itens:", error);
+      return;
+    }
 
     setCliente(p.cliente_nome);
 
-    // remove timezone que causa -1 dia
+    // Remove timezone que causa -1 dia
     const dataFormatada = p.data_retirada.split("T")[0];
     setData(dataFormatada);
 
     setEditingId(p.id);
 
-    const mapped = itens.map((i) => ({
-      product_id: i.product_id || crypto.randomUUID(),
-      product_name: i.product_name,
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-      subtotal: i.subtotal,
-    }));
+    const mapped: Item[] = itens.map((i) => {
+      // Usamos a coluna is_weight que agora existe no banco
+      const isWeight = !!i.is_weight;
+
+      return {
+        product_id: i.product_id || crypto.randomUUID(),
+        product_name: i.product_name,
+        // Se for peso no banco (0.500), volta para gramas (500) para o formulário
+        quantity: isWeight ? i.quantity * 1000 : i.quantity,
+        unit_price: i.unit_price,
+        subtotal: i.subtotal,
+        is_weight: isWeight,
+      };
+    });
 
     setItems(mapped);
 
@@ -450,26 +505,28 @@ export default function ClientesPendentesClient() {
 
   const pendentesVisiveis = useMemo(() => {
     const agora = Date.now();
-    
-    return pendentes
-      .filter((p) => {
-        // 1. Se NÃO está pago no banco, mostra sempre
-        if (p.pago === false) return true;
 
-        // 2. Se ESTÁ pago no banco, verifica se ele ainda está no nosso cronômetro de 60s
-        const tempoPagamento = pendenciasTemporarias[p.id];
-        
-        if (tempoPagamento) {
-          const diferencaGeral = agora - tempoPagamento;
-          // Retorna verdadeiro se passou menos de 60.000 milissegundos (60 segundos)
-          return diferencaGeral < 60000;
-        }
+    return (
+      pendentes
+        .filter((p) => {
+          // 1. Se NÃO está pago no banco, mostra sempre
+          if (p.pago === false) return true;
 
-        // 3. Se está pago e não tem tempo registrado ou já passou de 60s, esconde
-        return false;
-      })
-      // Ordena para que os pagos (que ainda estão visíveis) fiquem no final da lista
-      .sort((a, b) => Number(a.pago) - Number(b.pago));
+          // 2. Se ESTÁ pago no banco, verifica se ele ainda está no nosso cronômetro de 60s
+          const tempoPagamento = pendenciasTemporarias[p.id];
+
+          if (tempoPagamento) {
+            const diferencaGeral = agora - tempoPagamento;
+            // Retorna verdadeiro se passou menos de 60.000 milissegundos (60 segundos)
+            return diferencaGeral < 60000;
+          }
+
+          // 3. Se está pago e não tem tempo registrado ou já passou de 60s, esconde
+          return false;
+        })
+        // Ordena para que os pagos (que ainda estão visíveis) fiquem no final da lista
+        .sort((a, b) => Number(a.pago) - Number(b.pago))
+    );
   }, [pendentes, pendenciasTemporarias]);
 
   return (
@@ -522,7 +579,9 @@ export default function ClientesPendentesClient() {
                     className="cursor-pointer p-3 hover:bg-blue-50 flex justify-between text-sm transition-colors"
                   >
                     <span className="font-medium">{p.name}</span>
-                    <span className="text-blue-600 font-bold">R$ {p.value.toFixed(2)}</span>
+                    <span className="text-blue-600 font-bold">
+                      R$ {p.value.toFixed(2)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -532,22 +591,43 @@ export default function ClientesPendentesClient() {
           {/* Listagem de Itens no Formulário */}
           {items.length > 0 && (
             <div className="space-y-2 border-t pt-4">
-              <p className="text-xs font-bold text-gray-400 uppercase">Itens Selecionados</p>
+              <p className="text-xs font-bold text-gray-400 uppercase">
+                Itens Selecionados
+              </p>
               {items.map((item) => (
-                <div key={item.product_id} className="flex items-center gap-3 bg-gray-50 p-2 rounded-lg border">
-                  <span className="flex-1 text-sm font-medium">{item.product_name}</span>
+                <div
+                  key={item.product_id}
+                  className="flex items-center gap-3 bg-gray-50 p-2 rounded-lg border"
+                >
+                  <span className="flex-1 text-sm font-medium">
+                    {item.product_name}
+                  </span>
 
-                  <div className="w-20">
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateQuantity(item.product_id, Number(e.target.value))}
-                      className="h-8 text-center"
-                    />
+                  <div className="w-32 flex items-center gap-1">
+                    <div className="relative flex-1">
+                      <Input
+                        type="number"
+                        // Step 50 para subir de 50g em 50g como no PDV
+                        step={item.is_weight ? 50 : 1}
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateQuantity(
+                            item.product_id,
+                            Number(e.target.value)
+                          )
+                        }
+                        className="h-9 text-center font-mono font-bold pr-6"
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 pointer-events-none">
+                        {item.is_weight ? "g" : "un"}
+                      </span>
+                    </div>
                   </div>
 
                   <span className="w-24 text-right text-sm font-semibold">
-                    R$ {item.subtotal.toFixed(2)}
+                    {/* Removemos o R$ fixo daqui pois o formatCurrency já adiciona */}
+                    {formatCurrency(item.subtotal)}
                   </span>
 
                   <Button
@@ -565,7 +645,10 @@ export default function ClientesPendentesClient() {
 
           <div className="flex justify-between items-center pt-4 border-t">
             <div className="text-lg">
-              Total: <span className="font-bold text-2xl text-blue-600">R$ {calcularTotalItens(items).toFixed(2)}</span>
+              Total:{" "}
+              <span className="font-bold text-2xl text-blue-600">
+                R$ {calcularTotalItens(items).toFixed(2)}
+              </span>
             </div>
 
             <Button
@@ -588,14 +671,19 @@ export default function ClientesPendentesClient() {
         <div className="grid gap-3">
           {pendentesVisiveis.map((p) => {
             const totalEfetivo = pendenteItens[p.id]
-            ? pendenteItens[p.id].reduce((acc, item) => acc + Number(item.subtotal), 0)
-            : Number(p.total);
+              ? pendenteItens[p.id].reduce(
+                  (acc, item) => acc + Number(item.subtotal),
+                  0
+                )
+              : Number(p.total);
 
             return (
               <div
                 key={p.id}
                 className={`border rounded-xl transition-all overflow-hidden ${
-                  p.pago ? "bg-green-50 border-green-200 opacity-80" : "bg-white hover:shadow-md"
+                  p.pago
+                    ? "bg-green-50 border-green-200 opacity-80"
+                    : "bg-white hover:shadow-md"
                 }`}
               >
                 {/* LINHA PRINCIPAL */}
@@ -604,10 +692,16 @@ export default function ClientesPendentesClient() {
                   onClick={() => togglePendencia(p.id)}
                 >
                   <div className="flex gap-3">
-                    <div className={`mt-1.5 h-2.5 w-2.5 rounded-full${p.pago ? "bg-green-500" : "bg-amber-500 animate-pulse"}`} />
+                    <div
+                      className={`mt-1.5 h-2.5 w-2.5 rounded-full${
+                        p.pago ? "bg-green-500" : "bg-amber-500 animate-pulse"
+                      }`}
+                    />
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-gray-800">{p.cliente_nome}</p>
+                        <p className="font-bold text-gray-800">
+                          {p.cliente_nome}
+                        </p>
                         {p.pago && (
                           <span className="flex items-center gap-1 text-[10px] font-bold uppercase bg-green-600 text-white px-2 py-0.5 rounded-full">
                             <CheckCircle size={10} /> Pago
@@ -615,15 +709,21 @@ export default function ClientesPendentesClient() {
                         )}
                       </div>
                       <p className="text-xs text-gray-500 font-medium italic">
-                        Retirada: {p.data_retirada.split("-").reverse().join("/")}
+                        Retirada:{" "}
+                        {p.data_retirada.split("-").reverse().join("/")}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between w-full md:w-auto gap-6">
-                    <b className="text-lg font-bold text-gray-700">R$ {totalEfetivo.toFixed(2)}</b>
+                    <b className="text-lg font-bold text-gray-700">
+                      R$ {totalEfetivo.toFixed(2)}
+                    </b>
 
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="flex gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {!p.pago && (
                         <>
                           <Button
@@ -670,10 +770,25 @@ export default function ClientesPendentesClient() {
                     </div>
                     <div className="space-y-1">
                       {pendenteItens[p.id].map((item) => (
-                        <div key={item.id} className="grid grid-cols-3 px-2 py-1.5 text-sm bg-white border rounded shadow-sm">
+                        <div
+                          key={item.id}
+                          className="grid grid-cols-3 px-2 py-1.5 text-sm bg-white border rounded shadow-sm"
+                        >
                           <div className="font-medium">{item.product_name}</div>
-                          <div className="text-center text-gray-600">{item.quantity} UN</div>
-                          <div className="text-right font-semibold">R$ {Number(item.subtotal).toFixed(2)}</div>
+                          <div className="text-center text-gray-600 font-mono">
+                            {item.is_weight === true
+                              ? // Se for peso (is_weight explicitamente true no banco)
+                                item.quantity < 1
+                                ? `${(item.quantity * 1000).toFixed(0)}g`
+                                : `${item.quantity
+                                    .toFixed(3)
+                                    .replace(".", ",")} Kg`
+                              : // Se is_weight for false OU nulo (para itens antigos)
+                                `${Math.floor(item.quantity)} un`}
+                          </div>
+                          <div className="text-right font-semibold">
+                            R$ {Number(item.subtotal).toFixed(2)}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -690,23 +805,35 @@ export default function ClientesPendentesClient() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-6 shadow-2xl border">
             <div className="space-y-1 text-center">
-              <h2 className="text-2xl font-bold text-gray-800">Receber Pagamento</h2>
+              <h2 className="text-2xl font-bold text-gray-800">
+                Receber Pagamento
+              </h2>
               <p className="text-gray-500">Confirme os detalhes do cliente</p>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-xl space-y-2 border">
-              <p className="flex justify-between"><span>Cliente:</span> <b>{pendenciaSelecionada.cliente_nome}</b></p>
+              <p className="flex justify-between">
+                <span>Cliente:</span> <b>{pendenciaSelecionada.cliente_nome}</b>
+              </p>
               <p className="flex justify-between text-lg text-blue-700 font-bold border-t pt-2 mt-2">
-                <span>Total:</span> <span>R$ {Number(pendenciaSelecionada.total).toFixed(2)}</span>
+                <span>Total:</span>{" "}
+                <span>R$ {Number(pendenciaSelecionada.total).toFixed(2)}</span>
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {['cash', 'pix', 'credit', 'debit', 'vr', 'va'].map((type) => (
-                <label key={type} className={`
+              {["cash", "pix", "credit", "debit", "vr", "va"].map((type) => (
+                <label
+                  key={type}
+                  className={`
                   flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all
-                  ${selectedPayment === type ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'hover:bg-gray-50'}
-                `}>
+                  ${
+                    selectedPayment === type
+                      ? "bg-blue-50 border-blue-500 ring-1 ring-blue-500"
+                      : "hover:bg-gray-50"
+                  }
+                `}
+                >
                   <input
                     type="radio"
                     className="hidden"
@@ -715,10 +842,15 @@ export default function ClientesPendentesClient() {
                     onChange={(e) => setSelectedPayment(e.target.value)}
                   />
                   <span className="uppercase text-xs font-bold text-gray-700 w-full text-center">
-                    {type === 'cash' ? '💵 Dinheiro' : 
-                     type === 'pix' ? '📱 Pix' : 
-                     type === 'credit' ? '💳 Crédito' : 
-                     type === 'debit' ? '💳 Débito' : type.toUpperCase()}
+                    {type === "cash"
+                      ? "💵 Dinheiro"
+                      : type === "pix"
+                      ? "📱 Pix"
+                      : type === "credit"
+                      ? "💳 Crédito"
+                      : type === "debit"
+                      ? "💳 Débito"
+                      : type.toUpperCase()}
                   </span>
                 </label>
               ))}
