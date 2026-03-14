@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { TrendingUp, Package } from "lucide-react";
+import { TrendingUp, Package, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 type Produto = { nome: string; quantidade: number };
@@ -217,20 +217,23 @@ export default function ProdutosMaisVendidosClient() {
               <div className="space-y-4 overflow-x-auto">
                 {vendasProduto.map((venda) => (
                   <div key={venda.venda_id} className="border rounded p-3 min-w-75 space-y-1">
-                    <div className="flex justify-between font-semibold">
-                      <span>{new Date(venda.data_venda).toLocaleString("pt-BR")}</span>
-                      <span>R$ {venda.total.toFixed(2)}</span>
-                      <span>{venda.payment_method}</span>
-                    </div>
-                    <div className="pl-4 space-y-1">
-                      {venda.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-sm">
-                          <span>{item.nome} ({item.quantidade}x)</span>
-                          <span>R$ {item.valor.toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex justify-between font-semibold">
+                    <span className="flex items-center gap-1">
+                      <Clock size={16} className="text-muted-foreground" />
+                      {new Date(venda.data_venda).toLocaleTimeString("pt-BR")}
+                    </span>
+                    <span>R$ {venda.total.toFixed(2)}</span>
+                    <span>{venda.payment_method}</span>
                   </div>
+                  <div className="pl-4 space-y-1">
+                    {venda.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span>{item.nome} ({item.quantidade} UN)</span>
+                        <span>R$ {item.valor.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 ))}
               </div>
             )}
