@@ -473,7 +473,7 @@ export default function ClientesPendentesClient() {
   }, [pendentes, pendenciasTemporarias]);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20 p-4">
+    <div className="max-w-5xl space-y-6 pb-20">
       <h1 className="text-3xl font-bold tracking-tight">Clientes Pendentes</h1>
 
       {/* FORMULÁRIO */}
