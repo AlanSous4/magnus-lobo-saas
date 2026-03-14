@@ -153,14 +153,14 @@ export default function ProdutosMaisVendidosClient() {
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <Select defaultValue={periodo} onValueChange={setPeriodo}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 cursor-pointer">
             <SelectValue placeholder="Período" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="0">Hoje</SelectItem>
-            <SelectItem value="7">Últimos 7 dias</SelectItem>
-            <SelectItem value="30">Últimos 30 dias</SelectItem>
-            <SelectItem value="90">Últimos 90 dias</SelectItem>
+            <SelectItem className="cursor-pointer" value="0">Hoje</SelectItem>
+            <SelectItem className="cursor-pointer" value="7">Últimos 7 dias</SelectItem>
+            <SelectItem className="cursor-pointer" value="30">Últimos 30 dias</SelectItem>
+            <SelectItem className="cursor-pointer" value="90">Últimos 90 dias</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -193,9 +193,9 @@ export default function ProdutosMaisVendidosClient() {
               <button
                 key={item.nome}
                 onClick={() => fetchVendasPorProduto(item.nome)}
-                className="w-full text-left flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-3 hover:bg-orange-50 gap-2 sm:gap-0"
+                className="w-full text-left flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-3 hover:bg-orange-50 gap-2 sm:gap-0 cursor-pointer"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 cursor-pointer">
                   <span className="font-bold text-orange-600">#{index + 1}</span>
                   <span className="font-medium">{item.nome}</span>
                 </div>

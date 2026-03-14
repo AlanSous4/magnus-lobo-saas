@@ -495,7 +495,7 @@ export default function ClientesPendentesClient() {
             <label className="text-sm font-medium">Data de Retirada:</label>
             <Input
               type="date"
-              className="md:col-span-2"
+              className="w-1/2 cursor-pointer"
               value={data}
               onChange={(e) => setData(e.target.value)}
             />
@@ -506,7 +506,7 @@ export default function ClientesPendentesClient() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar produto para adicionar..."
-              className="bg-gray-50"
+              className="bg-gray-50 cursor-pointer"
             />
 
             {/* Resultados da Busca */}
@@ -569,7 +569,7 @@ export default function ClientesPendentesClient() {
             </div>
 
             <Button
-              className="px-8 font-semibold shadow-md active:scale-95 transition-transform"
+              className="px-8 font-semibold shadow-md active:scale-95 transition-transform cursor-pointer"
               onClick={editingId ? updatePendencia : savePendencia}
             >
               {editingId ? "Atualizar Pendência" : "Salvar Pendência"}
@@ -581,7 +581,7 @@ export default function ClientesPendentesClient() {
       {/* LISTA DE PENDÊNCIAS */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <span className="w-1.5 h-6 bg-blue-600 rounded-full" />
+          <span className="w-1.5 h-6 rounded-full" />
           Lista de Pendências
         </h2>
 
@@ -604,7 +604,7 @@ export default function ClientesPendentesClient() {
                   onClick={() => togglePendencia(p.id)}
                 >
                   <div className="flex gap-3">
-                    <div className={`mt-1.5 h-2.5 w-2.5 rounded-full ${p.pago ? "bg-green-500" : "bg-amber-500 animate-pulse"}`} />
+                    <div className={`mt-1.5 h-2.5 w-2.5 rounded-full${p.pago ? "bg-green-500" : "bg-amber-500 animate-pulse"}`} />
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-gray-800">{p.cliente_nome}</p>
@@ -629,7 +629,7 @@ export default function ClientesPendentesClient() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="bg-white"
+                            className="bg-white cursor-pointer"
                             onClick={() => editarPendencia(p)}
                           >
                             Editar
@@ -637,7 +637,7 @@ export default function ClientesPendentesClient() {
 
                           <Button
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            className="bg-green-600 hover:bg-green-700 text-white cursor-pointer"
                             onClick={() => {
                               setPendenciaSelecionada(p);
                               setShowPaymentModal(true);
@@ -649,7 +649,7 @@ export default function ClientesPendentesClient() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-gray-400 hover:text-red-600"
+                            className="text-gray-400 hover:text-red-600 cursor-pointer"
                             onClick={() => excluirPendencia(p.id)}
                           >
                             <Trash2 size={18} />
