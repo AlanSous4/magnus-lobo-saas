@@ -55,6 +55,16 @@ function formatHour(date: string | Date) {
   });
 }
 
+/* =========================
+   NOVO: FORMATA MOEDA (R$)
+========================= */
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
 
@@ -132,8 +142,18 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     }
 
     if (periodMode === "month") {
-      const [year, month] = selectedMonth.split("-");
-      return [`${month}/${year}`];
+      const [year, month] = selectedMonth.split("-").map(Number);
+      // Descobre o último dia do mês (ex: 28, 30 ou 31)
+      const lastDay = new Date(year, month, 0).getDate();
+      
+      const daysArray = [];
+      for (let i = 1; i <= lastDay; i++) {
+        // Formata cada dia como DD/MM/AAAA
+        const day = String(i).padStart(2, "0");
+        const monthStr = String(month).padStart(2, "0");
+        daysArray.push(`${day}/${monthStr}/${year}`);
+      }
+      return daysArray; // Retorna do 01 ao 31
     }
 
     return [...metrics.labels].reverse();
@@ -258,11 +278,11 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
           </div>
           <div>
             <strong>Receita total</strong>
-            <p>R$ {metrics.summary.totalRevenue.toFixed(2)}</p>
+            <p>R$ {formatCurrency(metrics.summary.totalRevenue)}</p>
           </div>
           <div>
             <strong>Ticket médio</strong>
-            <p>R$ {metrics.summary.averageTicket.toFixed(2)}</p>
+            <p>{formatCurrency(metrics.summary.averageTicket)}</p>
           </div>
         </div>
 
@@ -279,15 +299,19 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </thead>
 
             <tbody>
-              {labelsToRender.map((label) => {
+            {labelsToRender.map((label) => {
                 const periodSales = filteredSales.filter((s) => {
                   const saleDateBR = formatBR(getLocalDate(s.created_at));
+                  
+                  // Se estivermos no modo mês ou range, comparamos o dia da venda com o label da linha
+                  if (periodMode === "month" || periodMode === "range") {
+                    return saleDateBR === label;
+                  }
 
-                  if (periodMode === "daily")
+                  // Se for diário, mostra tudo daquele dia selecionado
+                  if (periodMode === "daily") {
                     return getLocalDate(s.created_at) === selectedDate;
-
-                  if (periodMode === "month")
-                    return getLocalMonth(s.created_at) === selectedMonth;
+                  }
 
                   return saleDateBR === label;
                 });
@@ -296,6 +320,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                   (sum, s) => sum + (s.total_value ?? 0),
                   0
                 );
+
+                // NOVO: Cálculo do Ticket Médio seguro para evitar erro de divisão por zero
+                const averageTicket = periodSales.length > 0 ? revenue / periodSales.length : 0;
 
                 const isOpen = expandedLabel === label;
 
@@ -308,12 +335,12 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                       <td className="p-2">{label}</td>
                       <td className="p-2 text-right">{periodSales.length}</td>
                       <td className="p-2 text-right">
-                        R$ {revenue.toFixed(2)}
+                        {formatCurrency(revenue)}
                       </td>
                       <td className="p-2 text-right">
-                        R$ {(revenue / (periodSales.length || 1)).toFixed(2)}
+                        {formatCurrency(averageTicket)}
                       </td>
-                    </tr>
+                      </tr>
 
                     {isOpen &&
                       periodSales.map((sale) => (
@@ -333,9 +360,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                                   {sale.payment_method ?? "Desconhecido"}
                                 </span>
 
-                                <span>
-                                  Total: R$ {(sale.total_value ?? 0).toFixed(2)}
-                                </span>
+                                <span>Total: {formatCurrency(sale.total_value ?? 0)}</span>
                               </div>
 
                               <div className="pl-4 space-y-1">
@@ -353,9 +378,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                                           : `${item.quantity} UN`}
                                       </span>
 
-                                      <span className="text-right">
-                                        R$ {item.total.toFixed(2)}
-                                      </span>
+                                      <span className="text-right">{formatCurrency(item.total)}</span>
                                     </div>
                                   ))
                                 ) : (
