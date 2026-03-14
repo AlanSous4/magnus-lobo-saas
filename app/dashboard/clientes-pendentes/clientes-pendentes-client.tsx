@@ -109,37 +109,19 @@ export default function ClientesPendentesClient() {
   }, []);
 
   const fetchPendencias = async () => {
+    // Buscamos apenas o que não está pago OU o que foi pago recentemente
     const { data, error } = await supabase
       .from("clientes_pendentes")
-      .select(
-        `
-        *,
-        clientes_pendentes_itens (*)
-      `
-      )
-      // FILTRO CRÍTICO:
-      // 1. Traz o que NÃO está pago (pago.eq.false)
-      // 2. OU traz o que ESTÁ pago mas o ID consta no seu localStorage (id.in.([...]))
-      .or(
-        `pago.eq.false,id.in.(${
-          Object.keys(pendenciasTemporarias).length > 0
-            ? Object.keys(pendenciasTemporarias)
-                .map((id) => `"${id}"`)
-                .join(",")
-            : '"00000000-0000-0000-0000-000000000000"'
-        })`
-      )
+      .select(`*, clientes_pendentes_itens (*)`)
+      .or(`pago.eq.false, pago.eq.true`) // Buscamos ambos para o useMemo filtrar localmente
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error(error);
       return;
     }
-    // ... resto da função
 
     if (!data) return;
-
-    // Atualiza a lista de pendentes
     setPendentes(data);
 
     const itensMap: Record<string, PendenteItem[]> = {};
@@ -147,13 +129,7 @@ export default function ClientesPendentesClient() {
       if (p.clientes_pendentes_itens) {
         itensMap[p.id] = p.clientes_pendentes_itens;
       }
-
-      // LOGICA CRITICA: Se o banco diz que está PAGO, mas não temos o timer no localStorage
-      // (ex: página recarregada após o pagamento), precisamos decidir se mostramos ou não.
-      // Para evitar que "volte", se o banco diz que está pago e não há timer,
-      // o useMemo filtrará automaticamente se não houver registro no pendenciasTemporarias.
     });
-
     setPendenteItens(itensMap);
   };
 
@@ -456,7 +432,7 @@ export default function ClientesPendentesClient() {
     // CORREÇÃO AQUI: Select simples, pois já estamos na tabela de itens
     const { data: itens, error } = await supabase
       .from("clientes_pendentes_itens")
-      .select("*") 
+      .select("*")
       .eq("pendente_id", p.id);
 
     if (error || !itens) {
@@ -506,28 +482,24 @@ export default function ClientesPendentesClient() {
   const pendentesVisiveis = useMemo(() => {
     const agora = Date.now();
 
-    return (
-      pendentes
-        .filter((p) => {
-          // 1. Se NÃO está pago no banco, mostra sempre
-          if (p.pago === false) return true;
+    return pendentes
+      .filter((p) => {
+        // 1. Se NÃO está pago, mostra sempre
+        if (!p.pago) return true;
 
-          // 2. Se ESTÁ pago no banco, verifica se ele ainda está no nosso cronômetro de 60s
-          const tempoPagamento = pendenciasTemporarias[p.id];
+        // 2. Se ESTÁ pago, mostra apenas se estiver no timer de 60s
+        const tempoPagamento = pendenciasTemporarias[p.id];
+        if (tempoPagamento) {
+          return agora - tempoPagamento < 60000;
+        }
 
-          if (tempoPagamento) {
-            const diferencaGeral = agora - tempoPagamento;
-            // Retorna verdadeiro se passou menos de 60.000 milissegundos (60 segundos)
-            return diferencaGeral < 60000;
-          }
-
-          // 3. Se está pago e não tem tempo registrado ou já passou de 60s, esconde
-          return false;
-        })
-        // Ordena para que os pagos (que ainda estão visíveis) fiquem no final da lista
-        .sort((a, b) => Number(a.pago) - Number(b.pago))
-    );
-  }, [pendentes, pendenciasTemporarias]);
+        return false; // Se pago e sem timer, esconde
+      })
+      .sort((a, b) => {
+        // Garante que pagos fiquem por último
+        return Number(a.pago) - Number(b.pago);
+      });
+  }, [pendentes, pendenciasTemporarias]); // Re-calcula quando o timer ou a lista mudar
 
   return (
     <div className="max-w-5xl space-y-6 pb-20">
@@ -678,11 +650,12 @@ export default function ClientesPendentesClient() {
               : Number(p.total);
 
             return (
+              // Localize o mapeamento da lista: {pendentesVisiveis.map((p) => { ...
               <div
                 key={p.id}
                 className={`border rounded-xl transition-all overflow-hidden ${
                   p.pago
-                    ? "bg-green-50 border-green-200 opacity-80"
+                    ? "bg-green-50 border-green-200 opacity-60 pointer-events-none" // pointer-events impede cliques acidentais no pago
                     : "bg-white hover:shadow-md"
                 }`}
               >
