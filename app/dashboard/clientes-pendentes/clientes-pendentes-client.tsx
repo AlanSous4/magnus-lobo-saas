@@ -831,7 +831,7 @@ export default function ClientesPendentesClient() {
 
             <div className="flex flex-col gap-2 pt-2">
               <Button
-                className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg font-bold"
+                className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg font-bold cursor-pointer"
                 onClick={() => {
                   receberPendencia(pendenciaSelecionada, selectedPayment);
                   setShowPaymentModal(false);
@@ -841,7 +841,7 @@ export default function ClientesPendentesClient() {
               </Button>
               <Button
                 variant="ghost"
-                className="w-full text-gray-500"
+                className="w-full text-gray-500 cursor-pointer"
                 onClick={() => setShowPaymentModal(false)}
               >
                 Voltar
