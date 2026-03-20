@@ -5,21 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import type { Sale } from "@/types/sale";
 
 /* =========================
-   🔹 TIPOS
-========================= */
-
-type SaleItem = {
-  id: string;
-  sale_id: string;
-  product_name: string;
-  quantity: number;
-  price: number;
-  is_weight: boolean;
-  total: number;
-};
-
-/* =========================
-   🔹 MAPA PAGAMENTO
+    🔹 MAPA PAGAMENTO
 ========================= */
 
 const paymentLabelMap: Record<string, string> = {
@@ -32,7 +18,7 @@ const paymentLabelMap: Record<string, string> = {
 };
 
 /* =========================
-   🔹 HOOK
+    🔹 HOOK FINALIZADO
 ========================= */
 
 export function useSalesRealtime({ userId }: { userId: string }) {
@@ -49,20 +35,41 @@ export function useSalesRealtime({ userId }: { userId: string }) {
     let isMounted = true;
 
     async function loadSales() {
-      setLoading(true);
+      // Mantém o estado atual enquanto carrega para evitar saltos na tela
+      if (sales.length === 0) setLoading(true);
 
-      /* =========================
-         1️⃣ BUSCA VENDAS
-      ========================= */
-
+      /* 🚀 BUSCA UNIFICADA: 
+         Buscamos vendas e itens em uma única query. 
+         Note o products(name) para garantir o nome caso product_name esteja nulo.
+      */
       const { data: salesData, error: salesError } = await supabase
         .from("sales")
-        .select("id, user_id, total_amount, created_at, payment_method")
+        .select(`
+          id,
+          user_id,
+          total_amount,
+          created_at,
+          payment_method,
+          sale_items (
+            id,
+            quantity,
+            unit_price,
+            subtotal,
+            is_weight,
+            product_name,
+            products ( name ) 
+          )
+        `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
-      if (salesError || !salesData) {
-        console.error("Erro ao buscar vendas:", salesError);
+      if (salesError) {
+        console.error("Erro Supabase:", salesError.message);
+        if (isMounted) setLoading(false);
+        return;
+      }
+
+      if (!salesData) {
         if (isMounted) {
           setSales([]);
           setLoading(false);
@@ -70,95 +77,31 @@ export function useSalesRealtime({ userId }: { userId: string }) {
         return;
       }
 
-      if (salesData.length === 0) {
-        if (isMounted) {
-          setSales([]);
-          setLoading(false);
-        }
-        return;
-      }
-
-      const saleIds = salesData.map((s) => s.id);
-
-      /* =========================
-         2️⃣ BUSCA ITENS (JOIN EXPLÍCITO)
-      ========================= */
-
-      const { data: itemsData, error: itemsError } = await supabase
-        .from("sale_items")
-        .select(`
-          id,
-          sale_id,
-          quantity,
-          unit_price,
-          subtotal,
-          is_weight,
-          products:product_id (
-            name,
-            image_url
-          )
-        `)
-        .in("sale_id", saleIds);
-
-      if (itemsError) {
-        console.error("Erro ao buscar itens:", itemsError);
-      }
-
-      /* =========================
-         3️⃣ NORMALIZA ITENS
-      ========================= */
-
-      const normalizedItems: SaleItem[] = Array.isArray(itemsData)
-        ? itemsData.map((item: any) => {
-            const quantity = Number(item.quantity) || 0;
-            const unitPrice = Number(item.unit_price) || 0;
-            const subtotal = Number(item.subtotal) || 0;
-            const isWeight = item.is_weight ?? false;
-
-            return {
-              id: item.id,
-              sale_id: item.sale_id,
-              product_name: item.products?.name ?? "Produto",
-              quantity,
-              price: unitPrice,
-              is_weight: isWeight,
-              total: subtotal, // usa valor salvo no banco
-            };
-          })
-        : [];
-
-      /* =========================
-         4️⃣ AGRUPA POR VENDA
-      ========================= */
-
-      const itemsBySale: Record<string, SaleItem[]> = normalizedItems.reduce(
-        (acc, item) => {
-          if (!acc[item.sale_id]) acc[item.sale_id] = [];
-          acc[item.sale_id].push(item);
-          return acc;
-        },
-        {} as Record<string, SaleItem[]>
-      );
-
-      /* =========================
-         5️⃣ NORMALIZA VENDAS
-      ========================= */
-
-      const normalizedSales: Sale[] = salesData.map((sale) => ({
+      /* 📦 NORMALIZAÇÃO: 
+         Tratamos os dados para o formato exato que o componente espera.
+      */
+      const normalizedSales: Sale[] = salesData.map((sale: any) => ({
         id: sale.id,
         user_id: sale.user_id,
         created_at: sale.created_at,
-
         product_id: "MULTI",
         product_name: "Venda",
         quantity: 1,
-
         total_value: Number(sale.total_amount) || 0,
+        payment_method: paymentLabelMap[sale.payment_method] ?? "Não informado",
 
-        payment_method:
-          paymentLabelMap[sale.payment_method] ?? "Não informado",
-
-        items: itemsBySale[sale.id] ?? [],
+        items: (sale.sale_items || []).map((item: any) => ({
+          id: item.id,
+          sale_id: sale.id,
+          // Prioridade 1: product_name da tabela sale_items
+          // Prioridade 2: name da tabela products (via join)
+          // Prioridade 3: Texto padrão "Produto"
+          product_name: item.product_name || item.products?.name || "Produto",
+          quantity: Number(item.quantity) || 0,
+          price: Number(item.unit_price) || 0,
+          is_weight: item.is_weight ?? false,
+          total: Number(item.subtotal) || 0,
+        })),
       }));
 
       if (isMounted) {
@@ -169,17 +112,23 @@ export function useSalesRealtime({ userId }: { userId: string }) {
 
     loadSales();
 
+    /* 📡 CONFIGURAÇÃO REALTIME */
     const channel = supabase
-      .channel("sales-realtime")
+      .channel(`sales-sync-${userId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "sales" },
-        loadSales
+        {
+          event: "*",
+          schema: "public",
+          table: "sales",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => loadSales()
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "sale_items" },
-        loadSales
+        () => loadSales()
       )
       .subscribe();
 
