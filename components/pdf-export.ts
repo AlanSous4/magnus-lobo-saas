@@ -12,6 +12,14 @@ const CNPJ_FIXO = "60.227.207.0001-25";
  * Utils
  * -------------------------------------------------- */
 
+// Função para formatar valores em Reais (R$ 1.234,56)
+const formatBRL = (value: number) => {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+};
+
 async function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -130,13 +138,15 @@ export async function exportSalesPDF(
   pdf.text(`Total de vendas: ${metrics.summary.totalSales}`, 14, yCursor);
 
   yCursor += 6;
-  pdf.text(`Receita total: R$ ${metrics.summary.totalRevenue.toFixed(2)}`, 14, yCursor);
+  // Alterado de .toFixed(2) para formatBRL
+  pdf.text(`Receita total: ${formatBRL(metrics.summary.totalRevenue)}`, 14, yCursor);
 
   yCursor += 6;
-  pdf.text(`Ticket médio: R$ ${metrics.summary.averageTicket.toFixed(2)}`, 14, yCursor);
+  // Alterado de .toFixed(2) para formatBRL
+  pdf.text(`Ticket médio: ${formatBRL(metrics.summary.averageTicket)}`, 14, yCursor);
 
   /* --------------------------------------------------
- * Resumo por forma de pagamento com valor centralizado (sem "1 venda")
+ * Resumo por forma de pagamento
  * -------------------------------------------------- */
 
 if (metrics.paymentTotals && metrics.paymentTotals.length > 0) {
@@ -150,7 +160,7 @@ if (metrics.paymentTotals && metrics.paymentTotals.length > 0) {
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const marginLeft = 14;
-  const valueX = pageWidth / 2; // valor centralizado
+  const valueX = pageWidth / 2; 
 
   metrics.paymentTotals.forEach((p) => {
     if (yCursor > 280) {
@@ -160,16 +170,13 @@ if (metrics.paymentTotals && metrics.paymentTotals.length > 0) {
       yCursor = 20;
     }
 
-    const methodText = p.method; // apenas o nome do método
-    const valueText = `R$ ${p.total.toFixed(2)}`;
+    const methodText = p.method; 
+    // Alterado de .toFixed(2) para formatBRL
+    const valueText = formatBRL(p.total);
 
-    // Desenhar o texto à esquerda
     pdf.text(methodText, marginLeft, yCursor);
-
-    // Desenhar o valor centralizado
     pdf.text(valueText, valueX, yCursor, { align: "center" });
 
-    // Calcular e desenhar pontos
     const methodWidth = pdf.getTextWidth(methodText);
     const valueWidth = pdf.getTextWidth(valueText);
     const dotsWidth = valueX - marginLeft - methodWidth - valueWidth / 2 - 2;
@@ -214,8 +221,10 @@ if (metrics.paymentTotals && metrics.paymentTotals.length > 0) {
 
     pdf.text(row.period, 14, yCursor);
     pdf.text(String(row.sales), 70, yCursor);
-    pdf.text(`R$ ${row.revenue.toFixed(2)}`, 100, yCursor);
-    pdf.text(`R$ ${row.ticket.toFixed(2)}`, 150, yCursor);
+    // Alterado para formatBRL
+    pdf.text(formatBRL(row.revenue), 100, yCursor);
+    // Alterado para formatBRL
+    pdf.text(formatBRL(row.ticket), 150, yCursor);
 
     yCursor += 6;
   });
