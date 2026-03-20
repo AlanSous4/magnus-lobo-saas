@@ -36,6 +36,13 @@ const labels: Record<string, string> = {
   va: "VA",
 }
 
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+};
+
 export function SalesByPaymentChart() {
   const [data, setData] = useState<SalesByPayment[]>([])
   const [period, setPeriod] = useState<number>(30)
@@ -43,16 +50,10 @@ export function SalesByPaymentChart() {
 
   const fetchData = async (days: number) => {
     setLoading(true)
-
     const { data, error } = await supabase.rpc("vendas_por_pagamento", {
       periodo: days,
-      
     })
 
-    // 👇 COLOQUE O LOG AQUI
-  console.log("Resultado RPC vendas_por_pagamento:", data)
-
-    
     if (error) {
       console.error("Erro ao buscar vendas:", error)
       setLoading(false)
@@ -78,39 +79,18 @@ export function SalesByPaymentChart() {
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Vendas por forma de pagamento</CardTitle>
 
-        {/* 🔹 Filtros de período */}
         <div className="flex gap-2 flex-wrap">
-          <Button className="cursor-pointer"
-            size="sm"
-            variant={period === 1 ? "default" : "outline"}
-            onClick={() => setPeriod(1)}
-          >
-            Hoje
-          </Button>
-
-          <Button className="cursor-pointer"
-            size="sm"
-            variant={period === 7 ? "default" : "outline"}
-            onClick={() => setPeriod(7)}
-          >
-            7 dias
-          </Button>
-
-          <Button className="cursor-pointer"
-            size="sm"
-            variant={period === 30 ? "default" : "outline"}
-            onClick={() => setPeriod(30)}
-          >
-            30 dias
-          </Button>
-
-          <Button className="cursor-pointer"
-            size="sm"
-            variant={period === 90 ? "default" : "outline"}
-            onClick={() => setPeriod(90)}
-          >
-            90 dias
-          </Button>
+          {[1, 7, 30, 90].map((d) => (
+            <Button
+              key={d}
+              className="cursor-pointer"
+              size="sm"
+              variant={period === d ? "default" : "outline"}
+              onClick={() => setPeriod(d)}
+            >
+              {d === 1 ? "Hoje" : `${d} dias`}
+            </Button>
+          ))}
         </div>
       </CardHeader>
 
@@ -131,23 +111,33 @@ export function SalesByPaymentChart() {
                 dataKey="total"
                 nameKey="payment_method"
                 outerRadius={100}
-                label
+                // 🛠️ REMOVIDO: a prop label foi retirada para ocultar os valores fixos
+                label={false} 
               >
                 {data.map((_, index) => (
                   <Cell
                     key={index}
                     fill={COLORS[index % COLORS.length]}
+                    className="outline-none" // Remove a borda de seleção ao clicar
                   />
                 ))}
               </Pie>
 
+              {/* 🛠️ O valor só aparecerá aqui ao passar o mouse */}
               <Tooltip
-                formatter={(value: number) =>
-                  `R$ ${value.toFixed(2)}`
-                }
+                formatter={(value: number) => formatCurrency(value)}
+                contentStyle={{ 
+                  borderRadius: '8px', 
+                  border: 'none', 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)' 
+                }}
               />
 
-              <Legend />
+              <Legend 
+                verticalAlign="bottom"
+                height={36}
+                iconType="circle"
+              />
             </PieChart>
           </ResponsiveContainer>
         )}

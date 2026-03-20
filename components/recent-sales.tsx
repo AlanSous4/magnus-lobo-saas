@@ -22,6 +22,16 @@ const paymentMethodLabels: Record<string, string> = {
   pix: "Pix",
 }
 
+/* --------------------------------------------------
+ * Função Utilitária de Formatação BRL
+ * -------------------------------------------------- */
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+};
+
 export function RecentSales({ sales }: RecentSalesProps) {
   if (sales.length === 0) {
     return (
@@ -40,10 +50,12 @@ export function RecentSales({ sales }: RecentSalesProps) {
             className="flex items-center justify-between gap-4"
           >
             <div className="space-y-1">
-              <p className="text-sm font-medium whitespace-nowrap">
-                R$ {Number(sale.total_amount).toFixed(2)}
+              {/* 🛠️ Valor formatado em Reais */}
+              <p className="text-sm font-bold whitespace-nowrap">
+                {formatCurrency(Number(sale.total_amount))}
               </p>
-              <p className="text-xs text-muted-foreground whitespace-nowrap">
+              
+              <p className="text-xs text-muted-foreground whitespace-nowrap italic">
                 {formatDistanceToNow(new Date(sale.created_at), {
                   addSuffix: true,
                   locale: ptBR,

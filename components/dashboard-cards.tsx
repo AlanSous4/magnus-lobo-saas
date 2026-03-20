@@ -9,6 +9,16 @@ interface DashboardCardsProps {
   averageTicket: number
 }
 
+/* --------------------------------------------------
+ * Função Utilitária de Formatação
+ * -------------------------------------------------- */
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+};
+
 export function DashboardCards({
   productsCount,
   salesCount,
@@ -59,7 +69,7 @@ export function DashboardCards({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {revenue.toFixed(2)}
+              {formatCurrency(revenue)}
             </div>
           </CardContent>
         </Card>
@@ -76,7 +86,7 @@ export function DashboardCards({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {averageTicket.toFixed(2)}
+              {formatCurrency(averageTicket)}
             </div>
           </CardContent>
         </Card>

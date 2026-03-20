@@ -406,7 +406,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7 text-destructive"
+                      className="h-7 w-7 md:h-14 md:w-14 lg:h-7 lg:w-7 text-destructive cursor-pointer"
                       onClick={() => removeFromCart(item.id)}
                     >
                       <X className="h-4 w-4 md:h-6 md:w-6 lg:h-4 lg:w-4" />
