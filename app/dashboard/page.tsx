@@ -6,6 +6,8 @@ import { RecentSales } from "@/components/recent-sales"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { SalesByPaymentChart } from "@/components/sales-by-payment-chart"
+import { ThemeToggle } from "@/components/ThemeToggle"
+
 
 // 🔹 Métricas centralizadas
 import { getDashboardMetrics } from "@/lib/dashboard-metrics"
@@ -82,14 +84,20 @@ export default async function DashboardPage() {
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
 
         {/* Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Dashboard
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Visão geral da Padaria Lanchonete Magnus Lobo
-          </p>
-        </div>
+<div className="flex items-center justify-between border-b pb-4">
+  <div className="space-y-1">
+    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+      Dashboard
+    </h1>
+    <p className="text-sm sm:text-base text-muted-foreground">
+      Visão geral da Padaria Lanchonete Magnus Lobo
+    </p>
+  </div>
+
+  {/* 🔹 Botão de alternância de tema no canto direito */}
+  <ThemeToggle />
+</div>
+
 
         {/* 🔹 Cards de métricas */}
         <DashboardCards
