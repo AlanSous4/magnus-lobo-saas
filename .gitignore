@@ -31,3 +31,16 @@ sw.js
 
 # Mas manter o sw.js manual dentro de public/
 !public/sw.js
+
+# --- Supabase CLI & Docker ---
+# Dados locais do banco e do Docker (pesados e irrelevantes para o Git)
+.supabase/
+
+# Arquivos temporários gerados pela CLI
+supabase/.temp/
+
+# IMPORTANTE: Descomente a linha abaixo se você for usar dados REAIS no seed.sql
+supabase/seed.sql
+
+# Logs e arquivos de cache da CLI
+supabase/.branches/
