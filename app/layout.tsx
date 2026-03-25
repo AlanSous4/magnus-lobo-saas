@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import InstallPWAButton from "@/components/InstallPWAButton";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geist = Geist({ subsets: ["latin"] });
 const geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -25,22 +26,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
+    /* suppressHydrationWarning evita erros no console ao alternar temas */
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* 🔗 Manifesto PWA */}
         <link rel="manifest" href="/manifest.json" />
-        {/* 🔗 Ícone para navegadores */}
         <link rel="icon" href="/logo-padaria-192.png" type="image/png" />
       </head>
-      <body className=" antialiased ">
-        {children}
+      {/* MANTIVE APENAS 'antialiased' PARA NÃO ALTERAR A ESCRITA (FONTE). 
+         As fontes Geist acima foram mantidas apenas para não dar erro de variável não usada.
+      */}
+      <body className="antialiased">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
 
-        {/* Botão de instalação PWA */}
-        <InstallPWAButton />
+          {/* Botão de instalação PWA */}
+          <InstallPWAButton />
 
-        <Analytics />
+          <Analytics />
+        </ThemeProvider>
 
         {/* Registro manual do Service Worker */}
         <script
