@@ -75,7 +75,7 @@ export default async function DashboardPage() {
   return (
     /* 🔹 Removido h-screen e overflow-hidden para evitar o scroll duplo */
     <div className="w-full min-h-full">
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className="pl-0 pr-4 space-y-4">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b pb-4">
