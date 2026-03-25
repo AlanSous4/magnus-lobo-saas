@@ -8,14 +8,10 @@ import { Button } from "@/components/ui/button"
 import { SalesByPaymentChart } from "@/components/sales-by-payment-chart"
 import { ThemeToggle } from "@/components/ThemeToggle"
 
-
 // 🔹 Métricas centralizadas
 import { getDashboardMetrics } from "@/lib/dashboard-metrics"
 import { DashboardCards } from "@/components/dashboard-cards"
 
-/**
- * Next.js metadata atualizado para evitar warnings de themeColor
- */
 export const metadata = {
   title: "Dashboard",
   viewport: {
@@ -63,9 +59,6 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(5)
 
-  const totalStock =
-    products?.reduce((sum, p) => sum + p.quantity, 0) ?? 0
-
   const lowStockProducts =
     products?.filter((p) => p.quantity < 10).length ?? 0
 
@@ -80,24 +73,22 @@ export default async function DashboardPage() {
     }).length ?? 0
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col">
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+    /* 🔹 Removido h-screen e overflow-hidden para evitar o scroll duplo */
+    <div className="w-full min-h-full">
+      <div className="p-4 sm:p-6 space-y-6">
 
         {/* Header */}
-<div className="flex items-center justify-between border-b pb-4">
-  <div className="space-y-1">
-    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-      Dashboard
-    </h1>
-    <p className="text-sm sm:text-base text-muted-foreground">
-      Visão geral da Padaria Lanchonete Magnus Lobo
-    </p>
-  </div>
-
-  {/* 🔹 Botão de alternância de tema no canto direito */}
-  <ThemeToggle />
-</div>
-
+        <div className="flex items-center justify-between border-b pb-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Dashboard
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Visão geral da Padaria Lanchonete Magnus Lobo
+            </p>
+          </div>
+          <ThemeToggle />
+        </div>
 
         {/* 🔹 Cards de métricas */}
         <DashboardCards
@@ -109,9 +100,9 @@ export default async function DashboardPage() {
 
         {/* 🔹 ALERTA ESTOQUE */}
         {lowStockProducts > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
+          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-500/10 dark:border-orange-500/20">
             <CardContent className="pt-4">
-              <p className="flex items-center gap-2 text-sm text-orange-700">
+              <p className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-400">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 {lowStockProducts} produto(s) com estoque baixo
               </p>
@@ -121,9 +112,9 @@ export default async function DashboardPage() {
 
         {/* 🔹 ALERTA VALIDADE */}
         {expiringSoon > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
+          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-500/10 dark:border-orange-500/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium dark:text-orange-400">
                 <AlertCircle className="h-5 w-5 text-orange-600 shrink-0" />
                 Atenção: Produtos com validade próxima
               </CardTitle>
@@ -133,7 +124,7 @@ export default async function DashboardPage() {
                 {expiringSoon} produto(s) vencendo nos próximos 7 dias.
                 <Link
                   href="/produtos"
-                  className="ml-2 font-medium text-orange-600 hover:underline"
+                  className="ml-2 font-medium text-orange-600 hover:underline dark:text-orange-400"
                 >
                   Ver produtos
                 </Link>
@@ -144,7 +135,6 @@ export default async function DashboardPage() {
 
         {/* 🔹 GRID INFERIOR */}
         <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-
           {/* Vendas Recentes */}
           <Card>
             <CardHeader>
@@ -176,9 +166,7 @@ export default async function DashboardPage() {
                 Ações Rápidas
               </CardTitle>
             </CardHeader>
-
             <CardContent className="space-y-3">
-
               <Button asChild className="w-full justify-start" size="lg">
                 <Link href="/vendas">
                   <ShoppingCart className="mr-2 h-5 w-5" />
@@ -197,10 +185,8 @@ export default async function DashboardPage() {
                   Gerenciar Produtos
                 </Link>
               </Button>
-
             </CardContent>
           </Card>
-
         </div>
       </div>
     </div>
