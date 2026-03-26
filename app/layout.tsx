@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    /* suppressHydrationWarning evita erros no console ao alternar temas */
+    /* suppressHydrationWarning é essencial para evitar erros de console com temas */
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
@@ -34,14 +34,11 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/logo-padaria-192.png" type="image/png" />
       </head>
-      {/* MANTIVE APENAS 'antialiased' PARA NÃO ALTERAR A ESCRITA (FONTE). 
-         As fontes Geist acima foram mantidas apenas para não dar erro de variável não usada.
-      */}
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"   // 👈 Força o início no modo claro
+          enableSystem={false}    // 👈 Ignora o tema do sistema operacional
           disableTransitionOnChange
         >
           {children}
