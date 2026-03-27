@@ -1,0 +1,191 @@
+/* TEMA CLARO: Branco, Cinza e Laranja */
+.theme-light {
+    --bg-color: #FFFFFF;
+    --bg-card: #F9F9F9;
+    --text-primary: #333333;
+    --text-secondary: #777777;
+    --color-orange: #FF6600; /* Laranja Vibrante */
+    --border-color: #E0E0E0;
+    --status-pending: #FFA500; /* Laranja para status 'A Conferir' */
+    --status-scanned: #888888; /* Cinza para status 'Bipado' */
+  }
+  
+  .recebimento-container {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--text-primary);
+    background-color: var(--bg-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 60px; /* Espaço para o bottom-nav */
+  }
+  
+  .main-header {
+    text-align: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .main-content {
+    display: flex;
+    flex: 1;
+    padding: 1rem;
+    gap: 1rem;
+  }
+  
+  /* CARDS */
+  .card {
+    background-color: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+  }
+  
+  /* COLUNA ESQUERDA */
+  .left-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  /* SCANNER: Configuração para que o scanner fique centralizado */
+  .scanner-section {
+    text-align: center;
+  }
+  
+  #reader {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+  }
+  
+  #reader__scan_region video {
+    border-radius: 8px; /* Arredonda os cantos da câmera */
+  }
+  
+  .status-text {
+    margin-top: 0.5rem;
+    color: var(--color-orange);
+    font-weight: bold;
+  }
+  
+  /* LISTA DE NOTAS */
+  .note-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .note-item .tag {
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.8rem;
+  }
+  
+  .a-conferir .tag {
+    background-color: var(--status-pending);
+  }
+  
+  .bipado .tag {
+    background-color: var(--status-scanned);
+  }
+  
+  /* COLUNA DIREITA */
+  .right-panel {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .detailed-header {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+  }
+  
+  .access-key {
+    color: var(--text-secondary);
+    font-family: monospace;
+  }
+  
+  /* TABELA DE ITENS */
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    flex: 1;
+  }
+  
+  .items-table th {
+    text-align: left;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .items-table td {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #EEE;
+  }
+  
+  /* FISCAL SUMMARY E BOTÃO */
+  .detailed-footer {
+    margin-top: auto;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  
+  .fiscal-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+  
+  .fiscal-field .label {
+    color: var(--text-secondary);
+  }
+  
+  .fiscal-field .value {
+    color: var(--color-orange);
+    font-weight: bold;
+  }
+  
+  .btn-confirmar {
+    background-color: var(--color-orange);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    padding: 0.5rem;
+  }
+  
+  .nav-item {
+    color: var(--text-secondary);
+    text-decoration: none;
+  }
+  
+  .nav-item.active {
+    color: var(--color-orange);
+    font-weight: bold;
+  }

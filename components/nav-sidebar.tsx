@@ -12,6 +12,7 @@ import {
   X,
   BarChart3,
   Users,
+  FileText,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -24,6 +25,7 @@ const navItems = [
   { title: "Produtos", href: "/produtos", icon: Package },
   { title: "Produtos mais vendidos",href: "/dashboard/produtos-mais-vendidos",icon: BarChart3,},
   { title: "Clientes Pendente", href: "/dashboard/clientes-pendentes", icon: Users },
+  { title: "Recebimento", href: "/recebimento", icon: FileText },
 ]
 
 export function NavSidebar() {
