@@ -11,6 +11,60 @@ const RecebimentoFiscal = ({ organizationId }) => {
   const [status, setStatus] = useState("Aguardando scan...");
   const [showScanner, setShowScanner] = useState(false); // Adicione esta linha
 
+  // --- COPIE A PARTIR DAQUI ---
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const xmlText = e.target.result;
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+
+      try {
+        // Busca a chave (ID da tag infNFe) e limpa o prefixo 'NFe'
+        const infNFe = xmlDoc.getElementsByTagName("infNFe")[0];
+        const chave = infNFe.getAttribute("Id").replace("NFe", "");
+        
+        // Busca o nome do emitente (Fornecedor)
+        const fornecedor = xmlDoc.getElementsByTagName("xNome")[0].textContent;
+
+        // Busca os itens (produtos)
+        const detNodes = xmlDoc.getElementsByTagName("det");
+        const itensFormatados = [];
+
+        for (let i = 0; i < detNodes.length; i++) {
+          const prod = detNodes[i].getElementsByTagName("prod")[0];
+          itensFormatados.push({
+            nome: prod.getElementsByTagName("xProd")[0].textContent,
+            qtd: prod.getElementsByTagName("qCom")[0].textContent,
+            valor: "R$ " + parseFloat(prod.getElementsByTagName("vUnCom")[0].textContent).toFixed(2).replace(".", ","),
+          });
+        }
+
+        // Busca Totais Fiscais
+        const total = xmlDoc.getElementsByTagName("ICMSTot")[0];
+
+        setScannedResult(chave);
+        setNotaDados({
+          fornecedor: fornecedor,
+          itens: itensFormatados,
+          fiscal: {
+            base: "R$ " + total.getElementsByTagName("vBC")[0].textContent,
+            icms: "R$ " + total.getElementsByTagName("vICMS")[0].textContent,
+            cfop: detNodes[0].getElementsByTagName("prod")[0].getElementsByTagName("CFOP")[0].textContent,
+          },
+        });
+        setStatus("XML importado com sucesso!");
+      } catch (err) {
+        console.error("Erro ao processar XML:", err);
+        alert("O arquivo XML parece ser inválido ou não é uma NF-e.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // Estados para persistência e vínculo
   const [vinculos, setVinculos] = useState({}); // Mapeia { "Nome na NF": "ID_do_Produto_no_Estoque" }
   const [isSaving, setIsSaving] = useState(false);
@@ -241,6 +295,21 @@ const RecebimentoFiscal = ({ organizationId }) => {
                 onChange={handleManualInput}
                 maxLength={44}
               />
+
+              {/* --- ADICIONE O BLOCO ABAIXO --- */}
+              <div style={{ marginTop: "15px", borderTop: "1px dashed #eee", paddingTop: "15px" }}>
+                <label style={{ color: "#FF6600", fontWeight: "bold", fontSize: "0.85rem" }}>
+                  Importar via arquivo XML:
+                </label>
+                <input
+                  type="file"
+                  accept=".xml"
+                  className="cursor-pointer"
+                  onChange={handleFileUpload}
+                  style={{ marginTop: "8px", fontSize: "0.8rem", width: "100%" }}
+                />
+              </div>
+
             </div>
             <p className="status-text">{status}</p>
           </div>
