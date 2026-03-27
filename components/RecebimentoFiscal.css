@@ -20,28 +20,30 @@
   flex-direction: column;
 }
 
-/* HEADER COM BOTÃO ATRAENTE */
+/* HEADER RESPONSIVO */
 .main-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
+  padding: 1rem;
   border-bottom: 1px solid var(--border-color);
   background: white;
   box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.header-spacer {
-  width: 140px; /* Mesma largura aproximada do botão para centralizar o título */
-}
+.header-spacer { width: 40px; }
 
 .main-header h1 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   letter-spacing: 1px;
   font-weight: 700;
   color: #444;
   text-transform: uppercase;
+  text-align: center;
 }
 
 .btn-voltar {
@@ -50,41 +52,23 @@
   gap: 8px;
   background-color: #fff;
   border: 1.5px solid var(--border-color);
-  padding: 8px 18px;
+  padding: 6px 12px;
   border-radius: 20px;
   cursor: pointer;
   color: var(--text-secondary);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   text-decoration: none;
   transition: all 0.3s ease;
-  width: 140px;
-  justify-content: center;
 }
 
-.btn-voltar:hover {
-  border-color: var(--color-orange);
-  color: var(--color-orange);
-  background-color: #fff5ed;
-  transform: translateX(-3px);
-}
-
-.btn-voltar .arrow {
-  font-size: 1.1rem;
-  transition: transform 0.3s ease;
-}
-
-.btn-voltar:hover .arrow {
-  transform: translateX(-2px);
-}
-
-/* ESTRUTURA E CARDS */
+/* ESTRUTURA MOBILE-FIRST */
 .main-content {
-  display: grid;
-  grid-template-columns: 350px 1fr; 
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  padding: 1.5rem;
-  gap: 1.5rem;
+  padding: 1rem;
+  gap: 1rem;
   background-color: var(--bg-body);
 }
 
@@ -92,20 +76,41 @@
   background-color: #FFFFFF;
   border-radius: 12px;
   border: 1px solid var(--border-color);
-  padding: 1.2rem;
+  padding: 1rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-/* LADO ESQUERDO */
-.left-panel {
+.left-panel, .right-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
+/* ESTILIZAÇÃO DOS CONTROLES DO SCANNER */
 #reader {
   width: 100% !important;
   border: none !important;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+#reader button {
+  background-color: var(--color-orange) !important;
+  color: white !important;
+  border: none !important;
+  padding: 8px 15px !important;
+  border-radius: 20px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  margin: 10px 0 !important;
+  font-size: 0.8rem !important;
+}
+
+#reader select {
+  padding: 5px !important;
+  border-radius: 5px !important;
+  border: 1px solid var(--border-color) !important;
+  margin-bottom: 10px !important;
 }
 
 .status-text {
@@ -132,30 +137,35 @@
 .a-conferir .tag { background-color: var(--status-pending); }
 .bipado .tag { background-color: var(--status-scanned); }
 
-/* LADO DIREITO */
+/* RESUMO E TABELA */
 .summary-header {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
 }
 
 .summary-card {
   background: white;
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 12px;
   text-align: center;
   border: 1px solid var(--border-color);
 }
 
-.summary-card .label { font-size: 0.9rem; color: var(--text-primary); }
-.summary-card .value { font-size: 2rem; font-weight: bold; display: block; }
+.summary-card .label { font-size: 0.8rem; color: var(--text-primary); }
+.summary-card .value { font-size: 1.5rem; font-weight: bold; display: block; }
 .summary-card .value.orange { color: var(--color-orange); }
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+}
 
 .items-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1rem;
+  min-width: 450px; 
 }
 
 .items-table th {
@@ -166,47 +176,73 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.items-table td { padding: 12px 0; border-bottom: 1px solid #F5F5F5; }
+.items-table td { padding: 12px 0; border-bottom: 1px solid #F5F5F5; font-size: 0.9rem; }
 
+/* RODAPÉ FISCAL */
 .detailed-footer {
-  margin-top: auto;
-  padding-top: 1.5rem;
+  margin-top: 1rem;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .fiscal-summary {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
   background: #FAFAFA;
   padding: 1rem;
   border-radius: 8px;
 }
 
-.fiscal-field .value { color: var(--color-orange); font-weight: bold; }
+.fiscal-field .label { font-size: 0.7rem; display: block; }
+.fiscal-field .value { color: var(--color-orange); font-weight: bold; font-size: 0.85rem; }
 
 .btn-confirmar {
   background-color: var(--color-orange);
   color: white;
   border: none;
-  padding: 15px 35px;
+  padding: 15px;
   border-radius: 30px;
   font-weight: bold;
   cursor: pointer;
-  transition: transform 0.2s;
+  width: 100%;
 }
-
-.btn-confirmar:hover { transform: scale(1.02); }
 
 .bottom-nav {
   display: flex;
   justify-content: space-around;
-  padding: 1rem;
+  padding: 0.8rem;
   background: white;
   border-top: 1px solid var(--border-color);
 }
 
-.nav-item { text-decoration: none; color: var(--text-secondary); }
+.nav-item { text-decoration: none; color: var(--text-secondary); font-size: 0.8rem; }
 .nav-item.active { color: var(--color-orange); font-weight: bold; }
+
+/* -----------------------------------------
+   DESKTOP OVERRIDES (A partir de 1024px)
+----------------------------------------- */
+@media (min-width: 1024px) {
+  .main-header { padding: 1rem 2rem; }
+  .header-spacer { width: 140px; }
+  .main-header h1 { font-size: 1.1rem; }
+  .btn-voltar { width: 140px; padding: 8px 18px; font-size: 0.85rem; justify-content: center; }
+  .btn-voltar:hover { transform: translateX(-3px); border-color: var(--color-orange); color: var(--color-orange); background-color: #fff5ed; }
+  
+  .main-content {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    padding: 1.5rem;
+    gap: 1.5rem;
+  }
+
+  .summary-header { grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .summary-card { padding: 1.5rem; }
+  .summary-card .value { font-size: 2rem; }
+
+  .fiscal-summary { grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  
+  .detailed-footer { flex-direction: row; justify-content: space-between; align-items: flex-end; }
+  .btn-confirmar { width: auto; padding: 15px 35px; }
+}
