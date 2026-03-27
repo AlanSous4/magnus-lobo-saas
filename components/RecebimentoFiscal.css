@@ -1,191 +1,212 @@
 /* TEMA CLARO: Branco, Cinza e Laranja */
 .theme-light {
-    --bg-color: #FFFFFF;
-    --bg-card: #F9F9F9;
-    --text-primary: #333333;
-    --text-secondary: #777777;
-    --color-orange: #FF6600; /* Laranja Vibrante */
-    --border-color: #E0E0E0;
-    --status-pending: #FFA500; /* Laranja para status 'A Conferir' */
-    --status-scanned: #888888; /* Cinza para status 'Bipado' */
-  }
-  
-  .recebimento-container {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: var(--text-primary);
-    background-color: var(--bg-color);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    padding-bottom: 60px; /* Espaço para o bottom-nav */
-  }
-  
-  .main-header {
-    text-align: center;
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .main-content {
-    display: flex;
-    flex: 1;
-    padding: 1rem;
-    gap: 1rem;
-  }
-  
-  /* CARDS */
-  .card {
-    background-color: var(--bg-card);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    padding: 1rem;
-  }
-  
-  /* COLUNA ESQUERDA */
-  .left-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  /* SCANNER: Configuração para que o scanner fique centralizado */
-  .scanner-section {
-    text-align: center;
-  }
-  
-  #reader {
-    width: 100%;
-    max-width: 300px;
-    margin: 0 auto;
-  }
-  
-  #reader__scan_region video {
-    border-radius: 8px; /* Arredonda os cantos da câmera */
-  }
-  
-  .status-text {
-    margin-top: 0.5rem;
-    color: var(--color-orange);
-    font-weight: bold;
-  }
-  
-  /* LISTA DE NOTAS */
-  .note-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .note-item .tag {
-    padding: 2px 8px;
-    border-radius: 12px;
-    color: white;
-    font-size: 0.8rem;
-  }
-  
-  .a-conferir .tag {
-    background-color: var(--status-pending);
-  }
-  
-  .bipado .tag {
-    background-color: var(--status-scanned);
-  }
-  
-  /* COLUNA DIREITA */
-  .right-panel {
-    flex: 2;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .detailed-header {
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 0.5rem;
-  }
-  
-  .access-key {
-    color: var(--text-secondary);
-    font-family: monospace;
-  }
-  
-  /* TABELA DE ITENS */
-  .items-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-    flex: 1;
-  }
-  
-  .items-table th {
-    text-align: left;
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .items-table td {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #EEE;
-  }
-  
-  /* FISCAL SUMMARY E BOTÃO */
-  .detailed-footer {
-    margin-top: auto;
-    border-top: 1px solid var(--border-color);
-    padding-top: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-  }
-  
-  .fiscal-summary {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
-    font-size: 0.9rem;
-  }
-  
-  .fiscal-field .label {
-    color: var(--text-secondary);
-  }
-  
-  .fiscal-field .value {
-    color: var(--color-orange);
-    font-weight: bold;
-  }
-  
-  .btn-confirmar {
-    background-color: var(--color-orange);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 20px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  
-  /* BOTTOM NAV */
-  .bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: var(--bg-card);
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-around;
-    padding: 0.5rem;
-  }
-  
-  .nav-item {
-    color: var(--text-secondary);
-    text-decoration: none;
-  }
-  
-  .nav-item.active {
-    color: var(--color-orange);
-    font-weight: bold;
-  }
+  --bg-color: #FFFFFF;
+  --bg-card: #F9F9F9;
+  --bg-body: #F4F4F4;
+  --text-primary: #333333;
+  --text-secondary: #777777;
+  --color-orange: #FF6600;
+  --border-color: #E0E0E0;
+  --status-pending: #FFA500;
+  --status-scanned: #888888;
+}
+
+.recebimento-container {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text-primary);
+  background-color: var(--bg-color);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER COM BOTÃO ATRAENTE */
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid var(--border-color);
+  background: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+}
+
+.header-spacer {
+  width: 140px; /* Mesma largura aproximada do botão para centralizar o título */
+}
+
+.main-header h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: #444;
+  text-transform: uppercase;
+}
+
+.btn-voltar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #fff;
+  border: 1.5px solid var(--border-color);
+  padding: 8px 18px;
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  width: 140px;
+  justify-content: center;
+}
+
+.btn-voltar:hover {
+  border-color: var(--color-orange);
+  color: var(--color-orange);
+  background-color: #fff5ed;
+  transform: translateX(-3px);
+}
+
+.btn-voltar .arrow {
+  font-size: 1.1rem;
+  transition: transform 0.3s ease;
+}
+
+.btn-voltar:hover .arrow {
+  transform: translateX(-2px);
+}
+
+/* ESTRUTURA E CARDS */
+.main-content {
+  display: grid;
+  grid-template-columns: 350px 1fr; 
+  flex: 1;
+  padding: 1.5rem;
+  gap: 1.5rem;
+  background-color: var(--bg-body);
+}
+
+.card {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  padding: 1.2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* LADO ESQUERDO */
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+#reader {
+  width: 100% !important;
+  border: none !important;
+}
+
+.status-text {
+  margin-top: 10px;
+  text-align: center;
+  color: var(--color-orange);
+  font-weight: bold;
+}
+
+.note-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.8rem;
+  border-bottom: 1px solid #eee;
+}
+
+.tag {
+  padding: 2px 10px;
+  border-radius: 12px;
+  color: white;
+  font-size: 0.75rem;
+}
+
+.a-conferir .tag { background-color: var(--status-pending); }
+.bipado .tag { background-color: var(--status-scanned); }
+
+/* LADO DIREITO */
+.summary-header {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid var(--border-color);
+}
+
+.summary-card .label { font-size: 0.9rem; color: var(--text-primary); }
+.summary-card .value { font-size: 2rem; font-weight: bold; display: block; }
+.summary-card .value.orange { color: var(--color-orange); }
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.items-table th {
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.items-table td { padding: 12px 0; border-bottom: 1px solid #F5F5F5; }
+
+.detailed-footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.fiscal-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  background: #FAFAFA;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.fiscal-field .value { color: var(--color-orange); font-weight: bold; }
+
+.btn-confirmar {
+  background-color: var(--color-orange);
+  color: white;
+  border: none;
+  padding: 15px 35px;
+  border-radius: 30px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.btn-confirmar:hover { transform: scale(1.02); }
+
+.bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  padding: 1rem;
+  background: white;
+  border-top: 1px solid var(--border-color);
+}
+
+.nav-item { text-decoration: none; color: var(--text-secondary); }
+.nav-item.active { color: var(--color-orange); font-weight: bold; }
