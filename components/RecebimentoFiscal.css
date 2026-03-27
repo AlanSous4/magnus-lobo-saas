@@ -9,6 +9,7 @@
   --border-color: #E0E0E0;
   --status-pending: #FFA500;
   --status-scanned: #888888;
+  --color-success: #28a745; /* Melhoria: Cor de validação */
 }
 
 .recebimento-container {
@@ -62,6 +63,13 @@
   transition: all 0.3s ease;
 }
 
+/* Melhoria coesa de hover no mobile/geral */
+.btn-voltar:hover {
+  border-color: var(--color-orange);
+  color: var(--color-orange);
+  background-color: #fff5ed;
+}
+
 /* ESTRUTURA MOBILE-FIRST */
 .main-content {
   display: flex;
@@ -86,7 +94,7 @@
   gap: 1rem;
 }
 
-/* ESTILIZAÇÃO DOS CONTROLES DO SCANNER */
+/* SCANNER E INPUT MANUAL */
 #reader {
   width: 100% !important;
   border: none !important;
@@ -98,19 +106,50 @@
   background-color: var(--color-orange) !important;
   color: white !important;
   border: none !important;
-  padding: 8px 15px !important;
+  padding: 10px 20px !important;
   border-radius: 20px !important;
   font-weight: 600 !important;
   cursor: pointer;
-  margin: 10px 0 !important;
+  margin: 10px auto !important;
   font-size: 0.8rem !important;
+  display: block;
 }
 
-#reader select {
-  padding: 5px !important;
-  border-radius: 5px !important;
-  border: 1px solid var(--border-color) !important;
-  margin-bottom: 10px !important;
+.manual-entry {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border-color);
+}
+
+.manual-entry label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* MELHORIA: Validação do Input Manual */
+.input-manual {
+  width: 100%;
+  padding: 10px;
+  border: 1.5px solid var(--border-color); /* Borda levemente mais grossa para o efeito */
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.input-manual:focus { 
+  border-color: var(--color-orange); 
+}
+
+/* Classe aplicada via JS quando atingir 44 dígitos */
+.input-manual.valid {
+  border-color: var(--color-success);
+  background-color: #f6fff8;
+  box-shadow: 0 0 5px rgba(40, 167, 69, 0.2);
 }
 
 .status-text {
@@ -118,6 +157,13 @@
   text-align: center;
   color: var(--color-orange);
   font-weight: bold;
+}
+
+.chave-text {
+  font-size: 0.75rem;
+  color: #777;
+  word-break: break-all;
+  margin-top: 5px;
 }
 
 .note-item {
@@ -209,6 +255,11 @@
   width: 100%;
 }
 
+.btn-confirmar:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
 .bottom-nav {
   display: flex;
   justify-content: space-around;
@@ -220,15 +271,13 @@
 .nav-item { text-decoration: none; color: var(--text-secondary); font-size: 0.8rem; }
 .nav-item.active { color: var(--color-orange); font-weight: bold; }
 
-/* -----------------------------------------
-   DESKTOP OVERRIDES (A partir de 1024px)
------------------------------------------ */
+/* DESKTOP OVERRIDES */
 @media (min-width: 1024px) {
   .main-header { padding: 1rem 2rem; }
   .header-spacer { width: 140px; }
   .main-header h1 { font-size: 1.1rem; }
   .btn-voltar { width: 140px; padding: 8px 18px; font-size: 0.85rem; justify-content: center; }
-  .btn-voltar:hover { transform: translateX(-3px); border-color: var(--color-orange); color: var(--color-orange); background-color: #fff5ed; }
+  .btn-voltar:hover { transform: translateX(-3px); }
   
   .main-content {
     display: grid;
