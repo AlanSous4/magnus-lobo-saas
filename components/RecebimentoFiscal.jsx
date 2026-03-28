@@ -90,6 +90,41 @@ const RecebimentoFiscal = ({ organizationId }) => {
     },
   });
 
+  // --- COLE O CÓDIGO ABAIXO AQUI ---
+  const cadastrarNovoProdutoRapido = async (nomeNaNota) => {
+    const nomeLimpo = prompt(
+      "Confirme o nome do produto para o seu estoque:",
+      nomeNaNota
+    );
+    if (!nomeLimpo) return;
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return alert("Faça login novamente.");
+      const { data: novoProd, error } = await supabase
+        .from("products")
+        .insert([
+          {
+            name: nomeLimpo,
+            value: 0,
+            quantity: 0,
+            organization_id: organizationId,
+            user_id: user.id,
+            is_weight: false,
+          },
+        ])
+        .select()
+        .single();
+      if (error) throw error;
+      setMeusProdutos((prev) => [...prev, novoProd]);
+      setVinculos((prev) => ({ ...prev, [nomeNaNota]: novoProd.id }));
+      alert("✅ Produto cadastrado e vinculado!");
+    } catch (err) {
+      alert("Erro: " + err.message);
+    }
+  };
+
   // 1. Inicialização do Scanner (Só executa se showScanner for true)
   useEffect(() => {
     if (!showScanner) return; // Só inicia se o usuário clicar no botão
@@ -133,7 +168,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
       const { data, error } = await supabase
         .from("products")
         .select("id, name");
-    
+
       if (error) {
         console.error("❌ Erro:", error.message);
       } else {
@@ -230,8 +265,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
 
           if (itemErr) throw itemErr;
 
-          // Atualiza a quantidade real na sua tabela 'products'
-          // Certifique-se que sua RPC 'increment_stock' usa a coluna 'quantity' ou 'quantidade'
+          // Localize este trecho logo abaixo do que você me mandou:
           const { error: rpcErr } = await supabase.rpc("increment_stock", {
             row_id: productIdVinculado,
             amount: parseFloat(item.qtd),
@@ -442,30 +476,37 @@ const RecebimentoFiscal = ({ organizationId }) => {
                               className="select-vinculo"
                               value={vinculos[item.nome] || ""}
                               onChange={(e) => {
-                                const idSelecionado = e.target.value;
-                                setVinculos((prev) => ({
-                                  ...prev,
-                                  [item.nome]: idSelecionado,
-                                }));
+                                if (e.target.value === "NOVO") {
+                                  cadastrarNovoProdutoRapido(item.nome);
+                                } else {
+                                  setVinculos((prev) => ({
+                                    ...prev,
+                                    [item.nome]: e.target.value,
+                                  }));
+                                }
                               }}
                               style={{
                                 padding: "6px",
                                 borderRadius: "6px",
-                                fontSize: "0.8rem",
+                                width: "100%",
                                 border: vinculos[item.nome]
                                   ? "1px solid #28a745"
                                   : "1px solid #FF6600",
                                 background: vinculos[item.nome]
                                   ? "#f6fff8"
                                   : "#fff",
-                                outline: "none",
-                                width: "100%",
                               }}
                             >
                               <option value="">Vincular ao estoque...</option>
+                              <option
+                                value="NOVO"
+                                style={{ fontWeight: "bold", color: "blue" }}
+                              >
+                                + CADASTRAR NOVO PRODUTO
+                              </option>
                               {meusProdutos.map((p) => (
                                 <option key={p.id} value={p.id}>
-                                  {p.name} {/* Use .name aqui também */}
+                                  {p.name}
                                 </option>
                               ))}
                             </select>
