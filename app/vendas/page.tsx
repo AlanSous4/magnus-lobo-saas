@@ -16,10 +16,12 @@ export default async function VendasPage() {
     redirect("/login");
   }
 
-  // 🔹 Busca produtos
+  // 🔹 Busca apenas produtos ATIVOS e pertencentes ao USUÁRIO
   const { data: products, error } = await supabase
     .from("products")
-    .select("id, name, value, quantity, image_url")
+    .select("id, name, value, quantity, image_url, active") // Adicionado 'active'
+    .eq("user_id", user.id) // ✅ Segurança: apenas itens do dono
+    .eq("active", true)      // ✅ Filtro: esconde os "deletados"
     .order("name");
 
   if (error) {

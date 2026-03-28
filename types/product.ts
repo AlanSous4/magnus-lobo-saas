@@ -19,4 +19,10 @@ export interface Product {
   expiration_date: string | null
   created_at: string
   image_url?: string | null
+
+  // ✅ ADICIONE ESTES CAMPOS ABAIXO:
+  active: boolean                 // Controle de Soft Delete
+  deleted_at?: string | null      // Registro de quando foi desativado
+  user_id: string                 // ID do dono (importante para RLS)
+  organization_id?: string        // ID da padaria (multi-tenant)
 }

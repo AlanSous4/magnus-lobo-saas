@@ -28,6 +28,7 @@ function isNearExpiration(expiresAt: string | null, days = 7) {
   return diffDays <= days;
 }
 
+
 export default async function ProductsPage() {
   const supabase = await createClient();
 
@@ -37,21 +38,22 @@ export default async function ProductsPage() {
     error: authError,
   } = await supabase.auth.getUser();
 
-  // Redireciona para login se token expirou ou não houver usuário
   if (authError?.message?.includes("Refresh Token Not Found") || !user) {
     redirect("/login");
   }
 
-  // 🔹 Buscar produtos do usuário (SERVER)
+  // 🔹 Buscar produtos do usuário (FILTRANDO APENAS OS ATIVOS)
   const { data: products } = await supabase
     .from("products")
     .select("*")
     .eq("user_id", user.id)
+    .eq("active", true) // ✅ ESTA LINHA É A CHAVE: Remove os itens "deletados" da vista
     .order("created_at", { ascending: false });
 
   const safeProducts = products || [];
 
   // 🔹 Contadores de alerta (SERVER)
+  // Eles também serão atualizados automaticamente, ignorando os inativos
   const nearExpirationCount = safeProducts.filter((p) =>
     isNearExpiration(p.expires_at, DIAS_PARA_VENCER)
   ).length;
@@ -62,7 +64,7 @@ export default async function ProductsPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* ================= HEADER ================= */}
+      {/* ... restante do seu código (Header, Alertas e ProductListClient) ... */}
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
@@ -74,28 +76,27 @@ export default async function ProductsPage() {
         </div>
       </header>
 
-      {/* ================= MAIN ================= */}
       <main className="flex-1 container px-4 py-6 space-y-6">
         {/* 🔔 ALERTAS VISUAIS */}
         {(nearExpirationCount > 0 || lowStockCount > 0) && (
           <div className="flex flex-wrap gap-4">
-            {nearExpirationCount > 0 && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-500 bg-red-50 px-4 py-2 text-sm text-red-700">
-                <AlertTriangle className="h-4 w-4" />
-                {nearExpirationCount} produto(s) perto do vencimento
-              </div>
-            )}
+             {/* ... conteúdo dos alertas ... */}
+             {nearExpirationCount > 0 && (
+               <div className="flex items-center gap-2 rounded-lg border border-red-500 bg-red-50 px-4 py-2 text-sm text-red-700">
+                 <AlertTriangle className="h-4 w-4" />
+                 {nearExpirationCount} produto(s) perto do vencimento
+               </div>
+             )}
 
-            {lowStockCount > 0 && (
-              <div className="flex items-center gap-2 rounded-lg border border-orange-500 bg-orange-50 px-4 py-2 text-sm text-orange-700">
-                <AlertTriangle className="h-4 w-4" />
-                {lowStockCount} produto(s) com estoque baixo
-              </div>
-            )}
+             {lowStockCount > 0 && (
+               <div className="flex items-center gap-2 rounded-lg border border-orange-500 bg-orange-50 px-4 py-2 text-sm text-orange-700">
+                 <AlertTriangle className="h-4 w-4" />
+                 {lowStockCount} produto(s) com estoque baixo
+               </div>
+             )}
           </div>
         )}
 
-        {/* 🔹 LISTA DE PRODUTOS (CLIENT + REALTIME GRANULAR) */}
         <ProductListClient
           initialProducts={safeProducts}
           userId={user.id}
