@@ -160,37 +160,63 @@ export function calculateSalesMetrics(
   const labels = rows.map((r) => r.period)
 
   /* =========================
-     TOTAIS POR PAGAMENTO
+      TOTAIS POR PAGAMENTO (COM DECOMPOSIÇÃO)
   ========================= */
 
-  const paymentMap: Record<
-    string,
-    { total: number; count: number }
-  > = {}
+  const paymentMap: Record<string, { total: number; count: number }> = {};
+
+  // Mapa de tradução para as chaves do banco
+  const labelMap: Record<string, string> = {
+    va: "Vale Alimentação",
+    vr: "Vale Refeição",
+    cash: "Dinheiro",
+    pix: "Pix",
+    credit: "Crédito",
+    debit: "Débito",
+  };
 
   sales.forEach((sale) => {
+    const rawMethod = sale.payment_method || "Não informado";
 
-    const method = sale.payment_method || "Outros"
+    // 1. Verificar se é pagamento misto (ex: "va (R$ 4.00) + vr (R$ 4.00)")
+    if (rawMethod.includes("+")) {
+      const parts = rawMethod.split("+");
 
-    if (!paymentMap[method]) {
-      paymentMap[method] = {
-        total: 0,
-        count: 0,
+      parts.forEach((part) => {
+        // Extrai o código (va, vr, etc) e o valor dentro dos parênteses
+        const codeMatch = part.match(/(va|vr|cash|pix|credit|debit)/i);
+        const valueMatch = part.match(/\d+(\.\d+)?/); // Pega o número (ex: 4.00)
+
+        if (codeMatch && valueMatch) {
+          const code = codeMatch[0].toLowerCase();
+          const value = parseFloat(valueMatch[0]);
+          const label = labelMap[code] || code;
+
+          if (!paymentMap[label]) paymentMap[label] = { total: 0, count: 0 };
+          
+          paymentMap[label].total += value;
+          // Contamos como 1 uso dessa forma de pagamento
+          paymentMap[label].count += 1;
+        }
+      });
+    } else {
+      // 2. Pagamento simples
+      const label = labelMap[rawMethod.toLowerCase()] || rawMethod;
+
+      if (!paymentMap[label]) {
+        paymentMap[label] = { total: 0, count: 0 };
       }
+
+      paymentMap[label].total += Number(sale.total_value);
+      paymentMap[label].count += 1;
     }
+  });
 
-    paymentMap[method].total += Number(sale.total_value)
-    paymentMap[method].count += 1
-
-  })
-
-  const paymentTotals = Object.entries(paymentMap).map(
-    ([method, values]) => ({
-      method,
-      total: values.total,
-      count: values.count,
-    })
-  )
+  const paymentTotals = Object.entries(paymentMap).map(([method, values]) => ({
+    method,
+    total: values.total,
+    count: values.count,
+  }));
 
   /* =========================
      RETORNO FINAL

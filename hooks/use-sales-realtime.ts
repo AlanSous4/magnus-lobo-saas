@@ -88,7 +88,7 @@ export function useSalesRealtime({ userId }: { userId: string }) {
         product_name: "Venda",
         quantity: 1,
         total_value: Number(sale.total_amount) || 0,
-        payment_method: paymentLabelMap[sale.payment_method] ?? "Não informado",
+        payment_method: sale.payment_method, // Agora enviamos o texto bruto (ex: "va + vr")
 
         items: (sale.sale_items || []).map((item: any) => ({
           id: item.id,

@@ -65,20 +65,45 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function formatPaymentMethod(method: string | null | undefined) {
+  if (!method || method.trim() === "") return "Não informado";
+
+  const labels: Record<string, string> = {
+    va: "Vale Alimentação",
+    vr: "Vale Refeição",
+    cash: "Dinheiro",
+    pix: "Pix",
+    credit: "Crédito",
+    debit: "Débito",
+  };
+
+  let formatted = method.toLowerCase();
+
+  Object.entries(labels).forEach(([key, value]) => {
+    // Mudança aqui: 'gi' para busca global e case-insensitive, sem o rigor do \b
+    const regex = new RegExp(key, 'gi'); 
+    formatted = formatted.replace(regex, value);
+  });
+
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   const { sales, loading } = useSalesRealtime({ userId });
 
   /* =========================
-     NORMALIZAÇÃO DE DADOS
-  ========================= */
+    NORMALIZAÇÃO DE DADOS
+========================= */
 
-  const typedSales: Sale[] = useMemo(() => {
-    return sales.map((s: any) => ({
-      ...s,
-      total_value: s.total_value ?? s.total_amount ?? 0,
-      items: s.items ?? [],
-    }));
-  }, [sales]);
+const typedSales: Sale[] = useMemo(() => {
+  return sales.map((s: any) => ({
+    ...s,
+    total_value: s.total_value ?? s.total_amount ?? 0,
+    // Garante que o método bruto chegue na função formatPaymentMethod
+    payment_method: s.payment_method, 
+    items: s.items ?? [],
+  }));
+}, [sales]);
 
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
@@ -145,7 +170,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
       const [year, month] = selectedMonth.split("-").map(Number);
       // Descobre o último dia do mês (ex: 28, 30 ou 31)
       const lastDay = new Date(year, month, 0).getDate();
-      
+
       const daysArray = [];
       for (let i = 1; i <= lastDay; i++) {
         // Formata cada dia como DD/MM/AAAA
@@ -299,10 +324,10 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </thead>
 
             <tbody>
-            {labelsToRender.map((label) => {
+              {labelsToRender.map((label) => {
                 const periodSales = filteredSales.filter((s) => {
                   const saleDateBR = formatBR(getLocalDate(s.created_at));
-                  
+
                   // Se estivermos no modo mês ou range, comparamos o dia da venda com o label da linha
                   if (periodMode === "month" || periodMode === "range") {
                     return saleDateBR === label;
@@ -322,7 +347,8 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                 );
 
                 // NOVO: Cálculo do Ticket Médio seguro para evitar erro de divisão por zero
-                const averageTicket = periodSales.length > 0 ? revenue / periodSales.length : 0;
+                const averageTicket =
+                  periodSales.length > 0 ? revenue / periodSales.length : 0;
 
                 const isOpen = expandedLabel === label;
 
@@ -340,7 +366,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                       <td className="p-2 text-right">
                         {formatCurrency(averageTicket)}
                       </td>
-                      </tr>
+                    </tr>
 
                     {isOpen &&
                       periodSales.map((sale) => (
@@ -357,10 +383,12 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
                                 <span>
                                   Pagamento:{" "}
-                                  {sale.payment_method ?? "Desconhecido"}
+                                  {formatPaymentMethod(sale.payment_method)}
                                 </span>
 
-                                <span>Total: {formatCurrency(sale.total_value ?? 0)}</span>
+                                <span>
+                                  Total: {formatCurrency(sale.total_value ?? 0)}
+                                </span>
                               </div>
 
                               <div className="pl-4 space-y-1">
@@ -378,7 +406,9 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
                                           : `${item.quantity} UN`}
                                       </span>
 
-                                      <span className="text-right">{formatCurrency(item.total)}</span>
+                                      <span className="text-right">
+                                        {formatCurrency(item.total)}
+                                      </span>
                                     </div>
                                   ))
                                 ) : (

@@ -11,6 +11,7 @@ type Product = {
   name: string;
   value: number;
   is_weight?: boolean;
+  active?: boolean; // Adicionado aqui
 };
 
 type Item = {
@@ -53,6 +54,11 @@ function formatCurrency(value: number) {
 }
 
 export default function ClientesPendentesClient() {
+
+  const [isSplit, setIsSplit] = useState(false);
+  const [selectedPayment2, setSelectedPayment2] = useState("pix");
+  const [valueForm1, setValueForm1] = useState(0);
+
   const [cliente, setCliente] = useState("");
   const [data, setData] = useState("");
 
@@ -73,7 +79,7 @@ export default function ClientesPendentesClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState("dinheiro");
+  const [selectedPayment, setSelectedPayment] = useState("cash");
   const [pendenciaSelecionada, setPendenciaSelecionada] =
     useState<Pendente | null>(null);
 
@@ -99,7 +105,8 @@ export default function ClientesPendentesClient() {
     const fetchProducts = async () => {
       const { data } = await supabase
         .from("products")
-        .select("id,name,value,is_weight")
+        .select("id, name, value, is_weight, active") // Adicionado active
+        .eq("active", true) // ✅ FILTRO: Apenas produtos ativos aparecem na busca
         .order("name");
 
       if (data) setProducts(data);
@@ -213,70 +220,87 @@ export default function ClientesPendentesClient() {
 
   const receberPendencia = async (p: Pendente, payment: string) => {
     try {
-      console.log("Iniciando pagamento para ID:", p.id); // Debug no console
-
+      const { data: { user } } = await supabase.auth.getUser();
       const itens = pendenteItens[p.id];
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      
       if (!user || !itens) {
-        console.error("Usuário ou itens não encontrados");
+        console.error("ERRO: Usuário ou itens não encontrados", { user, itens });
         return;
       }
-
-      // 1. MARCA COMO PAGO NO BANCO (A PARTE QUE ESTÁ FALHANDO)
+  
+      // 🔹 Lógica do Label de Pagamento
+      let labelPagamento = payment;
+      if (isSplit) {
+        const v1 = Number(valueForm1).toFixed(2);
+        const v2 = (Number(p.total) - Number(valueForm1)).toFixed(2);
+        labelPagamento = `${payment} (R$ ${v1}) + ${selectedPayment2} (R$ ${v2})`;
+      }
+  
+      console.log("Tentando processar pagamento:", labelPagamento);
+  
+      // 1. MARCA COMO PAGO
       const { error: updateError } = await supabase
         .from("clientes_pendentes")
-        .update({ pago: true }) // Certifique-se que o nome da coluna é 'pago'
+        .update({ pago: true })
         .eq("id", p.id);
-
+  
       if (updateError) {
-        console.error("Erro ao atualizar status de pago:", updateError);
-        alert("Erro no banco: " + updateError.message);
-        return; // Para aqui se der erro
+        console.error("Erro no passo 1 (Update Pago):", updateError);
+        throw new Error(`Erro ao atualizar status: ${updateError.message}`);
       }
-
-      // 2. CRIA A VENDA (Histórico)
+  
+      // 2. CRIA A VENDA
       const { data: venda, error: vErr } = await supabase
         .from("sales")
         .insert({
           total_amount: p.total,
           total_value: p.total,
-          payment_method: payment,
+          payment_method: labelPagamento,
           user_id: user.id,
         })
         .select()
         .single();
-
-      if (vErr) throw vErr;
-
+  
+      if (vErr) {
+        console.error("Erro no passo 2 (Insert Sales):", vErr);
+        throw new Error(`Erro ao criar venda: ${vErr.message}`);
+      }
+  
       // 3. CRIA ITENS DA VENDA
+      // Ajuste aqui: verifique se os nomes das colunas batem com sua tabela 'sale_items'
       const saleItems = itens.map((i) => ({
         sale_id: venda.id,
-        product_id: i.product_id,
+        product_id: i.product_id || null, // Evita erro se o ID for undefined
         product_name: i.product_name,
         quantity: i.quantity,
         unit_price: i.unit_price,
         subtotal: i.subtotal,
       }));
-      await supabase.from("sale_items").insert(saleItems);
-
-      // 4. PERSISTÊNCIA NO NAVEGADOR (Timer de 60s)
+      
+      const { error: itemsErr } = await supabase.from("sale_items").insert(saleItems);
+      
+      if (itemsErr) {
+        console.error("Erro no passo 3 (Insert Sale Items):", itemsErr);
+        throw new Error(`Erro nos itens da venda: ${itemsErr.message}`);
+      }
+  
+      // 4. PERSISTÊNCIA E FINALIZAÇÃO
       const agora = Date.now();
       setPendenciasTemporarias((prev) => {
         const novo = { ...prev, [p.id]: agora };
         localStorage.setItem("pendencias_pagas_timer", JSON.stringify(novo));
         return novo;
       });
-
-      console.log("Pagamento concluído com sucesso no banco e local!");
+  
+      setIsSplit(false);
       setShowPaymentModal(false);
-
-      // 5. ATUALIZA A LISTA DO BANCO PARA CONFIRMAR
       fetchPendencias();
-    } catch (error) {
-      console.error("Erro geral:", error);
-      alert("Erro ao processar pagamento");
+      alert("Pagamento recebido com sucesso!");
+  
+    } catch (error: any) {
+      // Agora o log vai mostrar a mensagem real em vez de {}
+      console.error("DETALHE DO ERRO:", error.message || error);
+      alert(`Erro: ${error.message || "Erro desconhecido"}`);
     }
   };
 
@@ -776,7 +800,11 @@ export default function ClientesPendentesClient() {
       {/* MODAL DE PAGAMENTO */}
       {showPaymentModal && pendenciaSelecionada && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-6 shadow-2xl border">
+          <div
+            className={`bg-white rounded-2xl p-6 w-full ${
+              isSplit ? "max-w-md" : "max-w-sm"
+            } space-y-6 shadow-2xl border transition-all max-h-[95vh] overflow-y-auto`}
+          >
             <div className="space-y-1 text-center">
               <h2 className="text-2xl font-bold text-gray-800">
                 Receber Pagamento
@@ -794,39 +822,141 @@ export default function ClientesPendentesClient() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {["cash", "pix", "credit", "debit", "vr", "va"].map((type) => (
-                <label
-                  key={type}
-                  className={`
-                  flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all
-                  ${
-                    selectedPayment === type
-                      ? "bg-blue-50 border-blue-500 ring-1 ring-blue-500"
-                      : "hover:bg-gray-50"
-                  }
-                `}
-                >
-                  <input
-                    type="radio"
-                    className="hidden"
-                    value={type}
-                    checked={selectedPayment === type}
-                    onChange={(e) => setSelectedPayment(e.target.value)}
-                  />
-                  <span className="uppercase text-xs font-bold text-gray-700 w-full text-center">
-                    {type === "cash"
-                      ? "💵 Dinheiro"
-                      : type === "pix"
-                      ? "📱 Pix"
-                      : type === "credit"
-                      ? "💳 Crédito"
-                      : type === "debit"
-                      ? "💳 Débito"
-                      : type.toUpperCase()}
-                  </span>
-                </label>
-              ))}
+            {/* BOTÃO PARA ATIVAR DIVISÃO - Estilo discreto */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`w-full border border-dashed text-xs ${
+                isSplit
+                  ? "text-red-500 border-red-200"
+                  : "text-blue-500 border-blue-200"
+              }`}
+              onClick={() => {
+                setIsSplit(!isSplit);
+                setValueForm1(Number(pendenciaSelecionada.total) / 2);
+              }}
+            >
+              {isSplit
+                ? "✕ Cancelar divisão de pagamento"
+                : "➕ Receber em duas formas (Ex: Dinheiro + Pix)"}
+            </Button>
+
+            {/* ÁREA DE SELEÇÃO DE PAGAMENTO */}
+            <div className="space-y-4">
+              {/* FORMA 1 */}
+              <div
+                className={
+                  isSplit
+                    ? "space-y-2 p-3 border rounded-lg bg-gray-50/30"
+                    : "space-y-4"
+                }
+              >
+                {isSplit && (
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <span className="text-[10px] font-bold uppercase text-gray-400">
+                      Forma 1
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold">R$</span>
+                      <Input
+                        type="number"
+                        className="h-7 w-24 text-right font-bold"
+                        value={valueForm1}
+                        onChange={(e) => setValueForm1(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  {["cash", "pix", "credit", "debit", "vr", "va"].map(
+                    (type) => (
+                      <label
+                        key={type}
+                        className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                          selectedPayment === type
+                            ? "bg-blue-50 border-blue-500 ring-1 ring-blue-500"
+                            : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          className="hidden"
+                          name="payment1"
+                          value={type}
+                          checked={selectedPayment === type}
+                          onChange={(e) => setSelectedPayment(e.target.value)}
+                        />
+                        <span className="uppercase text-[10px] font-bold text-gray-700 w-full text-center">
+                          {type === "cash"
+                            ? "💵 Dinheiro"
+                            : type === "pix"
+                            ? "📱 Pix"
+                            : type === "credit"
+                            ? "💳 Crédito"
+                            : type === "debit"
+                            ? "💳 Débito"
+                            : type.toUpperCase()}
+                        </span>
+                      </label>
+                    )
+                  )}
+                </div>
+              </div>
+
+              {/* FORMA 2 (SÓ APARECE SE DIVIDIDO) */}
+              {isSplit && (
+                <div className="space-y-2 p-3 border rounded-lg bg-blue-50/20 border-blue-100 animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase text-blue-500">
+                      Forma 2 (Restante)
+                    </span>
+                    <span className="text-sm font-bold text-blue-700">
+                      R${" "}
+                      {(
+                        Number(pendenciaSelecionada.total) - valueForm1
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {["cash", "pix", "credit", "debit", "vr", "va"].map(
+                      (type) => (
+                        <label
+                          key={`split-${type}`}
+                          className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                            selectedPayment2 === type
+                              ? "bg-blue-50 border-blue-500 ring-1 ring-blue-500"
+                              : "bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            className="hidden"
+                            name="payment2"
+                            value={type}
+                            checked={selectedPayment2 === type}
+                            onChange={(e) =>
+                              setSelectedPayment2(e.target.value)
+                            }
+                          />
+                          <span className="uppercase text-[10px] font-bold text-gray-700 w-full text-center">
+                            {type === "cash"
+                              ? "💵 Dinheiro"
+                              : type === "pix"
+                              ? "📱 Pix"
+                              : type === "credit"
+                              ? "💳 Crédito"
+                              : type === "debit"
+                              ? "💳 Débito"
+                              : type.toUpperCase()}
+                          </span>
+                        </label>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
@@ -834,7 +964,6 @@ export default function ClientesPendentesClient() {
                 className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg font-bold cursor-pointer"
                 onClick={() => {
                   receberPendencia(pendenciaSelecionada, selectedPayment);
-                  setShowPaymentModal(false);
                 }}
               >
                 Confirmar Recebimento
@@ -842,7 +971,10 @@ export default function ClientesPendentesClient() {
               <Button
                 variant="ghost"
                 className="w-full text-gray-500 cursor-pointer"
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setIsSplit(false);
+                }}
               >
                 Voltar
               </Button>
