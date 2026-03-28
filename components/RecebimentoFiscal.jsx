@@ -26,7 +26,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
         // Busca a chave (ID da tag infNFe) e limpa o prefixo 'NFe'
         const infNFe = xmlDoc.getElementsByTagName("infNFe")[0];
         const chave = infNFe.getAttribute("Id").replace("NFe", "");
-        
+
         // Busca o nome do emitente (Fornecedor)
         const fornecedor = xmlDoc.getElementsByTagName("xNome")[0].textContent;
 
@@ -37,9 +37,14 @@ const RecebimentoFiscal = ({ organizationId }) => {
         for (let i = 0; i < detNodes.length; i++) {
           const prod = detNodes[i].getElementsByTagName("prod")[0];
           itensFormatados.push({
-            nome: prod.getElementsByTagName("xProd")[0].textContent,
+            // O .trim() remove espaços invisíveis que impedem o vínculo no select
+            nome: prod.getElementsByTagName("xProd")[0].textContent.trim(),
             qtd: prod.getElementsByTagName("qCom")[0].textContent,
-            valor: "R$ " + parseFloat(prod.getElementsByTagName("vUnCom")[0].textContent).toFixed(2).replace(".", ","),
+            valor:
+              "R$ " +
+              parseFloat(prod.getElementsByTagName("vUnCom")[0].textContent)
+                .toFixed(2)
+                .replace(".", ","),
           });
         }
 
@@ -53,7 +58,9 @@ const RecebimentoFiscal = ({ organizationId }) => {
           fiscal: {
             base: "R$ " + total.getElementsByTagName("vBC")[0].textContent,
             icms: "R$ " + total.getElementsByTagName("vICMS")[0].textContent,
-            cfop: detNodes[0].getElementsByTagName("prod")[0].getElementsByTagName("CFOP")[0].textContent,
+            cfop: detNodes[0]
+              .getElementsByTagName("prod")[0]
+              .getElementsByTagName("CFOP")[0].textContent,
           },
         });
         setStatus("XML importado com sucesso!");
@@ -119,29 +126,24 @@ const RecebimentoFiscal = ({ organizationId }) => {
     };
   }, [showScanner]); // Importante: monitora a mudança do botão
 
-  // 2. Busca produtos cadastrados para o Select de Vínculo
+  // 2. Busca produtos cadastrados (Ajustado para as colunas REAIS da sua tabela)
   useEffect(() => {
     const fetchProdutos = async () => {
-      if (!organizationId) return;
-
-      try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("id, name")
-          .eq("organization_id", organizationId);
-
-        if (error) {
-          console.error("Erro do Supabase ao carregar produtos:", error);
-        } else if (data) {
-          setMeusProdutos(data);
-        }
-      } catch (err) {
-        console.error("Erro inesperado ao buscar produtos:", err);
+      console.log("🔄 Buscando produtos com RLS desativado...");
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name");
+    
+      if (error) {
+        console.error("❌ Erro:", error.message);
+      } else {
+        console.log("✅ AGORA APARECEU:", data);
+        setMeusProdutos(data || []);
       }
     };
 
     fetchProdutos();
-  }, [organizationId]);
+  }, []); // Deixamos o array vazio para carregar assim que abrir a tela
 
   const processarNota = (chave) => {
     setScannedResult(chave);
@@ -172,32 +174,31 @@ const RecebimentoFiscal = ({ organizationId }) => {
     }
   };
 
-  // 3. Função para Salvar no Banco e Atualizar Estoque
+  // 3. Função para Salvar no Banco e Atualizar Estoque (Corrigida para Colunas em PT)
   const handleConfirmarEstoque = async () => {
     if (!scannedResult || notaDados.itens.length === 0) return;
 
     const todosVinculados = notaDados.itens.every(
       (item) => vinculos[item.nome]
     );
+
     if (!todosVinculados) {
-      alert(
-        "Por favor, vincule todos os produtos da nota aos produtos do seu estoque antes de confirmar."
-      );
+      alert("Por favor, vincule todos os produtos da nota antes de confirmar.");
       return;
     }
 
     setIsSaving(true);
 
     try {
-      // A. Salva o cabeçalho
+      // Dentro de handleConfirmarEstoque:
       const { data: rec, error: recErr } = await supabase
         .from("recebimentos")
         .insert([
           {
             chave_nfe: scannedResult,
             fornecedor_nome: notaDados.fornecedor,
-            valor_total: 130.0,
-            organization_id: organizationId,
+            valor_total: valorTotalNota,
+            organization_id: organizationId, // Use organization_id (em inglês)
             status: "confirmado",
           },
         ])
@@ -211,7 +212,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
         const productIdVinculado = vinculos[item.nome];
 
         if (productIdVinculado) {
-          // Salva item do recebimento
+          // Salva o item vinculado na tabela de histórico
           const { error: itemErr } = await supabase
             .from("recebimento_itens")
             .insert({
@@ -220,13 +221,17 @@ const RecebimentoFiscal = ({ organizationId }) => {
               nome_produto_nfe: item.nome,
               quantidade: parseFloat(item.qtd),
               preco_unitario: parseFloat(
-                item.valor.replace("R$ ", "").replace(",", ".")
+                item.valor
+                  .replace("R$ ", "")
+                  .replace(/\./g, "")
+                  .replace(",", ".")
               ),
             });
 
           if (itemErr) throw itemErr;
 
-          // Atualiza estoque real via RPC
+          // Atualiza a quantidade real na sua tabela 'products'
+          // Certifique-se que sua RPC 'increment_stock' usa a coluna 'quantity' ou 'quantidade'
           const { error: rpcErr } = await supabase.rpc("increment_stock", {
             row_id: productIdVinculado,
             amount: parseFloat(item.qtd),
@@ -237,6 +242,8 @@ const RecebimentoFiscal = ({ organizationId }) => {
       }
 
       alert("Estoque da Padaria Magnus Lobo atualizado com sucesso!");
+
+      // Limpa tudo após o sucesso
       setScannedResult("");
       setNotaDados({
         fornecedor: "Aguardando leitura...",
@@ -245,11 +252,38 @@ const RecebimentoFiscal = ({ organizationId }) => {
       });
       setVinculos({});
     } catch (err) {
-      alert("Erro ao salvar no banco: " + err.message);
+      console.error("Erro ao salvar:", err);
+      alert(
+        "Erro ao salvar no banco: " + (err.message || "Verifique o console")
+      );
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Só calcula se a chave estiver completa (44 dígitos)
+  const temNotaValida = scannedResult.length === 44;
+
+  const totalItensNota = temNotaValida ? notaDados.itens.length : 0;
+
+  const valorTotalNota = temNotaValida
+    ? notaDados.itens.reduce((acc, item) => {
+        const preco = parseFloat(
+          item.valor.replace("R$ ", "").replace(/\./g, "").replace(",", ".")
+        );
+        const qtd = parseFloat(item.qtd);
+        return acc + preco * qtd;
+      }, 0)
+    : 0;
+
+  const valorTotalICMS = temNotaValida
+    ? parseFloat(
+        notaDados.fiscal.icms
+          ?.replace("R$ ", "")
+          .replace(/\./g, "")
+          .replace(",", ".") || 0
+      )
+    : 0;
 
   return (
     <div className="recebimento-container theme-light">
@@ -297,8 +331,20 @@ const RecebimentoFiscal = ({ organizationId }) => {
               />
 
               {/* --- ADICIONE O BLOCO ABAIXO --- */}
-              <div style={{ marginTop: "15px", borderTop: "1px dashed #eee", paddingTop: "15px" }}>
-                <label style={{ color: "#FF6600", fontWeight: "bold", fontSize: "0.85rem" }}>
+              <div
+                style={{
+                  marginTop: "15px",
+                  borderTop: "1px dashed #eee",
+                  paddingTop: "15px",
+                }}
+              >
+                <label
+                  style={{
+                    color: "#FF6600",
+                    fontWeight: "bold",
+                    fontSize: "0.85rem",
+                  }}
+                >
                   Importar via arquivo XML:
                 </label>
                 <input
@@ -306,10 +352,13 @@ const RecebimentoFiscal = ({ organizationId }) => {
                   accept=".xml"
                   className="cursor-pointer"
                   onChange={handleFileUpload}
-                  style={{ marginTop: "8px", fontSize: "0.8rem", width: "100%" }}
+                  style={{
+                    marginTop: "8px",
+                    fontSize: "0.8rem",
+                    width: "100%",
+                  }}
                 />
               </div>
-
             </div>
             <p className="status-text">{status}</p>
           </div>
@@ -326,16 +375,26 @@ const RecebimentoFiscal = ({ organizationId }) => {
         <section className="right-panel">
           <div className="summary-header">
             <div className="summary-card">
-              <span className="label">Total Notas</span>
-              <span className="value">13</span>
+              <span className="label">Itens na Nota</span>
+              <span className="value">{totalItensNota}</span>
             </div>
             <div className="summary-card">
-              <span className="label">Total Compras</span>
-              <span className="value orange">R$ 5.420</span>
+              <span className="label">Total da Compra</span>
+              <span className="value orange">
+                {valorTotalNota.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </span>
             </div>
             <div className="summary-card">
               <span className="label">Total ICMS</span>
-              <span className="value orange">R$ 325</span>
+              <span className="value orange">
+                {valorTotalICMS.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </span>
             </div>
           </div>
 
@@ -382,12 +441,13 @@ const RecebimentoFiscal = ({ organizationId }) => {
                             <select
                               className="select-vinculo"
                               value={vinculos[item.nome] || ""}
-                              onChange={(e) =>
-                                setVinculos({
-                                  ...vinculos,
-                                  [item.nome]: e.target.value,
-                                })
-                              }
+                              onChange={(e) => {
+                                const idSelecionado = e.target.value;
+                                setVinculos((prev) => ({
+                                  ...prev,
+                                  [item.nome]: idSelecionado,
+                                }));
+                              }}
                               style={{
                                 padding: "6px",
                                 borderRadius: "6px",
@@ -399,12 +459,13 @@ const RecebimentoFiscal = ({ organizationId }) => {
                                   ? "#f6fff8"
                                   : "#fff",
                                 outline: "none",
+                                width: "100%",
                               }}
                             >
                               <option value="">Vincular ao estoque...</option>
                               {meusProdutos.map((p) => (
                                 <option key={p.id} value={p.id}>
-                                  {p.name}
+                                  {p.name} {/* Use .name aqui também */}
                                 </option>
                               ))}
                             </select>
@@ -437,19 +498,19 @@ const RecebimentoFiscal = ({ organizationId }) => {
                 <div className="fiscal-field">
                   <span className="label">Base ICMS:</span>
                   <span className="value">
-                    {notaDados.fiscal.base || "---"}
+                    {temNotaValida ? notaDados.fiscal.base : "---"}
                   </span>
                 </div>
                 <div className="fiscal-field">
                   <span className="label">Vlr ICMS:</span>
                   <span className="value">
-                    {notaDados.fiscal.icms || "---"}
+                    {temNotaValida ? notaDados.fiscal.icms : "---"}
                   </span>
                 </div>
                 <div className="fiscal-field">
                   <span className="label">CFOP:</span>
                   <span className="value">
-                    {notaDados.fiscal.cfop || "---"}
+                    {temNotaValida ? notaDados.fiscal.cfop : "---"}
                   </span>
                 </div>
               </div>
