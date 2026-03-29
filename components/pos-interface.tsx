@@ -126,6 +126,8 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
+  const [valoresPagamento, setValoresPagamento] = useState<{ [key in PaymentMethod]?: number }>({});
+
   const router = useRouter();
 
   const filteredProducts = products.filter((p) =>
@@ -178,41 +180,60 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     return sum + subtotal;
   }, 0);
 
+  // CÁLCULOS DE PAGAMENTO (COLE ESTAS DUAS LINHAS AQUI)
+  const totalPago = Object.values(valoresPagamento).reduce((acc, val) => acc + (val || 0), 0);
+  const troco = totalPago > total ? totalPago - total : 0;
+
   const handleCheckout = () => {
     if (cart.length === 0) return;
     setShowPayment(true);
   };
 
   const processSale = async () => {
-    if (!selectedPayment) return;
+    if (totalPago < (total - 0.01) || isProcessing) return;
     setIsProcessing(true);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // GERA O TEXTO COMBINADO (Igual ao Clientes Pendentes)
+      const entradas = Object.entries(valoresPagamento).filter(([_, v]) => (v || 0) > 0);
+      
+      let labelPagamento = "";
+      if (entradas.length > 1) {
+        // Se tiver mais de uma forma, cria o texto: "pix (R$ 10.00) + cash (R$ 5.00)"
+        labelPagamento = entradas
+          .map(([metodo, valor]) => `${metodo} (R$ ${valor?.toFixed(2)})`)
+          .join(" + ");
+      } else {
+        // Se for só uma, salva o nome limpo
+        labelPagamento = entradas[0][0];
+      }
+
       const { data: sale, error } = await supabase
         .from("sales")
         .insert({
-          user_id: userId,
+          user_id: user.id,
           total_amount: total,
-          payment_method: selectedPayment,
+          total_value: total, // Usando a coluna que existe no seu SQL
+          payment_method: labelPagamento, // Aqui vai o texto combinado
           created_at: getBrazilISOString(),
         })
         .select()
         .single();
 
-      if (error || !sale) {
-        console.error("Erro ao criar venda:", error);
-        return;
-      }
+        if (error || !sale) {
+          // O ?. garante que se o erro for null, ele não quebra o código
+          console.error("Erro ao criar venda:", error?.message || "Erro desconhecido");
+          return;
+        }
 
+      // ... (Restante do código de inserir itens e baixar estoque continua igual)
       for (const item of cart) {
         const isWeight = isWeightProduct(item.id);
-        const quantityToSave = isWeight
-          ? item.cartQuantity / 1000
-          : item.cartQuantity;
-
-        const subtotal = isWeight
-          ? (item.value / 100) * item.cartQuantity
-          : item.value * item.cartQuantity;
+        const quantityToSave = isWeight ? item.cartQuantity / 1000 : item.cartQuantity;
+        const subtotal = isWeight ? (item.value / 100) * item.cartQuantity : item.value * item.cartQuantity;
 
         await supabase.from("sale_items").insert({
           sale_id: sale.id,
@@ -223,24 +244,23 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           is_weight: isWeight,
         });
 
-        await supabase
-          .from("products")
-          .update({
-            quantity: item.quantity - quantityToSave,
-            exit_date: new Date().toISOString(),
-          })
-          .eq("id", item.id);
+        await supabase.from("products").update({
+          quantity: item.quantity - quantityToSave,
+          exit_date: new Date().toISOString(),
+        }).eq("id", item.id);
       }
 
       setCart([]);
+      setValoresPagamento({});
       setShowPayment(false);
-      setSelectedPayment(null);
       setShowSuccess(true);
 
       setTimeout(() => {
         setShowSuccess(false);
         router.refresh();
       }, 2000);
+    } catch (err) {
+      console.error("Erro inesperado:", err);
     } finally {
       setIsProcessing(false);
     }
@@ -417,41 +437,83 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
       {/* DIALOGS */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
-        <DialogContent>
+      <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Forma de Pagamento</DialogTitle>
-            <DialogDescription>Total: R$ {total.toFixed(2)}</DialogDescription>
+            <DialogDescription className="font-bold text-base text-orange-600">
+              Total a pagar: R$ {total.toFixed(2)}
+            </DialogDescription>
           </DialogHeader>
 
+          {/* Grid de Botões (Seu estilo original) */}
           <div className="grid grid-cols-2 gap-3 py-4">
             {paymentMethods.map((m) => {
               const Icon = m.icon;
+              const isAtivo = (valoresPagamento[m.id] || 0) > 0;
               return (
-                <Button
-                  key={m.id}
-                  variant={selectedPayment === m.id ? "default" : "outline"}
-                  className="h-20 flex flex-col gap-2 cursor-pointer"
-                  onClick={() => setSelectedPayment(m.id)}
-                >
-                  <Icon className="h-6 w-6" />
-                  {m.label}
-                </Button>
+                <div key={m.id} className="flex flex-col gap-2">
+                  <Button
+                    variant={isAtivo ? "default" : "outline"}
+                    className="h-20 flex flex-col gap-2 cursor-pointer transition-all"
+                    onClick={() => {
+                      if (!valoresPagamento[m.id]) {
+                        const falta = total - totalPago;
+                        setValoresPagamento({ ...valoresPagamento, [m.id]: falta > 0 ? falta : 0 });
+                      } else {
+                        const novos = { ...valoresPagamento };
+                        delete novos[m.id];
+                        setValoresPagamento(novos);
+                      }
+                    }}
+                  >
+                    <Icon className="h-6 w-6" />
+                    {m.label}
+                  </Button>
+                  
+                  {/* Input aparece só se o botão for ativado */}
+                  {isAtivo && (
+                    <Input
+                      type="number"
+                      placeholder="Valor"
+                      className="h-8 text-center border-orange-400 font-bold focus:ring-orange-500"
+                      value={valoresPagamento[m.id]}
+                      onChange={(e) => setValoresPagamento({ 
+                        ...valoresPagamento, 
+                        [m.id]: parseFloat(e.target.value) || 0 
+                      })}
+                    />
+                  )}
+                </div>
               );
             })}
           </div>
 
-          <DialogFooter>
-            <Button
-              className="cursor-pointer"
-              variant="outline"
-              onClick={() => setShowPayment(false)}
+          {/* Resumo Financeiro */}
+          <div className="bg-muted p-3 rounded-lg space-y-1 border">
+            <div className="flex justify-between text-sm">
+              <span>Total Recebido:</span>
+              <span className="font-bold">R$ {totalPago.toFixed(2)}</span>
+            </div>
+            {troco > 0 && (
+              <div className="flex justify-between text-green-600 font-bold">
+                <span>Troco:</span>
+                <span>R$ {troco.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-4 gap-2">
+            <Button 
+              variant="outline" 
+              className="cursor-pointer" 
+              onClick={() => { setShowPayment(false); setValoresPagamento({}); }}
             >
               Cancelar
             </Button>
             <Button
-              className="cursor-pointer"
+              className="cursor-pointer bg-orange-600 hover:bg-orange-700"
               onClick={processSale}
-              disabled={!selectedPayment || isProcessing}
+              disabled={totalPago < (total - 0.01) || isProcessing}
             >
               {isProcessing ? "Processando..." : "Confirmar Venda"}
             </Button>
