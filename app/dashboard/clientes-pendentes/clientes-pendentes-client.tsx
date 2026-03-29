@@ -54,7 +54,7 @@ function formatCurrency(value: number) {
 }
 
 export default function ClientesPendentesClient() {
-
+  const [showSuccess, setShowSuccess] = useState(false);
   const [isSplit, setIsSplit] = useState(false);
   const [selectedPayment2, setSelectedPayment2] = useState("pix");
   const [valueForm1, setValueForm1] = useState(0);
@@ -220,14 +220,19 @@ export default function ClientesPendentesClient() {
 
   const receberPendencia = async (p: Pendente, payment: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       const itens = pendenteItens[p.id];
-      
+
       if (!user || !itens) {
-        console.error("ERRO: Usuário ou itens não encontrados", { user, itens });
+        console.error("ERRO: Usuário ou itens não encontrados", {
+          user,
+          itens,
+        });
         return;
       }
-  
+
       // 🔹 Lógica do Label de Pagamento
       let labelPagamento = payment;
       if (isSplit) {
@@ -235,20 +240,20 @@ export default function ClientesPendentesClient() {
         const v2 = (Number(p.total) - Number(valueForm1)).toFixed(2);
         labelPagamento = `${payment} (R$ ${v1}) + ${selectedPayment2} (R$ ${v2})`;
       }
-  
+
       console.log("Tentando processar pagamento:", labelPagamento);
-  
+
       // 1. MARCA COMO PAGO
       const { error: updateError } = await supabase
         .from("clientes_pendentes")
         .update({ pago: true })
         .eq("id", p.id);
-  
+
       if (updateError) {
         console.error("Erro no passo 1 (Update Pago):", updateError);
         throw new Error(`Erro ao atualizar status: ${updateError.message}`);
       }
-  
+
       // 2. CRIA A VENDA
       const { data: venda, error: vErr } = await supabase
         .from("sales")
@@ -260,12 +265,12 @@ export default function ClientesPendentesClient() {
         })
         .select()
         .single();
-  
+
       if (vErr) {
         console.error("Erro no passo 2 (Insert Sales):", vErr);
         throw new Error(`Erro ao criar venda: ${vErr.message}`);
       }
-  
+
       // 3. CRIA ITENS DA VENDA
       // Ajuste aqui: verifique se os nomes das colunas batem com sua tabela 'sale_items'
       const saleItems = itens.map((i) => ({
@@ -276,14 +281,16 @@ export default function ClientesPendentesClient() {
         unit_price: i.unit_price,
         subtotal: i.subtotal,
       }));
-      
-      const { error: itemsErr } = await supabase.from("sale_items").insert(saleItems);
-      
+
+      const { error: itemsErr } = await supabase
+        .from("sale_items")
+        .insert(saleItems);
+
       if (itemsErr) {
         console.error("Erro no passo 3 (Insert Sale Items):", itemsErr);
         throw new Error(`Erro nos itens da venda: ${itemsErr.message}`);
       }
-  
+
       // 4. PERSISTÊNCIA E FINALIZAÇÃO
       const agora = Date.now();
       setPendenciasTemporarias((prev) => {
@@ -291,16 +298,21 @@ export default function ClientesPendentesClient() {
         localStorage.setItem("pendencias_pagas_timer", JSON.stringify(novo));
         return novo;
       });
-  
-      setIsSplit(false);
-      setShowPaymentModal(false);
-      fetchPendencias();
-      alert("Pagamento recebido com sucesso!");
-  
+
+      // Ativa a animação de sucesso
+      setShowSuccess(true);
+
+      // Limpa os estados e fecha os modais após 2 segundos
+      setTimeout(() => {
+        setShowSuccess(false);
+        setIsSplit(false);
+        setShowPaymentModal(false);
+        setPendenciaSelecionada(null);
+        fetchPendencias();
+      }, 2000);
     } catch (error: any) {
-      // Agora o log vai mostrar a mensagem real em vez de {}
       console.error("DETALHE DO ERRO:", error.message || error);
-      alert(`Erro: ${error.message || "Erro desconhecido"}`);
+      alert(`Erro: ${error.message || "Erro desconhecido"}`); // Mantém alert só para erro crítico
     }
   };
 
@@ -798,17 +810,30 @@ export default function ClientesPendentesClient() {
       </div>
 
       {/* MODAL DE PAGAMENTO */}
-      {showPaymentModal && pendenciaSelecionada && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div
-            className={`bg-white rounded-2xl p-6 w-full ${
-              isSplit ? "max-w-md" : "max-w-sm"
-            } space-y-6 shadow-2xl border transition-all max-h-[95vh] overflow-y-auto`}
-          >
-            <div className="space-y-1 text-center">
-              <h2 className="text-2xl font-bold text-gray-800">
-                Receber Pagamento
-              </h2>
+{showPaymentModal && pendenciaSelecionada && (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className={`relative bg-white rounded-2xl p-6 w-full ${isSplit ? "max-w-md" : "max-w-sm"} space-y-6 shadow-2xl border transition-all max-h-[95vh] overflow-y-auto`}>
+      
+      {/* --- AQUI ENTRA A MELHORIA IGUAL AO PDV --- */}
+      {showSuccess && (
+        <div className="absolute inset-0 bg-green-600 flex flex-col items-center justify-center z-60 animate-in fade-in duration-300 rounded-2xl">
+          <div className="bg-white/20 p-4 rounded-full mb-4 animate-bounce">
+            <CheckCircle size={64} className="text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-white uppercase tracking-widest">
+            Recebido!
+          </h2>
+          <p className="text-white/80 text-sm mt-2 font-medium italic">
+            Venda registrada com sucesso
+          </p>
+        </div>
+      )}
+      {/* ------------------------------------------ */}
+
+      <div className="space-y-1 text-center">
+        <h2 className="text-2xl font-bold text-gray-800">
+          Receber Pagamento
+        </h2>
               <p className="text-gray-500">Confirme os detalhes do cliente</p>
             </div>
 
@@ -980,6 +1005,21 @@ export default function ClientesPendentesClient() {
               </Button>
             </div>
           </div>
+
+          {/* OVERLAY DE SUCESSO IGUAL AO PDV */}
+          {showSuccess && (
+            <div className="absolute inset-0 bg-green-600 flex flex-col items-center justify-center z-60 animate-in fade-in duration-300">
+              <div className="bg-white/20 p-4 rounded-full mb-4 animate-bounce">
+                <CheckCircle size={64} className="text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white uppercase tracking-widest">
+                Recebido!
+              </h2>
+              <p className="text-white/80 text-sm mt-2">
+                Venda registrada com sucesso
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
