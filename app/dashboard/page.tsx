@@ -13,12 +13,14 @@ import { getDashboardMetrics } from "@/lib/dashboard-metrics"
 import { DashboardCards } from "@/components/dashboard-cards"
 
 export const metadata = {
-  title: "Dashboard",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    themeColor: "#ffffff",
-  },
+  title: "Dashboard - Magnus Lobo",
+  description: "Visão geral da Padaria Lanchonete Magnus Lobo",
+}
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#ffffff",
 }
 
 export default async function DashboardPage() {

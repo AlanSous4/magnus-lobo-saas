@@ -13,6 +13,7 @@ import {
   BarChart3,
   Users,
   FileText,
+  Utensils,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -22,6 +23,7 @@ import { useEffect, useState } from "react"
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Vendas (PDV)", href: "/vendas", icon: ShoppingCart },
+  { title: "Mesas", href: "/dashboard/mesas", icon: Utensils }, 
   { title: "Produtos", href: "/produtos", icon: Package },
   { title: "Produtos mais vendidos",href: "/dashboard/produtos-mais-vendidos",icon: BarChart3,},
   { title: "Clientes Pendente", href: "/dashboard/clientes-pendentes", icon: Users },
