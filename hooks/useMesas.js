@@ -8,21 +8,27 @@ export function useMesas() {
   const [loading, setLoading] = useState(true);
 
   const fetchMesas = useCallback(async () => {
-    // Retiramos o setLoading(true) daqui para não dar "piscada" no refresh
-    const { data, error } = await supabase
-      .from('mesas')
-      .select('*')
-      .eq('organization_id', ORG_ID)
-      .order('numero_mesa', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('mesas')
+        .select('*')
+        .eq('organization_id', ORG_ID)
+        .order('numero_mesa', { ascending: true });
 
-    if (!error) setMesas(data);
-    setLoading(false);
+      if (error) throw error;
+      setMesas(data || []);
+    } catch (err) {
+      console.error("Erro ao buscar mesas:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     fetchMesas();
     
-    // Opcional: Atualiza os dados automaticamente se você mudar de aba e voltar
+    // Atualiza os dados automaticamente se o usuário trocar de aba e voltar
+    // Essencial para manter o status de ocupação sincronizado
     window.addEventListener('focus', fetchMesas);
     return () => window.removeEventListener('focus', fetchMesas);
   }, [fetchMesas]);
