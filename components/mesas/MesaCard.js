@@ -1,14 +1,12 @@
 import React from 'react';
 
-// Recebemos a mesa e uma função de clique como props
 const MesaCard = ({ mesa, onClick }) => {
-  
-  // Definimos as cores baseadas no status da mesa
+  // Lógica para definir se está ocupada
   const isOcupada = mesa.status === 'ocupada';
   
   const statusStyles = isOcupada 
-    ? "bg-red-50 border-red-200 text-red-800 shadow-sm" 
-    : "bg-stone-50 border-stone-200 text-stone-800 hover:border-orange-300 hover:bg-orange-50";
+    ? "bg-red-50 border-red-200 text-red-800 shadow-inner" 
+    : "bg-white border-stone-200 text-stone-800 hover:border-orange-300 hover:bg-orange-50 shadow-sm";
 
   return (
     <div 
@@ -21,13 +19,13 @@ const MesaCard = ({ mesa, onClick }) => {
         min-h-35 w-full
       `}
     >
-      {/* Indicador visual de status no topo */}
+      {/* Indicador visual de status */}
       <div className={`
-        absolute top-3 right-3 h-3 w-3 rounded-full 
+        absolute top-3 right-3 h-3 w-3 rounded-full border border-white
         ${isOcupada ? 'bg-red-500 animate-pulse' : 'bg-green-500'}
       `} />
 
-      <span className="text-sm font-medium opacity-70 uppercase tracking-wider">
+      <span className="text-[10px] font-bold opacity-50 uppercase tracking-widest">
         Mesa
       </span>
       
@@ -35,13 +33,14 @@ const MesaCard = ({ mesa, onClick }) => {
         {mesa.numero_mesa}
       </span>
 
-      <div className="mt-2 text-xs font-semibold px-3 py-1 rounded-full bg-white/50 border border-current/10">
-        {isOcupada ? 'EM CONSUMO' : 'DISPONÍVEL'}
+      <div className={`mt-2 text-[10px] font-black px-3 py-1 rounded-full border ${
+        isOcupada ? 'bg-red-100 border-red-200' : 'bg-stone-100 border-stone-200'
+      }`}>
+        {isOcupada ? 'OCUPADA' : 'LIVRE'}
       </div>
-
-      {/* Se estiver ocupada, poderíamos mostrar um ícone ou valor prévio aqui no futuro */}
     </div>
   );
 };
+
 
 export default MesaCard;
