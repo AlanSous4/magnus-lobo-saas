@@ -244,42 +244,43 @@ export default function DetalheMesaPage() {
     }
   };
 
-  // 4. FINALIZAR PEDIDO (Adicionado tratamento de erro melhor)
+  
   const finalizarPedido = async () => {
     if (itensPedido.length === 0) return;
 
     setProcessandoPagamento(true);
     try {
       const pedidoId = itensPedido[0]?.pedido_id;
+      
+      // Transforma a lista de pagamentos (Ex: ["PIX", "DINHEIRO"]) em uma string única
       const stringMetodos = pagamentos
         .map((p) => p.metodo.toUpperCase())
         .join(", ");
 
-      const { error: erroPedido } = await supabase
-        .from("pedidos_mesa")
-        .update({
-          status_pagamento: "pago",
-          fechado_em: new Date().toISOString(),
-          total_pedido: totalGeral,
-          metodo_pagamento: stringMetodos,
-        })
-        .eq("id", pedidoId);
+      // --- AQUI ESTÁ A MUDANÇA PRINCIPAL ---
+      // Chamamos a função SQL (RPC) que faz 4 coisas: 
+      // 1. Cria Venda | 2. Baixa Estoque | 3. Fecha Pedido | 4. Libera Mesa
+      const { error: rpcError } = await supabase.rpc('finalizar_fechamento_mesa', {
+        p_pedido_id: pedidoId,
+        p_mesa_id: id,         // 'id' vem do useParams() da sua rota
+        p_org_id: ORG_ID,      // Sua constante de Organização
+        p_total_venda: totalGeral,
+        p_metodos_pagamento: stringMetodos
+      });
 
-      if (erroPedido) throw erroPedido;
+      if (rpcError) throw rpcError;
 
-      await supabase.from("mesas").update({ status: "livre" }).eq("id", id);
-
-      // EM VEZ DE ALERT:
+      // Se não deu erro, mostramos a tela de sucesso
       setSucesso(true);
 
       // Aguarda 2 segundos para o usuário ver o check de sucesso e redireciona
       setTimeout(() => {
         router.push("/dashboard/mesas");
       }, 2000);
+
     } catch (err) {
-      console.error(err);
-      // Aqui você pode usar um Toast futuramente
-      alert("Erro ao finalizar conta.");
+      console.error("Erro ao finalizar conta:", err);
+      alert(`Erro técnico: ${err.message || "Verifique o console"}`);
     } finally {
       setProcessandoPagamento(false);
     }
