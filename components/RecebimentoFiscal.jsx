@@ -11,6 +11,9 @@ const RecebimentoFiscal = ({ organizationId }) => {
   const [status, setStatus] = useState("Aguardando scan...");
   const [showScanner, setShowScanner] = useState(false); // Adicione esta linha
 
+  const [modalNovoProd, setModalNovoProd] = useState({ open: false, nomeNota: "" });
+  const [novoNomeEstoque, setNovoNomeEstoque] = useState("");
+
   // --- FUNÇÃO DE ARQUIVO XML ATUALIZADA E COMPLETA ---
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -118,38 +121,41 @@ const RecebimentoFiscal = ({ organizationId }) => {
     },
   });
 
-  // --- COLE O CÓDIGO ABAIXO AQUI ---
-  const cadastrarNovoProdutoRapido = async (nomeNaNota) => {
-    const nomeLimpo = prompt(
-      "Confirme o nome do produto para o seu estoque:",
-      nomeNaNota
-    );
-    if (!nomeLimpo) return;
+  const abrirModalCadastro = (nomeNaNota) => {
+    setNovoNomeEstoque(nomeNaNota);
+    setModalNovoProd({ open: true, nomeNota: nomeNaNota });
+  };
+  
+  // Esta será a função chamada pelo botão "Salvar" do modal
+  const confirmarCadastroRapido = async () => {
+    if (!novoNomeEstoque) return;
+    
+    setIsSaving(true); // Reaproveitando seu estado de loading
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return alert("Faça login novamente.");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return alert("Sessão expirada.");
+  
       const { data: novoProd, error } = await supabase
         .from("products")
-        .insert([
-          {
-            name: nomeLimpo,
-            value: 0,
-            quantity: 0,
-            organization_id: organizationId,
-            user_id: user.id,
-            is_weight: false,
-          },
-        ])
-        .select()
-        .single();
+        .insert([{
+          name: novoNomeEstoque,
+          value: 0,
+          quantity: 0,
+          organization_id: organizationId,
+          user_id: user.id,
+          is_weight: false,
+        }])
+        .select().single();
+  
       if (error) throw error;
+  
       setMeusProdutos((prev) => [...prev, novoProd]);
-      setVinculos((prev) => ({ ...prev, [nomeNaNota]: novoProd.id }));
-      alert("✅ Produto cadastrado e vinculado!");
+      setVinculos((prev) => ({ ...prev, [modalNovoProd.nomeNota]: novoProd.id }));
+      setModalNovoProd({ open: false, nomeNota: "" }); // Fecha o modal
     } catch (err) {
       alert("Erro: " + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -196,7 +202,8 @@ const RecebimentoFiscal = ({ organizationId }) => {
       const { data, error } = await supabase
         .from("products")
         .select("id, name")
-        .eq("organization_id", organizationId); // Filtra pela Padaria Magnus Lobo
+        .eq("organization_id", organizationId) // Filtra pela Padaria Magnus Lobo
+        .order("name", { ascending: true });
 
       if (error) {
         console.error("Erro ao buscar estoque:", error.message);
@@ -536,7 +543,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
                             value={vinculos[item.nome] || ""}
                             onChange={(e) => {
                               if (e.target.value === "NOVO") {
-                                cadastrarNovoProdutoRapido(item.nome);
+                                abrirModalCadastro(item.nome);
                               } else {
                                 setVinculos((prev) => ({
                                   ...prev,
@@ -657,6 +664,42 @@ const RecebimentoFiscal = ({ organizationId }) => {
           <p style={{ color: "#666" }}>Padaria Magnus Lobo</p>
         </div>
       )}
+
+{modalNovoProd.open && (
+  <div className="modal-overlay">
+    <div className="modal-content">
+      <h3>Novo Produto</h3>
+      <p style={{ fontSize: "0.85rem", color: "#666" }}>
+        Como deseja salvar este item no seu estoque?
+      </p>
+      
+      <input 
+        type="text" 
+        value={novoNomeEstoque}
+        onChange={(e) => setNovoNomeEstoque(e.target.value)}
+        placeholder="Nome do produto"
+        autoFocus
+      />
+
+      <div className="modal-actions">
+        <button 
+          className="btn-voltar" 
+          onClick={() => setModalNovoProd({ open: false, nomeNota: "" })}
+          style={{ background: "#eee", color: "#333" }}
+        >
+          Cancelar
+        </button>
+        <button 
+          className="btn-confirmar" 
+          onClick={confirmarCadastroRapido}
+          disabled={isSaving}
+        >
+          {isSaving ? "Salvando..." : "Cadastrar e Vincular"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
