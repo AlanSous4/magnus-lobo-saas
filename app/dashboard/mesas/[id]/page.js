@@ -13,6 +13,7 @@ export default function DetalheMesaPage() {
   // 1. ESTADOS (States)
   const [mesa, setMesa] = useState(null);
   const [produtos, setProdutos] = useState([]);
+  const [busca, setBusca] = useState("");
   const [itensPedido, setItensPedido] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalAberto, setIsModalAberto] = useState(false);
@@ -93,11 +94,13 @@ export default function DetalheMesaPage() {
 
         setMesa({ ...mesaData, status: statusFinal });
 
-        // Busca o cardápio
+        // 2. BUSCA O CARDÁPIO JÁ ORDENADO POR NOME
         const { data: produtosData } = await supabase
           .from("products")
           .select("*")
-          .eq("organization_id", ORG_ID);
+          .eq("organization_id", ORG_ID)
+          .order("name", { ascending: true }); // <--- ADICIONADO ORDENAÇÃO
+
         setProdutos(produtosData || []);
       } catch (err) {
         console.error("Erro ao carregar dados:", err);
@@ -108,6 +111,14 @@ export default function DetalheMesaPage() {
     carregarDados();
   }, [id]);
 
+  // 3. LÓGICA DE FILTRO EM TEMPO REAL
+  const produtosFiltrados = produtos.filter((prod) => {
+    const nome = (prod.name || prod.nome || "").toLowerCase();
+    return nome.startsWith(busca.toLowerCase());
+    // .startsWith traz apenas o que inicia com a letra.
+    // Se quiser que busque no meio da palavra também, use .includes(busca.toLowerCase())
+  });
+
   // Monitora a abertura do modal e o saldo para preencher o input automaticamente
   useEffect(() => {
     if (isModalAberto && saldoRestante > 0) {
@@ -117,28 +128,29 @@ export default function DetalheMesaPage() {
     }
   }, [isModalAberto, saldoRestante]);
 
-  
-
   const adicionarPagamento = () => {
     const valor = parseFloat(valorInput.toString().replace(",", "."));
-    
+
     if (isNaN(valor) || valor <= 0) {
       alert("Digite um valor válido.");
       return;
     }
-  
+
     if (valor > saldoRestante + 0.01) {
       alert("O valor digitado é maior que o saldo restante.");
       return;
     }
-  
-    const novosPagamentos = [...pagamentos, { metodo: metodoSelecionado, valor }];
+
+    const novosPagamentos = [
+      ...pagamentos,
+      { metodo: metodoSelecionado, valor },
+    ];
     setPagamentos(novosPagamentos);
-  
+
     // Calcula o novo saldo imediatamente para atualizar o input
     const novoTotalPago = novosPagamentos.reduce((acc, p) => acc + p.valor, 0);
     const novoSaldo = Math.max(0, totalGeral - novoTotalPago);
-    
+
     setValorInput(novoSaldo > 0 ? novoSaldo.toFixed(2) : "");
   };
 
@@ -235,35 +247,39 @@ export default function DetalheMesaPage() {
   // 4. FINALIZAR PEDIDO (Adicionado tratamento de erro melhor)
   const finalizarPedido = async () => {
     if (itensPedido.length === 0) return;
-    
+
     setProcessandoPagamento(true);
     try {
       const pedidoId = itensPedido[0]?.pedido_id;
-      const stringMetodos = pagamentos.map(p => p.metodo.toUpperCase()).join(", ");
-  
-      const { error: erroPedido } = await supabase.from("pedidos_mesa").update({
-        status_pagamento: "pago",
-        fechado_em: new Date().toISOString(),
-        total_pedido: totalGeral,
-        metodo_pagamento: stringMetodos
-      }).eq("id", pedidoId);
-  
+      const stringMetodos = pagamentos
+        .map((p) => p.metodo.toUpperCase())
+        .join(", ");
+
+      const { error: erroPedido } = await supabase
+        .from("pedidos_mesa")
+        .update({
+          status_pagamento: "pago",
+          fechado_em: new Date().toISOString(),
+          total_pedido: totalGeral,
+          metodo_pagamento: stringMetodos,
+        })
+        .eq("id", pedidoId);
+
       if (erroPedido) throw erroPedido;
-  
+
       await supabase.from("mesas").update({ status: "livre" }).eq("id", id);
-      
+
       // EM VEZ DE ALERT:
-      setSucesso(true); 
-  
+      setSucesso(true);
+
       // Aguarda 2 segundos para o usuário ver o check de sucesso e redireciona
       setTimeout(() => {
         router.push("/dashboard/mesas");
       }, 2000);
-  
     } catch (err) {
       console.error(err);
       // Aqui você pode usar um Toast futuramente
-      alert("Erro ao finalizar conta."); 
+      alert("Erro ao finalizar conta.");
     } finally {
       setProcessandoPagamento(false);
     }
@@ -282,7 +298,7 @@ export default function DetalheMesaPage() {
       <div className="flex justify-between items-center mb-6 bg-stone-100 p-4 rounded-xl border border-stone-200">
         <button
           onClick={() => router.back()}
-          className="px-4 py-2 bg-white rounded-lg shadow-sm text-sm font-bold"
+          className="cursor-pointer px-4 py-2 bg-white rounded-lg shadow-sm text-sm font-bold"
         >
           ← Voltar
         </button>
@@ -299,15 +315,27 @@ export default function DetalheMesaPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Cardápio */}
         <section className="bg-stone-50 p-4 rounded-2xl border border-stone-200">
-          <h2 className="font-black text-stone-400 mb-4 uppercase text-xs tracking-widest">
-            Cardápio
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-black text-stone-400 uppercase text-xs tracking-widest">
+              Cardápio
+            </h2>
+            {/* --- CAMPO DE BUSCA ADICIONADO AQUI --- */}
+            <input
+              type="text"
+              placeholder="Buscar produto..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="text-xs p-2 rounded-lg border border-stone-200 focus:outline-orange-400 w-1/2 shadow-sm"
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-2 overflow-y-auto max-h-[60vh] pr-1">
-            {produtos.map((prod) => (
+            {/* --- MUDANÇA AQUI: de 'produtos.map' para 'produtosFiltrados.map' --- */}
+            {produtosFiltrados.map((prod) => (
               <button
                 key={prod.id}
                 onClick={() => adicionarItem(prod)}
-                className="flex justify-between items-center p-4 bg-white border border-stone-100 rounded-xl hover:border-orange-400 transition-all active:scale-95 shadow-sm"
+                className="cursor-pointer flex justify-between items-center p-4 bg-white border border-stone-100 rounded-xl hover:border-orange-400 transition-all active:scale-95 shadow-sm"
               >
                 <span className="font-bold text-stone-700">
                   {prod.name || prod.nome}
@@ -317,6 +345,13 @@ export default function DetalheMesaPage() {
                 </span>
               </button>
             ))}
+
+            {/* Feedback caso não encontre nada */}
+            {produtosFiltrados.length === 0 && (
+              <p className="text-center text-stone-400 text-sm py-4">
+                Nenhum produto encontrado.
+              </p>
+            )}
           </div>
         </section>
 
@@ -364,7 +399,7 @@ export default function DetalheMesaPage() {
                     </span>
                     <button
                       onClick={() => removerItem(agrupado.ids[0])}
-                      className="text-red-400 hover:text-red-600 p-1"
+                      className="text-red-400 hover:text-red-600 p-1 cursor-pointer transition-colors rounded-full"
                     >
                       ✕
                     </button>
@@ -384,7 +419,7 @@ export default function DetalheMesaPage() {
           <button
             onClick={() => setIsModalAberto(true)}
             disabled={itensPedido.length === 0}
-            className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-black shadow-lg disabled:opacity-50"
+            className="cursor-pointer w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-black shadow-lg disabled:opacity-50"
           >
             FECHAR CONTA
           </button>
@@ -415,7 +450,8 @@ export default function DetalheMesaPage() {
                   <div className="grid grid-cols-2 gap-2 mb-6">
                     <div
                       className={`p-3 rounded-xl text-center bg-stone-100 transition-all ${
-                        !(pagamentos.length > 0 && saldoRestante > 0.01) && "col-span-2"
+                        !(pagamentos.length > 0 && saldoRestante > 0.01) &&
+                        "col-span-2"
                       }`}
                     >
                       <span className="text-[10px] font-black uppercase text-stone-500 block mb-1">
@@ -449,7 +485,7 @@ export default function DetalheMesaPage() {
                         <button
                           key={m}
                           onClick={() => setMetodoSelecionado(m)}
-                          className={`py-2 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${
+                          className={`cursor-pointer py-2 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${
                             metodoSelecionado === m
                               ? "border-orange-500 bg-orange-50 text-orange-700"
                               : "border-stone-100 text-stone-400"
@@ -473,7 +509,7 @@ export default function DetalheMesaPage() {
                     />
                     <button
                       onClick={adicionarPagamento}
-                      className="bg-stone-800 text-white px-6 rounded-xl font-black text-[10px] uppercase hover:bg-black active:scale-95 transition-all"
+                      className="bg-stone-800 text-white px-6 rounded-xl font-black text-[10px] uppercase hover:bg-black active:scale-95 transition-all cursor-pointer"
                     >
                       Add
                     </button>
@@ -499,7 +535,7 @@ export default function DetalheMesaPage() {
                             </span>
                             <button
                               onClick={() => removerPagamento(idx)}
-                              className="text-red-500 font-bold hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors"
+                              className="text-red-500 font-bold hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors cursor-pointer"
                             >
                               ✕
                             </button>
@@ -512,8 +548,12 @@ export default function DetalheMesaPage() {
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={finalizarPedido}
-                      disabled={saldoRestante > 0.01 || processandoPagamento || totalGeral <= 0}
-                      className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      disabled={
+                        saldoRestante > 0.01 ||
+                        processandoPagamento ||
+                        totalGeral <= 0
+                      }
+                      className="cursor-pointer w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                       {processandoPagamento ? (
                         <>
@@ -526,7 +566,7 @@ export default function DetalheMesaPage() {
                     </button>
                     <button
                       onClick={() => setIsModalAberto(false)}
-                      className="text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 transition-colors"
+                      className="text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 transition-colors cursor-pointer"
                     >
                       Voltar
                     </button>
@@ -573,9 +613,9 @@ export default function DetalheMesaPage() {
                   <p className="text-stone-400 font-bold text-sm mt-2 uppercase tracking-tighter">
                     Mesa {mesa?.numero_mesa} Liberada
                   </p>
-                  
+
                   <div className="w-full h-1 bg-stone-100 mt-8 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: "100%" }}
                       transition={{ duration: 2 }}
