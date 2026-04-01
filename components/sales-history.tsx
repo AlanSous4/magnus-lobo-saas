@@ -106,7 +106,7 @@ const typedSales: Sale[] = useMemo(() => {
 }, [sales]);
 
   const [days, setDays] = useState<30 | 60 | 90>(30);
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("range");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("daily");
 
   const [selectedDate, setSelectedDate] = useState(getLocalDate(new Date()));
   const [selectedMonth, setSelectedMonth] = useState(getLocalMonth(new Date()));
