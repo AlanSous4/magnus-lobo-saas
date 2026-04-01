@@ -11,7 +11,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
   const [status, setStatus] = useState("Aguardando scan...");
   const [showScanner, setShowScanner] = useState(false); // Adicione esta linha
 
-  // --- COPIE A PARTIR DAQUI ---
+  // --- FUNÇÃO DE ARQUIVO XML ATUALIZADA E COMPLETA ---
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -23,46 +23,73 @@ const RecebimentoFiscal = ({ organizationId }) => {
       const xmlDoc = parser.parseFromString(xmlText, "text/xml");
 
       try {
-        // Busca a chave (ID da tag infNFe) e limpa o prefixo 'NFe'
         const infNFe = xmlDoc.getElementsByTagName("infNFe")[0];
         const chave = infNFe.getAttribute("Id").replace("NFe", "");
 
-        // Busca o nome do emitente (Fornecedor)
-        const fornecedor = xmlDoc.getElementsByTagName("xNome")[0].textContent;
+        // 1. Dados do Emitente (Fornecedor)
+        const emit = xmlDoc.getElementsByTagName("emit")[0];
+        const fornecedorNome =
+          emit.getElementsByTagName("xNome")[0].textContent;
 
-        // Busca os itens (produtos)
+        // 2. Processamento Detalhado dos Itens
         const detNodes = xmlDoc.getElementsByTagName("det");
         const itensFormatados = [];
+        let acumuladorTotalICMS = 0;
 
         for (let i = 0; i < detNodes.length; i++) {
-          const prod = detNodes[i].getElementsByTagName("prod")[0];
+          const det = detNodes[i];
+          const prod = det.getElementsByTagName("prod")[0];
+          const imposto = det.getElementsByTagName("imposto")[0];
+
+          // Nome, Qtd e Valor Unitário
+          const xProd = prod
+            .getElementsByTagName("xProd")[0]
+            .textContent.trim();
+          const qCom = prod.getElementsByTagName("qCom")[0].textContent;
+          const vUnCom = prod.getElementsByTagName("vUnCom")[0].textContent;
+
+          // Captura de impostos por item para somar no total
+          const icmsNode = imposto.getElementsByTagName("ICMS")[0];
+          if (icmsNode) {
+            const vICMS = parseFloat(
+              icmsNode.getElementsByTagName("vICMS")[0]?.textContent || 0
+            );
+            acumuladorTotalICMS += vICMS;
+          }
+
+          // Busca a Unidade de Medida (UN, CX, KG, etc)
+          const uCom = prod.getElementsByTagName("uCom")[0].textContent;
+          // Busca o CFOP do item
+          const cfopItem = prod.getElementsByTagName("CFOP")[0].textContent;
+
           itensFormatados.push({
-            // O .trim() remove espaços invisíveis que impedem o vínculo no select
-            nome: prod.getElementsByTagName("xProd")[0].textContent.trim(),
-            qtd: prod.getElementsByTagName("qCom")[0].textContent,
-            valor:
-              "R$ " +
-              parseFloat(prod.getElementsByTagName("vUnCom")[0].textContent)
-                .toFixed(2)
-                .replace(".", ","),
+            nome: xProd,
+            qtd: qCom,
+            unid: uCom, // Novo campo
+            cfop: cfopItem, // Novo campo
+            valor: "R$ " + parseFloat(vUnCom).toFixed(2).replace(".", ","),
+            vUnReal: parseFloat(vUnCom),
           });
         }
 
-        // Busca Totais Fiscais
-        const total = xmlDoc.getElementsByTagName("ICMSTot")[0];
+        // 3. Totais da Nota
+        const totalNode = xmlDoc.getElementsByTagName("ICMSTot")[0];
+        const vNF = totalNode.getElementsByTagName("vNF")[0].textContent;
+        const vBC = totalNode.getElementsByTagName("vBC")[0].textContent;
 
         setScannedResult(chave);
         setNotaDados({
-          fornecedor: fornecedor,
+          fornecedor: fornecedorNome,
           itens: itensFormatados,
           fiscal: {
-            base: "R$ " + total.getElementsByTagName("vBC")[0].textContent,
-            icms: "R$ " + total.getElementsByTagName("vICMS")[0].textContent,
+            base: "R$ " + parseFloat(vBC).toFixed(2).replace(".", ","),
+            icms: "R$ " + acumuladorTotalICMS.toFixed(2).replace(".", ","),
             cfop: detNodes[0]
               .getElementsByTagName("prod")[0]
               .getElementsByTagName("CFOP")[0].textContent,
           },
         });
+
         setStatus("XML importado com sucesso!");
       } catch (err) {
         console.error("Erro ao processar XML:", err);
@@ -75,6 +102,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
   // Estados para persistência e vínculo
   const [vinculos, setVinculos] = useState({}); // Mapeia { "Nome na NF": "ID_do_Produto_no_Estoque" }
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [meusProdutos, setMeusProdutos] = useState([]); // Lista de produtos do seu banco para o Select
 
   const [notaDados, setNotaDados] = useState({
@@ -164,48 +192,35 @@ const RecebimentoFiscal = ({ organizationId }) => {
   // 2. Busca produtos cadastrados (Ajustado para as colunas REAIS da sua tabela)
   useEffect(() => {
     const fetchProdutos = async () => {
-      console.log("🔄 Buscando produtos com RLS desativado...");
+      // Busca id e name da sua tabela 'products'
       const { data, error } = await supabase
         .from("products")
-        .select("id, name");
+        .select("id, name")
+        .eq("organization_id", organizationId); // Filtra pela Padaria Magnus Lobo
 
       if (error) {
-        console.error("❌ Erro:", error.message);
+        console.error("Erro ao buscar estoque:", error.message);
       } else {
-        console.log("✅ AGORA APARECEU:", data);
         setMeusProdutos(data || []);
       }
     };
 
-    fetchProdutos();
-  }, []); // Deixamos o array vazio para carregar assim que abrir a tela
+    if (organizationId) fetchProdutos();
+  }, [organizationId]); // Deixamos o array vazio para carregar assim que abrir a tela
 
   const processarNota = (chave) => {
     setScannedResult(chave);
-    // Simulação de dados
-    setNotaDados({
-      fornecedor: "Mercadinho Sol",
-      itens: [
-        { nome: "Farinha de Trigo", qtd: "10", valor: "R$ 50,00" },
-        { nome: "Leite Integral", qtd: "20", valor: "R$ 80,00" },
-      ],
-      fiscal: {
-        base: "R$ 50,00",
-        icms: "R$ 6,00",
-        ipi: "R$ 2,50",
-        cfop: "5102",
-        pis: "R$ 1,10",
-        cofins: "R$ 4,50",
-      },
-    });
+    // Removido o setNotaDados com dados fixos (Mercadinho Sol) para não sobrescrever o XML.
+    // No futuro, aqui você faria um fetch(api/consulta-nfe?chave=...)
+    setStatus(`Chave ${chave.substring(0, 4)}... detectada!`);
   };
-
   const handleManualInput = (e) => {
     const val = e.target.value.replace(/\D/g, "");
     setScannedResult(val);
     if (val.length === 44) {
-      processarNota(val);
-      setStatus("Chave manual validada!");
+      // Apenas define a chave, sem injetar itens fakes
+      setScannedResult(val);
+      setStatus("Chave manual inserida.");
     }
   };
 
@@ -246,36 +261,61 @@ const RecebimentoFiscal = ({ organizationId }) => {
       for (const item of notaDados.itens) {
         const productIdVinculado = vinculos[item.nome];
 
-        if (productIdVinculado) {
-          // Salva o item vinculado na tabela de histórico
-          const { error: itemErr } = await supabase
-            .from("recebimento_itens")
-            .insert({
-              recebimento_id: rec.id,
-              product_id: productIdVinculado,
-              nome_produto_nfe: item.nome,
-              quantidade: parseFloat(item.qtd),
-              preco_unitario: parseFloat(
-                item.valor
-                  .replace("R$ ", "")
-                  .replace(/\./g, "")
-                  .replace(",", ".")
-              ),
-            });
+        // LOG DE SEGURANÇA
+        console.log(
+          `📦 Processando item: ${item.nome} | ID no Banco: ${productIdVinculado}`
+        );
 
-          if (itemErr) throw itemErr;
+        if (!productIdVinculado) {
+          throw new Error(
+            `O produto "${item.nome}" não está vinculado a nenhum item do seu estoque. Vincule-o antes de confirmar.`
+          );
+        }
 
-          // Localize este trecho logo abaixo do que você me mandou:
-          const { error: rpcErr } = await supabase.rpc("increment_stock", {
-            row_id: productIdVinculado,
-            amount: parseFloat(item.qtd),
+        // A. Salva o item vinculado na tabela de histórico
+        const { error: itemErr } = await supabase
+          .from("recebimento_itens")
+          .insert({
+            recebimento_id: rec.id,
+            product_id: productIdVinculado, // Aqui não pode ser null/undefined
+            nome_produto_nfe: item.nome,
+            quantidade: parseFloat(item.qtd.replace(",", ".")),
+            preco_unitario: parseFloat(
+              item.valor.replace("R$ ", "").replace(/\./g, "").replace(",", ".")
+            ),
           });
 
-          if (rpcErr) throw rpcErr;
+        if (itemErr) {
+          console.error("Erro na tabela recebimento_itens:", itemErr);
+          throw new Error(
+            `Erro ao salvar item ${item.nome}: ${itemErr.message}`
+          );
         }
+
+        // B. Atualiza o estoque via RPC
+        const { error: rpcErr } = await supabase.rpc("increment_stock", {
+          row_id: productIdVinculado,
+          amount: parseFloat(item.qtd.replace(",", ".")),
+        });
+
+        if (rpcErr) throw rpcErr;
       }
 
-      alert("Estoque da Padaria Magnus Lobo atualizado com sucesso!");
+      // Ativa a animação profissional
+      setShowSuccess(true);
+
+      // Aguarda 3 segundos (tempo da animação) e limpa a tela
+      setTimeout(() => {
+        setShowSuccess(false);
+        setScannedResult("");
+        setNotaDados({
+          fornecedor: "Aguardando leitura...",
+          itens: [],
+          fiscal: {},
+        });
+        setVinculos({});
+        setStatus("Aguardando nova nota...");
+      }, 3000);
 
       // Limpa tudo após o sucesso
       setScannedResult("");
@@ -286,10 +326,17 @@ const RecebimentoFiscal = ({ organizationId }) => {
       });
       setVinculos({});
     } catch (err) {
-      console.error("Erro ao salvar:", err);
-      alert(
-        "Erro ao salvar no banco: " + (err.message || "Verifique o console")
-      );
+      // Tratamento amigável para nota duplicada
+      if (
+        err.message?.includes("recebimentos_chave_nfe_key") ||
+        err.code === "23505"
+      ) {
+        alert("⚠️ Esta nota fiscal já foi lançada no sistema anteriormente!");
+      } else {
+        alert(
+          "Erro ao salvar no banco: " + (err.message || "Verifique o console")
+        );
+      }
     } finally {
       setIsSaving(false);
     }
@@ -300,19 +347,20 @@ const RecebimentoFiscal = ({ organizationId }) => {
 
   const totalItensNota = temNotaValida ? notaDados.itens.length : 0;
 
+  // Cálculo atualizado para a nova estrutura de itens
   const valorTotalNota = temNotaValida
     ? notaDados.itens.reduce((acc, item) => {
-        const preco = parseFloat(
-          item.valor.replace("R$ ", "").replace(/\./g, "").replace(",", ".")
-        );
-        const qtd = parseFloat(item.qtd);
+        // Usamos o vUnReal que extraímos no XML para garantir precisão
+        const preco = item.vUnReal || 0;
+        const qtd = parseFloat(item.qtd) || 0;
         return acc + preco * qtd;
       }, 0)
     : 0;
 
+  // Se o XML tiver o total do ICMS direto na tag fiscal, usamos ele, senão somamos dos itens
   const valorTotalICMS = temNotaValida
     ? parseFloat(
-        notaDados.fiscal.icms
+        notaDados.fiscal?.icms
           ?.replace("R$ ", "")
           .replace(/\./g, "")
           .replace(",", ".") || 0
@@ -410,24 +458,24 @@ const RecebimentoFiscal = ({ organizationId }) => {
           <div className="summary-header">
             <div className="summary-card">
               <span className="label">Itens na Nota</span>
-              <span className="value">{totalItensNota}</span>
+              <span className="value">{notaDados.itens.length}</span>
             </div>
             <div className="summary-card">
               <span className="label">Total da Compra</span>
               <span className="value orange">
-                {valorTotalNota.toLocaleString("pt-BR", {
+                {notaDados.totalNota?.toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
-                })}
+                }) || "R$ 0,00"}
               </span>
             </div>
             <div className="summary-card">
               <span className="label">Total ICMS</span>
               <span className="value orange">
-                {valorTotalICMS.toLocaleString("pt-BR", {
+                {notaDados.totalIcms?.toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
-                })}
+                }) || "R$ 0,00"}
               </span>
             </div>
           </div>
@@ -443,93 +491,102 @@ const RecebimentoFiscal = ({ organizationId }) => {
             </div>
 
             <div className="table-responsive">
-              <table className="items-table">
+              <table className="items-table" style={{ tableLayout: "fixed" }}>
                 <thead>
                   <tr>
-                    <th>PRODUTO (NOTA VS ESTOQUE)</th>
-                    <th>QTD</th>
-                    <th>VALOR</th>
+                    <th style={{ width: "38%" }}>PRODUTO (NOTA VS ESTOQUE)</th>
+                    <th style={{ width: "8%", textAlign: "center" }}>CFOP</th>
+                    <th style={{ width: "8%", textAlign: "center" }}>UNID</th>
+                    <th style={{ width: "10%", textAlign: "center" }}>QTD</th>
+                    <th style={{ width: "18%" }}>V. UNIT</th>
+                    <th style={{ width: "18%" }}>V. TOTAL</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {notaDados.itens.length > 0 ? (
-                    notaDados.itens.map((item, index) => (
-                      <tr key={index}>
-                        <td>
-                          <div
+                  {notaDados.itens.map((item, index) => (
+                    <tr key={index} style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "8px 0" }}>
+                        <div
+                          style={{ display: "flex", flexDirection: "column" }}
+                        >
+                          <span
                             style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "4px",
+                              fontSize: "0.65rem",
+                              color: "#888",
+                              fontWeight: "bold",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
                           >
-                            <span
-                              style={{
-                                fontSize: "0.7rem",
-                                color: "#888",
-                                fontWeight: "bold",
-                              }}
+                            {item.nome}
+                          </span>
+                          <select
+                            className="select-vinculo"
+                            value={vinculos[item.nome] || ""}
+                            onChange={(e) => {
+                              if (e.target.value === "NOVO") {
+                                // Função que você já deve ter para abrir o cadastro rápido
+                                cadastrarNovoProdutoRapido(item.nome);
+                              } else {
+                                setVinculos((prev) => ({
+                                  ...prev,
+                                  [item.nome]: e.target.value,
+                                }));
+                              }
+                            }}
+                            style={{
+                              fontSize: "0.8rem",
+                              padding: "2px",
+                              border: vinculos[item.nome]
+                                ? "1px solid #28a745"
+                                : "1px solid #FF6600",
+                            }}
+                          >
+                            <option value="">Vincular ao estoque...</option>
+
+                            <option
+                              value="NOVO"
+                              style={{ fontWeight: "bold", color: "#007bff" }}
                             >
-                              {item.nome}
-                            </span>
-                            <select
-                              className="select-vinculo"
-                              value={vinculos[item.nome] || ""}
-                              onChange={(e) => {
-                                if (e.target.value === "NOVO") {
-                                  cadastrarNovoProdutoRapido(item.nome);
-                                } else {
-                                  setVinculos((prev) => ({
-                                    ...prev,
-                                    [item.nome]: e.target.value,
-                                  }));
-                                }
-                              }}
-                              style={{
-                                padding: "6px",
-                                borderRadius: "6px",
-                                width: "100%",
-                                border: vinculos[item.nome]
-                                  ? "1px solid #28a745"
-                                  : "1px solid #FF6600",
-                                background: vinculos[item.nome]
-                                  ? "#f6fff8"
-                                  : "#fff",
-                              }}
-                            >
-                              <option value="">Vincular ao estoque...</option>
-                              <option
-                                value="NOVO"
-                                style={{ fontWeight: "bold", color: "blue" }}
-                              >
-                                + CADASTRAR NOVO PRODUTO
+                              + CADASTRAR COMO NOVO PRODUTO
+                            </option>
+
+                            {/* Aqui é onde a mágica acontece: percorremos o array meusProdutos */}
+                            {meusProdutos.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
                               </option>
-                              {meusProdutos.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                        <td>{item.qtd}</td>
-                        <td>{item.valor}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: "center", fontSize: "0.8rem" }}>
+                        {item.cfop}
+                      </td>
                       <td
-                        colSpan="3"
                         style={{
                           textAlign: "center",
-                          padding: "2rem",
-                          color: "#999",
+                          fontSize: "0.8rem",
+                          fontWeight: "600",
                         }}
                       >
-                        Nenhum item carregado.
+                        {item.unid}
+                      </td>
+                      <td style={{ textAlign: "center", fontSize: "0.9rem" }}>
+                        {parseFloat(item.qtd)}
+                      </td>
+                      <td style={{ fontSize: "0.9rem" }}>
+                        R$ {item.vUnReal.toFixed(2).replace(".", ",")}
+                      </td>
+                      <td style={{ fontSize: "0.9rem", fontWeight: "bold" }}>
+                        R${" "}
+                        {(parseFloat(item.qtd) * item.vUnReal)
+                          .toFixed(2)
+                          .replace(".", ",")}
                       </td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -539,19 +596,19 @@ const RecebimentoFiscal = ({ organizationId }) => {
                 <div className="fiscal-field">
                   <span className="label">Base ICMS:</span>
                   <span className="value">
-                    {temNotaValida ? notaDados.fiscal.base : "---"}
+                    {notaDados.fiscal?.base || "---"}
                   </span>
                 </div>
                 <div className="fiscal-field">
                   <span className="label">Vlr ICMS:</span>
                   <span className="value">
-                    {temNotaValida ? notaDados.fiscal.icms : "---"}
+                    {notaDados.fiscal?.icms || "---"}
                   </span>
                 </div>
                 <div className="fiscal-field">
-                  <span className="label">CFOP:</span>
+                  <span className="label">CFOP Nota:</span>
                   <span className="value">
-                    {temNotaValida ? notaDados.fiscal.cfop : "---"}
+                    {notaDados.fiscal?.cfop || "---"}
                   </span>
                 </div>
               </div>
@@ -578,6 +635,22 @@ const RecebimentoFiscal = ({ organizationId }) => {
           Recebimento
         </a>
       </nav>
+
+      {/* Overlay de Sucesso Animado */}
+      {showSuccess && (
+        <div className="loading-overlay">
+          <div className="success-checkmark">
+            <div className="check-icon">
+              <span className="icon-line line-tip"></span>
+              <span className="icon-line line-long"></span>
+              <div className="icon-circle"></div>
+              <div className="icon-fix"></div>
+            </div>
+          </div>
+          <h2 className="success-text">Estoque Atualizado!</h2>
+          <p style={{ color: "#666" }}>Padaria Magnus Lobo</p>
+        </div>
+      )}
     </div>
   );
 };
