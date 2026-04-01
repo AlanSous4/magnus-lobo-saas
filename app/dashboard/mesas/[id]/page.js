@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { motion, AnimatePresence } from "framer-motion";
 
 const ORG_ID = "5e391366-d0a5-46fb-8311-f5e86833219d";
 
@@ -9,84 +10,95 @@ export default function DetalheMesaPage() {
   const { id } = useParams();
   const router = useRouter();
 
+  // 1. ESTADOS (States)
   const [mesa, setMesa] = useState(null);
   const [produtos, setProdutos] = useState([]);
   const [itensPedido, setItensPedido] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [isModalAberto, setIsModalAberto] = useState(false);
   const [processandoPagamento, setProcessandoPagamento] = useState(false);
   const [pagamentos, setPagamentos] = useState([]);
   const [metodoSelecionado, setMetodoSelecionado] = useState("pix");
   const [valorInput, setValorInput] = useState("");
+  const [sucesso, setSucesso] = useState(false);
 
-  // 1. CARREGAMENTO DE DADOS
+  // --- LÓGICA DE CÁLCULOS ---
+  const totalGeral = itensPedido.reduce(
+    (acc, i) => acc + Number(i.preco_unitario) * (Number(i.quantidade) || 1),
+    0
+  );
+  const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
+  const saldoRestante = Math.max(0, totalGeral - totalPago);
+
+  // 1. CARREGAMENTO DE DADOS COM AUTO-CORREÇÃO
   useEffect(() => {
     async function carregarDados() {
       if (!id) return;
       setLoading(true);
 
       try {
-        // 1. Busca dados da mesa
+        // Busca dados básicos da mesa
         const { data: mesaData } = await supabase
           .from("mesas")
           .select("*")
           .eq("id", id)
           .single();
 
-        // 2. Busca se existe algum pedido pendente para esta mesa
-        const { data: temPedido } = await supabase
-          .from("pedidos_mesa")
-          .select("id")
-          .eq("mesa_id", id)
-          .eq("status_pagamento", "pendente")
-          .maybeSingle();
-
-        // LÓGICA DE SINCRONIZAÇÃO DE STATUS (FORA DE IFS RESTRITIVOS)
-        let statusFinal = mesaData?.status;
-
-        if (temPedido && mesaData?.status === "livre") {
-          // Se tem pedido no banco mas a mesa consta como livre, atualiza para ocupada
-          await supabase
-            .from("mesas")
-            .update({ status: "ocupada" })
-            .eq("id", id);
-          statusFinal = "ocupada";
-        } 
-        else if (!temPedido && mesaData?.status === "ocupada") {
-          // Se NÃO tem pedido mas a mesa consta como ocupada, libera a mesa
-          await supabase
-            .from("mesas")
-            .update({ status: "livre" })
-            .eq("id", id);
-          statusFinal = "livre";
-        }
-
-        setMesa({ ...mesaData, status: statusFinal });
-
-        // 3. Busca o cardápio
-        const { data: produtosData } = await supabase
-          .from("products")
-          .select("*")
-          .eq("organization_id", ORG_ID);
-        setProdutos(produtosData || []);
-
-        // 4. Busca itens do pedido ativo
+        // Busca pedido ativo E seus itens em uma única consulta
         const { data: pedidoAtivo } = await supabase
           .from("pedidos_mesa")
           .select("id, itens_pedido_mesa (*)")
           .eq("mesa_id", id)
           .eq("status_pagamento", "pendente")
-          .order("aberto_em", { ascending: false })
-          .limit(1)
           .maybeSingle();
 
-        if (pedidoAtivo?.itens_pedido_mesa) {
+        const temItensReais =
+          pedidoAtivo?.itens_pedido_mesa &&
+          pedidoAtivo.itens_pedido_mesa.length > 0;
+        let statusFinal = mesaData?.status;
+
+        // --- LÓGICA DE SINCRONIZAÇÃO RIGOROSA ---
+        if (pedidoAtivo && !temItensReais) {
+          // Caso 1: Existe pedido mas está vazio (limpa o "fantasma")
+          await supabase.from("pedidos_mesa").delete().eq("id", pedidoAtivo.id);
+          if (mesaData?.status !== "livre") {
+            await supabase
+              .from("mesas")
+              .update({ status: "livre" })
+              .eq("id", id);
+          }
+          statusFinal = "livre";
+          setItensPedido([]);
+        } else if (temItensReais) {
+          // Caso 2: Tem itens, garante que a mesa está ocupada
+          if (mesaData?.status !== "ocupada") {
+            await supabase
+              .from("mesas")
+              .update({ status: "ocupada" })
+              .eq("id", id);
+          }
+          statusFinal = "ocupada";
           setItensPedido(pedidoAtivo.itens_pedido_mesa);
         } else {
+          // Caso 3: Não tem pedido nenhum
+          if (mesaData?.status !== "livre") {
+            await supabase
+              .from("mesas")
+              .update({ status: "livre" })
+              .eq("id", id);
+          }
+          statusFinal = "livre";
           setItensPedido([]);
         }
 
+        setMesa({ ...mesaData, status: statusFinal });
+
+        // Busca o cardápio
+        const { data: produtosData } = await supabase
+          .from("products")
+          .select("*")
+          .eq("organization_id", ORG_ID);
+        setProdutos(produtosData || []);
       } catch (err) {
         console.error("Erro ao carregar dados:", err);
       } finally {
@@ -95,26 +107,39 @@ export default function DetalheMesaPage() {
     }
     carregarDados();
   }, [id]);
-  // --- LÓGICA DE CÁLCULOS (Declarada apenas uma vez) ---
-  const totalGeral = itensPedido.reduce(
-    (acc, i) => acc + Number(i.preco_unitario) * (Number(i.quantidade) || 1),
-    0
-  );
-  const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
-  const saldoRestante = Math.max(0, totalGeral - totalPago);
+
+  // Monitora a abertura do modal e o saldo para preencher o input automaticamente
+  useEffect(() => {
+    if (isModalAberto && saldoRestante > 0) {
+      setValorInput(saldoRestante.toFixed(2));
+    } else if (!isModalAberto) {
+      setValorInput(""); // Limpa quando fecha o modal
+    }
+  }, [isModalAberto, saldoRestante]);
+
+  
 
   const adicionarPagamento = () => {
-    const valor = parseFloat(valorInput.replace(",", "."));
+    const valor = parseFloat(valorInput.toString().replace(",", "."));
+    
     if (isNaN(valor) || valor <= 0) {
       alert("Digite um valor válido.");
       return;
     }
+  
     if (valor > saldoRestante + 0.01) {
       alert("O valor digitado é maior que o saldo restante.");
       return;
     }
-    setPagamentos([...pagamentos, { metodo: metodoSelecionado, valor }]);
-    setValorInput("");
+  
+    const novosPagamentos = [...pagamentos, { metodo: metodoSelecionado, valor }];
+    setPagamentos(novosPagamentos);
+  
+    // Calcula o novo saldo imediatamente para atualizar o input
+    const novoTotalPago = novosPagamentos.reduce((acc, p) => acc + p.valor, 0);
+    const novoSaldo = Math.max(0, totalGeral - novoTotalPago);
+    
+    setValorInput(novoSaldo > 0 ? novoSaldo.toFixed(2) : "");
   };
 
   const removerPagamento = (index) => {
@@ -181,17 +206,23 @@ export default function DetalheMesaPage() {
     try {
       // 1. Guardamos o ID do pedido antes de mexer no estado local
       const pedidoIdParaLimpar = itensPedido[0]?.pedido_id;
-  
-      const { error: deleteError } = await supabase.from("itens_pedido_mesa").delete().eq("id", itemId);
+
+      const { error: deleteError } = await supabase
+        .from("itens_pedido_mesa")
+        .delete()
+        .eq("id", itemId);
       if (deleteError) throw deleteError;
-  
+
       const novaLista = itensPedido.filter((item) => item.id !== itemId);
       setItensPedido(novaLista);
-  
+
       if (novaLista.length === 0) {
         // 2. Usamos a constante que guardamos com segurança
         if (pedidoIdParaLimpar) {
-          await supabase.from("pedidos_mesa").delete().eq("id", pedidoIdParaLimpar);
+          await supabase
+            .from("pedidos_mesa")
+            .delete()
+            .eq("id", pedidoIdParaLimpar);
         }
         await supabase.from("mesas").update({ status: "livre" }).eq("id", id);
         setMesa((prev) => ({ ...prev, status: "livre" }));
@@ -202,37 +233,41 @@ export default function DetalheMesaPage() {
   };
 
   // 4. FINALIZAR PEDIDO (Adicionado tratamento de erro melhor)
-const finalizarPedido = async () => {
-  if (itensPedido.length === 0) return;
-  
-  setProcessandoPagamento(true);
-  try {
-    const pedidoId = itensPedido[0]?.pedido_id;
-    const stringMetodos = pagamentos.map(p => p.metodo.toUpperCase()).join(", ");
-
-    // Atualiza o pedido
-    const { error: erroPedido } = await supabase.from("pedidos_mesa").update({
-      status_pagamento: "pago",
-      fechado_em: new Date().toISOString(),
-      total_pedido: totalGeral,
-      metodo_pagamento: stringMetodos
-    }).eq("id", pedidoId);
-
-    if (erroPedido) throw erroPedido;
-
-    // Libera a mesa
-    const { error: erroMesa } = await supabase.from("mesas").update({ status: "livre" }).eq("id", id);
-    if (erroMesa) throw erroMesa;
+  const finalizarPedido = async () => {
+    if (itensPedido.length === 0) return;
     
-    alert("Venda finalizada com sucesso!");
-    router.push("/dashboard/mesas");
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao finalizar conta. Verifique a conexão.");
-  } finally {
-    setProcessandoPagamento(false);
-  }
-};
+    setProcessandoPagamento(true);
+    try {
+      const pedidoId = itensPedido[0]?.pedido_id;
+      const stringMetodos = pagamentos.map(p => p.metodo.toUpperCase()).join(", ");
+  
+      const { error: erroPedido } = await supabase.from("pedidos_mesa").update({
+        status_pagamento: "pago",
+        fechado_em: new Date().toISOString(),
+        total_pedido: totalGeral,
+        metodo_pagamento: stringMetodos
+      }).eq("id", pedidoId);
+  
+      if (erroPedido) throw erroPedido;
+  
+      await supabase.from("mesas").update({ status: "livre" }).eq("id", id);
+      
+      // EM VEZ DE ALERT:
+      setSucesso(true); 
+  
+      // Aguarda 2 segundos para o usuário ver o check de sucesso e redireciona
+      setTimeout(() => {
+        router.push("/dashboard/mesas");
+      }, 2000);
+  
+    } catch (err) {
+      console.error(err);
+      // Aqui você pode usar um Toast futuramente
+      alert("Erro ao finalizar conta."); 
+    } finally {
+      setProcessandoPagamento(false);
+    }
+  };
 
   if (loading)
     return (
@@ -356,106 +391,203 @@ const finalizarPedido = async () => {
         </section>
       </div>
 
-      {/* Modal Pagamento */}
-      {isModalAberto && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h2 className="text-2xl font-black mb-4 text-stone-800">
-              Finalizar Mesa {mesa?.numero_mesa}
-            </h2>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <div className="bg-stone-100 p-3 rounded-xl text-center">
-                <span className="text-[10px] font-bold uppercase text-stone-500 block">
-                  Total
-                </span>
-                <p className="text-xl font-black text-stone-800 font-mono">
-                  R$ {totalGeral.toFixed(2)}
-                </p>
-              </div>
-              <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center">
-                <span className="text-[10px] font-bold uppercase text-orange-600 block">
-                  Falta
-                </span>
-                <p className="text-xl font-black text-orange-700 font-mono">
-                  R$ {saldoRestante.toFixed(2)}
-                </p>
-              </div>
-            </div>
+      {/* Modal Pagamento com Animações */}
+      <AnimatePresence>
+        {isModalAberto && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-hidden relative"
+            >
+              {!sucesso ? (
+                <>
+                  <h2 className="text-2xl font-black mb-6 text-stone-800 italic uppercase">
+                    Pagamento
+                  </h2>
 
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {["pix", "crédito", "débito", "dinheiro", "va", "vr"].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMetodoSelecionado(m)}
-                  className={`py-2 rounded-lg font-bold text-[10px] uppercase border-2 transition-all ${
-                    metodoSelecionado === m
-                      ? "border-orange-500 bg-orange-50 text-orange-700"
-                      : "border-stone-100 text-stone-400"
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2 mb-6">
-              <input
-                type="number"
-                placeholder="Valor"
-                value={valorInput}
-                onChange={(e) => setValorInput(e.target.value)}
-                className="flex-1 bg-stone-100 rounded-xl p-3 font-bold text-lg"
-              />
-              <button
-                onClick={adicionarPagamento}
-                className="bg-stone-800 text-white px-4 rounded-xl font-black text-xs uppercase"
-              >
-                Adicionar
-              </button>
-            </div>
-
-            <div className="space-y-2 mb-6">
-              {pagamentos.map((p, idx) => (
-                <div
-                  key={idx}
-                  className="flex justify-between items-center bg-green-50 p-2 rounded-xl border border-green-100"
-                >
-                  <span className="font-bold text-green-800 uppercase text-xs">
-                    {p.metodo}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-black text-green-900 text-sm">
-                      R$ {p.valor.toFixed(2)}
-                    </span>
-                    <button
-                      onClick={() => removerPagamento(idx)}
-                      className="text-red-500 font-bold"
+                  <div className="grid grid-cols-2 gap-2 mb-6">
+                    <div
+                      className={`p-3 rounded-xl text-center bg-stone-100 transition-all ${
+                        !(pagamentos.length > 0 && saldoRestante > 0.01) && "col-span-2"
+                      }`}
                     >
-                      ✕
+                      <span className="text-[10px] font-black uppercase text-stone-500 block mb-1">
+                        Total
+                      </span>
+                      <p className="text-xl font-black text-stone-800 font-mono italic">
+                        R$ {totalGeral.toFixed(2)}
+                      </p>
+                    </div>
+
+                    {/* Campo Falta: Aparece apenas se houver saldo restante e já houver algum pagamento iniciado */}
+                    {pagamentos.length > 0 && saldoRestante > 0.01 && (
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center"
+                      >
+                        <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">
+                          Falta
+                        </span>
+                        <p className="text-xl font-black text-orange-700 font-mono italic">
+                          R$ {saldoRestante.toFixed(2)}
+                        </p>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {["pix", "crédito", "débito", "dinheiro", "va", "vr"].map(
+                      (m) => (
+                        <button
+                          key={m}
+                          onClick={() => setMetodoSelecionado(m)}
+                          className={`py-2 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${
+                            metodoSelecionado === m
+                              ? "border-orange-500 bg-orange-50 text-orange-700"
+                              : "border-stone-100 text-stone-400"
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 mb-6">
+                    <input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={valorInput}
+                      onChange={(e) => setValorInput(e.target.value)}
+                      className="flex-1 bg-stone-100 rounded-xl p-4 font-black text-lg focus:outline-orange-500 transition-all"
+                      placeholder="0.00"
+                    />
+                    <button
+                      onClick={adicionarPagamento}
+                      className="bg-stone-800 text-white px-6 rounded-xl font-black text-[10px] uppercase hover:bg-black active:scale-95 transition-all"
+                    >
+                      Add
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
 
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={finalizarPedido}
-                disabled={totalPago < totalGeral - 0.01 || processandoPagamento}
-                className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-30"
-              >
-                {processandoPagamento ? "PROCESSANDO..." : "CONCLUIR VENDA"}
-              </button>
-              <button
-                onClick={() => setIsModalAberto(false)}
-                className="text-stone-400 font-bold py-2"
-              >
-                CANCELAR
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                  <div className="space-y-2 mb-6 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                    <AnimatePresence mode="popLayout">
+                      {pagamentos.map((p, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          layout
+                          className="flex justify-between items-center bg-stone-50 p-3 rounded-xl border border-stone-100"
+                        >
+                          <span className="font-black text-stone-500 uppercase text-[10px]">
+                            {p.metodo}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="font-black text-stone-800 text-sm">
+                              R$ {p.valor.toFixed(2)}
+                            </span>
+                            <button
+                              onClick={() => removerPagamento(idx)}
+                              className="text-red-500 font-bold hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={finalizarPedido}
+                      disabled={saldoRestante > 0.01 || processandoPagamento || totalGeral <= 0}
+                      className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      {processandoPagamento ? (
+                        <>
+                          <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          FINALIZANDO...
+                        </>
+                      ) : (
+                        "CONCLUIR VENDA"
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setIsModalAberto(false)}
+                      className="text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 transition-colors"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* TELA DE SUCESSO ANIMADA PROFISSIONAL */
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="py-12 flex flex-col items-center justify-center text-center"
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 200,
+                      damping: 10,
+                      delay: 0.2,
+                    }}
+                    className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 shadow-inner"
+                  >
+                    <svg
+                      className="w-12 h-12 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <motion.path
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: 1 }}
+                        transition={{ duration: 0.5, delay: 0.5 }}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="3"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </motion.div>
+                  <h3 className="text-2xl font-black text-stone-800 uppercase italic">
+                    Venda Concluída!
+                  </h3>
+                  <p className="text-stone-400 font-bold text-sm mt-2 uppercase tracking-tighter">
+                    Mesa {mesa?.numero_mesa} Liberada
+                  </p>
+                  
+                  <div className="w-full h-1 bg-stone-100 mt-8 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 2 }}
+                      className="h-full bg-green-500"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
