@@ -277,12 +277,16 @@ const RecebimentoFiscal = ({ organizationId }) => {
           .from("recebimento_itens")
           .insert({
             recebimento_id: rec.id,
-            product_id: productIdVinculado, // Aqui não pode ser null/undefined
+            product_id: productIdVinculado,
             nome_produto_nfe: item.nome,
             quantidade: parseFloat(item.qtd.replace(",", ".")),
-            preco_unitario: parseFloat(
-              item.valor.replace("R$ ", "").replace(/\./g, "").replace(",", ".")
-            ),
+            preco_unitario: item.vUnReal,
+            // NOVAS COLUNAS ABAIXO:
+            cfop: item.cfop,
+            vlr_ipi: item.vIPI || 0,
+            vlr_pis: item.vPIS || 0,
+            vlr_cofins: item.vCOFINS || 0,
+            organization_id: organizationId, // Importante manter o vínculo com a Padaria
           });
 
         if (itemErr) {
@@ -460,22 +464,28 @@ const RecebimentoFiscal = ({ organizationId }) => {
               <span className="label">Itens na Nota</span>
               <span className="value">{notaDados.itens.length}</span>
             </div>
+
             <div className="summary-card">
               <span className="label">Total da Compra</span>
               <span className="value orange">
-                {notaDados.totalNota?.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                }) || "R$ 0,00"}
+                {valorTotalNota > 0
+                  ? valorTotalNota.toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })
+                  : "R$ 0,00"}
               </span>
             </div>
+
             <div className="summary-card">
               <span className="label">Total ICMS</span>
               <span className="value orange">
-                {notaDados.totalIcms?.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                }) || "R$ 0,00"}
+                {valorTotalICMS > 0
+                  ? valorTotalICMS.toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })
+                  : "R$ 0,00"}
               </span>
             </div>
           </div>
@@ -526,7 +536,6 @@ const RecebimentoFiscal = ({ organizationId }) => {
                             value={vinculos[item.nome] || ""}
                             onChange={(e) => {
                               if (e.target.value === "NOVO") {
-                                // Função que você já deve ter para abrir o cadastro rápido
                                 cadastrarNovoProdutoRapido(item.nome);
                               } else {
                                 setVinculos((prev) => ({
@@ -544,15 +553,12 @@ const RecebimentoFiscal = ({ organizationId }) => {
                             }}
                           >
                             <option value="">Vincular ao estoque...</option>
-
                             <option
                               value="NOVO"
                               style={{ fontWeight: "bold", color: "#007bff" }}
                             >
                               + CADASTRAR COMO NOVO PRODUTO
                             </option>
-
-                            {/* Aqui é onde a mágica acontece: percorremos o array meusProdutos */}
                             {meusProdutos.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name}
