@@ -20,7 +20,7 @@ export const metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#ffffff",
+  themeColor: "#f97316",
 }
 
 export default async function DashboardPage() {
