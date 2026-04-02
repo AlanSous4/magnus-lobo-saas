@@ -13,7 +13,7 @@ import { getDashboardMetrics } from "@/lib/dashboard-metrics"
 import { DashboardCards } from "@/components/dashboard-cards"
 
 export const metadata = {
-  title: "Dashboard - Magnus Lobo",
+  title: "Dashboard",
   description: "Visão geral da Padaria Lanchonete Magnus Lobo",
 }
 
