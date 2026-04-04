@@ -25,28 +25,34 @@ export type SalesHistoryProps = {
 type PeriodMode = "range" | "daily" | "month";
 
 /* =========================
-   TIMEZONE FIX
+   TIMEZONE FIX - XEQUE-MATE (STRING PURA)
 ========================= */
 
-function getLocalDate(date: string | Date) {
-  return new Date(date).toLocaleDateString("sv-SE", {
+function getLocalDate(dateStr: string | Date) {
+  if (!dateStr) return "";
+  
+  // Se for a string do Supabase (ISO), pegamos apenas os primeiros 10 caracteres "YYYY-MM-DD"
+  // Isso ignora qualquer cálculo de fuso horário do navegador.
+  if (typeof dateStr === 'string' && dateStr.includes('T')) {
+    return dateStr.substring(0, 10); 
+  }
+
+  // Fallback para outros formatos
+  return new Date(dateStr).toLocaleDateString("sv-SE", {
     timeZone: "America/Sao_Paulo",
   });
 }
 
-function getLocalMonth(date: string | Date) {
-  return getLocalDate(date).slice(0, 7);
+function getLocalMonth(dateStr: string | Date) {
+  const date = getLocalDate(dateStr);
+  return date.slice(0, 7); // Retorna "YYYY-MM"
 }
 
-function formatBR(date: string) {
-  const [year, month, day] = date.split("-");
+function formatBR(dateISO: string) {
+  if (!dateISO || !dateISO.includes('-')) return dateISO;
+  const [year, month, day] = dateISO.split("-");
   return `${day}/${month}/${year}`;
 }
-
-/* =========================
-   NOVO: FORMATA HORA
-========================= */
-
 function formatHour(date: string | Date) {
   return new Date(date).toLocaleTimeString("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -55,9 +61,6 @@ function formatHour(date: string | Date) {
   });
 }
 
-/* =========================
-   NOVO: FORMATA MOEDA (R$)
-========================= */
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -72,16 +75,18 @@ function formatPaymentMethod(method: string | null | undefined) {
     va: "Vale Alimentação",
     vr: "Vale Refeição",
     cash: "Dinheiro",
+    dinheiro: "Dinheiro",
     pix: "Pix",
     credit: "Crédito",
+    credito: "Crédito",
     debit: "Débito",
+    debito: "Débito",
   };
 
   let formatted = method.toLowerCase();
-
   Object.entries(labels).forEach(([key, value]) => {
-    // Mudança aqui: 'gi' para busca global e case-insensitive, sem o rigor do \b
-    const regex = new RegExp(key, 'gi'); 
+    // Busca exata para evitar trocar "credito" dentro de outra palavra por erro
+    const regex = new RegExp(`\\b${key}\\b`, 'gi'); 
     formatted = formatted.replace(regex, value);
   });
 
@@ -114,30 +119,30 @@ const typedSales: Sale[] = useMemo(() => {
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
   /* =========================
-     FILTRO
+      FILTRAGEM BLINDADA (IGUAL AO BANCO)
   ========================= */
 
   const filteredSales = useMemo(() => {
     let filtered = typedSales;
 
     if (periodMode === "daily") {
-      filtered = typedSales.filter(
-        (s) => getLocalDate(s.created_at) === selectedDate
-      );
+      // Comparação direta de strings YYYY-MM-DD
+      filtered = typedSales.filter(s => getLocalDate(s.created_at) === selectedDate);
     } else if (periodMode === "month") {
-      filtered = typedSales.filter(
-        (s) => getLocalMonth(s.created_at) === selectedMonth
-      );
+      // Comparação direta de strings YYYY-MM
+      filtered = typedSales.filter(s => getLocalMonth(s.created_at) === selectedMonth);
     } else {
-      const limitDate = new Date();
-      limitDate.setDate(limitDate.getDate() - days);
-
-      filtered = typedSales.filter((s) => new Date(s.created_at) >= limitDate);
+      // Modo Range (30, 60, 90 dias) baseado na data civil de SP
+      const limit = new Date();
+      limit.setDate(limit.getDate() - days);
+      const limitStr = getLocalDate(limit);
+      
+      filtered = typedSales.filter(s => getLocalDate(s.created_at) >= limitStr);
     }
 
-    return filtered.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    // Ordena: Mais recente primeiro
+    return filtered.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
 
@@ -324,35 +329,19 @@ const typedSales: Sale[] = useMemo(() => {
             </thead>
 
             <tbody>
-              {labelsToRender.map((label) => {
-                const periodSales = filteredSales.filter((s) => {
-                  const saleDateBR = formatBR(getLocalDate(s.created_at));
+            {labelsToRender.map((label) => {
+                // IMPORTANTE: Filtra as vendas que pertencem EXATAMENTE a este label DD/MM/AAAA
+                const periodSales = filteredSales.filter(s => formatBR(getLocalDate(s.created_at)) === label);
+                
+                // Se não houver vendas no dia, não mostra a linha (exceto no modo Diário fixo)
+                if (periodSales.length === 0 && periodMode !== "daily") return null;
 
-                  // Se estivermos no modo mês ou range, comparamos o dia da venda com o label da linha
-                  if (periodMode === "month" || periodMode === "range") {
-                    return saleDateBR === label;
-                  }
-
-                  // Se for diário, mostra tudo daquele dia selecionado
-                  if (periodMode === "daily") {
-                    return getLocalDate(s.created_at) === selectedDate;
-                  }
-
-                  return saleDateBR === label;
-                });
-
-                const revenue = periodSales.reduce(
-                  (sum, s) => sum + (s.total_value ?? 0),
-                  0
-                );
-
-                // NOVO: Cálculo do Ticket Médio seguro para evitar erro de divisão por zero
-                const averageTicket =
-                  periodSales.length > 0 ? revenue / periodSales.length : 0;
-
+                const revenue = periodSales.reduce((sum, s) => sum + (s.total_value ?? 0), 0);
+                const averageTicket = periodSales.length > 0 ? revenue / periodSales.length : 0;
                 const isOpen = expandedLabel === label;
 
                 return (
+                   // Mantenha o seu <Fragment key={label}> e o restante do JSX abaixo
                   <Fragment key={label}>
                     <tr
                       className="border-t cursor-pointer hover:bg-muted/50"
