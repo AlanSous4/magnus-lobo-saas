@@ -23,7 +23,7 @@ interface DashboardContentProps {
 }
 
 export function DashboardClientContent({ userId, initialProducts, initialRecentSales }: DashboardContentProps) {
-  const [period, setPeriod] = useState<number>(30);
+  const [period, setPeriod] = useState<number>(1);
 
   const dateRange = useMemo(() => {
     const todayStr = getLocalDate();
