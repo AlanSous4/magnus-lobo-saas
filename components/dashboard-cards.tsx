@@ -48,7 +48,7 @@ export function DashboardCards({
         <Card className="cursor-pointer transition-shadow lg:hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Vendas (30 dias)
+              Vendas 
             </CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground lg:group-hover:text-primary" />
           </CardHeader>
@@ -63,7 +63,7 @@ export function DashboardCards({
         <Card className="cursor-pointer transition-shadow lg:hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Receita (30 dias)
+              Receita 
             </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground lg:group-hover:text-primary" />
           </CardHeader>

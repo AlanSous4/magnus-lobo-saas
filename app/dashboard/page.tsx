@@ -8,7 +8,12 @@ export default async function DashboardPage() {
 
   if (!user || error) redirect("/login");
 
-  const { data: products } = await supabase.from("products").select("*").eq("user_id", user.id);
+  const { data: products } = await supabase
+  .from("products")
+  .select("*")
+  .eq("user_id", user.id)
+  .eq("active", true)          // ✅ Filtra apenas ativos
+  .is("deleted_at", null);     // ✅ Filtra apenas os que não foram deletados
   
   const today = new Date();
   today.setHours(0,0,0,0);
