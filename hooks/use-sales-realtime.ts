@@ -18,10 +18,16 @@ const paymentLabelMap: Record<string, string> = {
 };
 
 /* =========================
-    🔹 HOOK FINALIZADO
+    🔹 HOOK FINALIZADO (COM FILTRO DE DATA)
 ========================= */
 
-export function useSalesRealtime({ userId }: { userId: string }) {
+interface UseSalesProps {
+  userId: string;
+  startDate?: string; // Formato YYYY-MM-DD
+  endDate?: string;   // Formato YYYY-MM-DD
+}
+
+export function useSalesRealtime({ userId, startDate, endDate }: UseSalesProps) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,14 +41,13 @@ export function useSalesRealtime({ userId }: { userId: string }) {
     let isMounted = true;
 
     async function loadSales() {
-      // Mantém o estado atual enquanto carrega para evitar saltos na tela
-      if (sales.length === 0) setLoading(true);
+      // Ativa o loading apenas se não houver dados ou se as datas mudarem
+      setLoading(true);
 
-      /* 🚀 BUSCA UNIFICADA: 
-         Buscamos vendas e itens em uma única query. 
-         Note o products(name) para garantir o nome caso product_name esteja nulo.
+      /* 🚀 BUSCA UNIFICADA E FILTRADA: 
+         Adicionamos filtros .gte (maior ou igual) e .lte (menor ou igual)
       */
-      const { data: salesData, error: salesError } = await supabase
+      let query = supabase
         .from("sales")
         .select(`
           id,
@@ -60,7 +65,17 @@ export function useSalesRealtime({ userId }: { userId: string }) {
             products ( name ) 
           )
         `)
-        .eq("user_id", userId)
+        .eq("user_id", userId);
+
+      // Aplica filtros de data se fornecidos para buscar meses retroativos
+      if (startDate) {
+        query = query.gte("created_at", `${startDate}T00:00:00+00:00`);
+      }
+      if (endDate) {
+        query = query.lte("created_at", `${endDate}T23:59:59+00:00`);
+      }
+
+      const { data: salesData, error: salesError } = await query
         .order("created_at", { ascending: false });
 
       if (salesError) {
@@ -78,7 +93,7 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       }
 
       /* 📦 NORMALIZAÇÃO: 
-         Tratamos os dados para o formato exato que o componente espera.
+          Tratamos os dados para o formato exato que o componente espera.
       */
       const normalizedSales: Sale[] = salesData.map((sale: any) => ({
         id: sale.id,
@@ -88,14 +103,11 @@ export function useSalesRealtime({ userId }: { userId: string }) {
         product_name: "Venda",
         quantity: 1,
         total_value: Number(sale.total_amount) || 0,
-        payment_method: sale.payment_method, // Agora enviamos o texto bruto (ex: "va + vr")
+        payment_method: sale.payment_method,
 
         items: (sale.sale_items || []).map((item: any) => ({
           id: item.id,
           sale_id: sale.id,
-          // Prioridade 1: product_name da tabela sale_items
-          // Prioridade 2: name da tabela products (via join)
-          // Prioridade 3: Texto padrão "Produto"
           product_name: item.product_name || item.products?.name || "Produto",
           quantity: Number(item.quantity) || 0,
           price: Number(item.unit_price) || 0,
@@ -114,7 +126,7 @@ export function useSalesRealtime({ userId }: { userId: string }) {
 
     /* 📡 CONFIGURAÇÃO REALTIME */
     const channel = supabase
-      .channel(`sales-sync-${userId}`)
+      .channel(`sales-sync-${userId}-${startDate}-${endDate}`)
       .on(
         "postgres_changes",
         {
@@ -136,7 +148,8 @@ export function useSalesRealtime({ userId }: { userId: string }) {
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+    // O Hook reinicia sempre que o userId ou o intervalo de datas mudar
+  }, [userId, startDate, endDate]);
 
   return { sales, loading };
 }

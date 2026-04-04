@@ -22,7 +22,7 @@ export type SalesHistoryProps = {
   userId: string;
 };
 
-type PeriodMode = "range" | "daily" | "month";
+type PeriodMode = "daily" | "month";
 
 /* =========================
    TIMEZONE FIX - XEQUE-MATE (STRING PURA)
@@ -30,11 +30,11 @@ type PeriodMode = "range" | "daily" | "month";
 
 function getLocalDate(dateStr: string | Date) {
   if (!dateStr) return "";
-  
+
   // Se for a string do Supabase (ISO), pegamos apenas os primeiros 10 caracteres "YYYY-MM-DD"
   // Isso ignora qualquer cálculo de fuso horário do navegador.
-  if (typeof dateStr === 'string' && dateStr.includes('T')) {
-    return dateStr.substring(0, 10); 
+  if (typeof dateStr === "string" && dateStr.includes("T")) {
+    return dateStr.substring(0, 10);
   }
 
   // Fallback para outros formatos
@@ -49,7 +49,7 @@ function getLocalMonth(dateStr: string | Date) {
 }
 
 function formatBR(dateISO: string) {
-  if (!dateISO || !dateISO.includes('-')) return dateISO;
+  if (!dateISO || !dateISO.includes("-")) return dateISO;
   const [year, month, day] = dateISO.split("-");
   return `${day}/${month}/${year}`;
 }
@@ -86,7 +86,7 @@ function formatPaymentMethod(method: string | null | undefined) {
   let formatted = method.toLowerCase();
   Object.entries(labels).forEach(([key, value]) => {
     // Busca exata para evitar trocar "credito" dentro de outra palavra por erro
-    const regex = new RegExp(`\\b${key}\\b`, 'gi'); 
+    const regex = new RegExp(`\\b${key}\\b`, "gi");
     formatted = formatted.replace(regex, value);
   });
 
@@ -94,61 +94,63 @@ function formatPaymentMethod(method: string | null | undefined) {
 }
 
 export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
-  const { sales, loading } = useSalesRealtime({ userId });
-
-  /* =========================
-    NORMALIZAÇÃO DE DADOS
-========================= */
-
-const typedSales: Sale[] = useMemo(() => {
-  return sales.map((s: any) => ({
-    ...s,
-    total_value: s.total_value ?? s.total_amount ?? 0,
-    // Garante que o método bruto chegue na função formatPaymentMethod
-    payment_method: s.payment_method, 
-    items: s.items ?? [],
-  }));
-}, [sales]);
-
-  const [days, setDays] = useState<30 | 60 | 90>(30);
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("daily");
-
+  // Apenas Diário e Mês agora
+  const [periodMode, setPeriodMode] = useState<"daily" | "month">("daily");
   const [selectedDate, setSelectedDate] = useState(getLocalDate(new Date()));
   const [selectedMonth, setSelectedMonth] = useState(getLocalMonth(new Date()));
-
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
 
+  const dateRange = useMemo(() => {
+    if (periodMode === "daily") {
+      return { start: selectedDate, end: selectedDate };
+    }
+    // Lógica para pegar o mês inteiro (ex: Janeiro)
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    return {
+      start: `${selectedMonth}-01`,
+      end: `${selectedMonth}-${String(lastDay).padStart(2, "0")}`,
+    };
+  }, [periodMode, selectedDate, selectedMonth]);
+
+  // Hook que busca os dados no Supabase baseado no range acima
+  const { sales, loading } = useSalesRealtime({
+    userId,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+  });
+
   /* =========================
-      FILTRAGEM BLINDADA (IGUAL AO BANCO)
+     NORMALIZAÇÃO E FILTRAGEM
   ========================= */
+  const typedSales: Sale[] = useMemo(() => {
+    return sales.map((s: any) => ({
+      ...s,
+      total_value: s.total_value ?? s.total_amount ?? 0,
+      payment_method: s.payment_method,
+      items: s.items ?? [],
+    }));
+  }, [sales]);
 
   const filteredSales = useMemo(() => {
     let filtered = typedSales;
 
     if (periodMode === "daily") {
-      // Comparação direta de strings YYYY-MM-DD
-      filtered = typedSales.filter(s => getLocalDate(s.created_at) === selectedDate);
-    } else if (periodMode === "month") {
-      // Comparação direta de strings YYYY-MM
-      filtered = typedSales.filter(s => getLocalMonth(s.created_at) === selectedMonth);
+      filtered = typedSales.filter(
+        (s) => getLocalDate(s.created_at) === selectedDate
+      );
     } else {
-      // Modo Range (30, 60, 90 dias) baseado na data civil de SP
-      const limit = new Date();
-      limit.setDate(limit.getDate() - days);
-      const limitStr = getLocalDate(limit);
-      
-      filtered = typedSales.filter(s => getLocalDate(s.created_at) >= limitStr);
+      // Se não é diário, é mensal (já que removemos o range)
+      filtered = typedSales.filter(
+        (s) => getLocalMonth(s.created_at) === selectedMonth
+      );
     }
 
-    // Ordena: Mais recente primeiro
-    return filtered.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    return filtered.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-  }, [typedSales, days, periodMode, selectedDate, selectedMonth]);
-
-  /* =========================
-     MÉTRICAS
-  ========================= */
+  }, [typedSales, periodMode, selectedDate, selectedMonth]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
     created_at: s.created_at,
@@ -162,32 +164,24 @@ const typedSales: Sale[] = useMemo(() => {
     groupBy
   );
 
-  /* =========================
-     ORDEM CORRETA (HOJE → ATRÁS)
-  ========================= */
-
+  // Labels para a tabela (Ordem Decrescente)
   const labelsToRender = useMemo(() => {
-    if (periodMode === "daily") {
-      return [formatBR(selectedDate)];
+    if (periodMode === "daily") return [formatBR(selectedDate)];
+
+    // Modo Mensal: Gera os dias do mês selecionado (do último para o primeiro)
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    const daysArray = [];
+    for (let i = lastDay; i >= 1; i--) {
+      daysArray.push(
+        `${String(i).padStart(2, "0")}/${String(month).padStart(
+          2,
+          "0"
+        )}/${year}`
+      );
     }
-
-    if (periodMode === "month") {
-      const [year, month] = selectedMonth.split("-").map(Number);
-      // Descobre o último dia do mês (ex: 28, 30 ou 31)
-      const lastDay = new Date(year, month, 0).getDate();
-
-      const daysArray = [];
-      for (let i = 1; i <= lastDay; i++) {
-        // Formata cada dia como DD/MM/AAAA
-        const day = String(i).padStart(2, "0");
-        const monthStr = String(month).padStart(2, "0");
-        daysArray.push(`${day}/${monthStr}/${year}`);
-      }
-      return daysArray; // Retorna do 01 ao 31
-    }
-
-    return [...metrics.labels].reverse();
-  }, [metrics.labels, periodMode, selectedDate, selectedMonth]);
+    return daysArray;
+  }, [periodMode, selectedDate, selectedMonth]);
 
   /* =========================
      PDF
@@ -223,23 +217,7 @@ const typedSales: Sale[] = useMemo(() => {
           </CardTitle>
 
           <div className="flex gap-2 flex-wrap items-center">
-            {[30, 60, 90].map((d) => (
-              <Button
-                className="cursor-pointer"
-                key={d}
-                size="sm"
-                variant={
-                  periodMode === "range" && days === d ? "default" : "outline"
-                }
-                onClick={() => {
-                  setPeriodMode("range");
-                  setDays(d as 30 | 60 | 90);
-                }}
-              >
-                {d} dias
-              </Button>
-            ))}
-
+            {/* BOTÃO DIÁRIO */}
             <Button
               className="cursor-pointer"
               size="sm"
@@ -254,10 +232,11 @@ const typedSales: Sale[] = useMemo(() => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="border rounded px-2 py-1 text-sm"
+                className="border rounded px-2 py-1 text-sm bg-background"
               />
             )}
 
+            {/* BOTÃO MÊS */}
             <Button
               className="cursor-pointer"
               size="sm"
@@ -272,7 +251,7 @@ const typedSales: Sale[] = useMemo(() => {
                 type="month"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="border rounded px-2 py-1 text-sm"
+                className="border rounded px-2 py-1 text-sm bg-background cursor-pointer"
               />
             )}
           </div>
@@ -329,19 +308,26 @@ const typedSales: Sale[] = useMemo(() => {
             </thead>
 
             <tbody>
-            {labelsToRender.map((label) => {
+              {labelsToRender.map((label) => {
                 // IMPORTANTE: Filtra as vendas que pertencem EXATAMENTE a este label DD/MM/AAAA
-                const periodSales = filteredSales.filter(s => formatBR(getLocalDate(s.created_at)) === label);
-                
-                // Se não houver vendas no dia, não mostra a linha (exceto no modo Diário fixo)
-                if (periodSales.length === 0 && periodMode !== "daily") return null;
+                const periodSales = filteredSales.filter(
+                  (s) => formatBR(getLocalDate(s.created_at)) === label
+                );
 
-                const revenue = periodSales.reduce((sum, s) => sum + (s.total_value ?? 0), 0);
-                const averageTicket = periodSales.length > 0 ? revenue / periodSales.length : 0;
+                // Se não houver vendas no dia, não mostra a linha (exceto no modo Diário fixo)
+                if (periodSales.length === 0 && periodMode !== "daily")
+                  return null;
+
+                const revenue = periodSales.reduce(
+                  (sum, s) => sum + (s.total_value ?? 0),
+                  0
+                );
+                const averageTicket =
+                  periodSales.length > 0 ? revenue / periodSales.length : 0;
                 const isOpen = expandedLabel === label;
 
                 return (
-                   // Mantenha o seu <Fragment key={label}> e o restante do JSX abaixo
+                  // Mantenha o seu <Fragment key={label}> e o restante do JSX abaixo
                   <Fragment key={label}>
                     <tr
                       className="border-t cursor-pointer hover:bg-muted/50"
