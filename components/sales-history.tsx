@@ -1,7 +1,7 @@
 "use client";
 
 import { SalesChart } from "@/components/sales-chart";
-import { useMemo, useState, Fragment } from "react";
+import { useMemo, useState, Fragment, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -97,21 +97,26 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
   // Apenas Diário e Mês agora
   const [periodMode, setPeriodMode] = useState<"daily" | "month">("daily");
   const [selectedDate, setSelectedDate] = useState(getLocalDate(new Date()));
-  const [selectedMonth, setSelectedMonth] = useState(getLocalMonth(new Date()));
+  const [monthStart, setMonthStart] = useState(getLocalMonth(new Date()));
+  const [monthEnd, setMonthEnd] = useState(getLocalMonth(new Date()));
   const [expandedLabel, setExpandedLabel] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15; // Define o bloco de 15 dias
 
   const dateRange = useMemo(() => {
     if (periodMode === "daily") {
       return { start: selectedDate, end: selectedDate };
     }
-    // Lógica para pegar o mês inteiro (ex: Janeiro)
-    const [year, month] = selectedMonth.split("-").map(Number);
-    const lastDay = new Date(year, month, 0).getDate();
-    return {
-      start: `${selectedMonth}-01`,
-      end: `${selectedMonth}-${String(lastDay).padStart(2, "0")}`,
+  
+    // Lógica para período entre meses
+    const [yearEnd, mEnd] = monthEnd.split("-").map(Number);
+    const lastDayOfEndMonth = new Date(yearEnd, mEnd, 0).getDate();
+  
+    return { 
+      start: `${monthStart}-01`, 
+      end: `${monthEnd}-${String(lastDayOfEndMonth).padStart(2, '0')}` 
     };
-  }, [periodMode, selectedDate, selectedMonth]);
+  }, [periodMode, selectedDate, monthStart, monthEnd]);
 
   // Hook que busca os dados no Supabase baseado no range acima
   const { sales, loading } = useSalesRealtime({
@@ -134,23 +139,19 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
 
   const filteredSales = useMemo(() => {
     let filtered = typedSales;
-
+    
     if (periodMode === "daily") {
-      filtered = typedSales.filter(
-        (s) => getLocalDate(s.created_at) === selectedDate
-      );
+      filtered = typedSales.filter(s => getLocalDate(s.created_at) === selectedDate);
     } else {
-      // Se não é diário, é mensal (já que removemos o range)
-      filtered = typedSales.filter(
-        (s) => getLocalMonth(s.created_at) === selectedMonth
-      );
+      // Filtra tudo que está entre o mês inicial e o final
+      filtered = typedSales.filter(s => {
+        const sMonth = getLocalMonth(s.created_at);
+        return sMonth >= monthStart && sMonth <= monthEnd;
+      });
     }
-
-    return filtered.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-  }, [typedSales, periodMode, selectedDate, selectedMonth]);
+    
+    return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [typedSales, periodMode, selectedDate, monthStart, monthEnd]);
 
   const salesForMetrics: MetricsSale[] = filteredSales.map((s) => ({
     created_at: s.created_at,
@@ -164,24 +165,41 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
     groupBy
   );
 
-  // Labels para a tabela (Ordem Decrescente)
-  const labelsToRender = useMemo(() => {
-    if (periodMode === "daily") return [formatBR(selectedDate)];
+  // Labels para a tabela (Ordem CRESCENTE: do dia 01 para frente)
+const labelsToRender = useMemo(() => {
+  if (periodMode === "daily") return [formatBR(selectedDate)];
 
-    // Modo Mensal: Gera os dias do mês selecionado (do último para o primeiro)
-    const [year, month] = selectedMonth.split("-").map(Number);
-    const lastDay = new Date(year, month, 0).getDate();
-    const daysArray = [];
-    for (let i = lastDay; i >= 1; i--) {
-      daysArray.push(
-        `${String(i).padStart(2, "0")}/${String(month).padStart(
-          2,
-          "0"
-        )}/${year}`
-      );
-    }
-    return daysArray;
-  }, [periodMode, selectedDate, selectedMonth]);
+  if (periodMode === "month") {
+    // Pegamos os dias que tiveram vendas no intervalo (Jan a Abr, por exemplo)
+    const daysWithSales = filteredSales.map(s => formatBR(getLocalDate(s.created_at)));
+    
+    // Set remove duplicados. O sort abaixo coloca do dia mais antigo para o mais novo
+    return Array.from(new Set(daysWithSales)).sort((a, b) => {
+      // Converte "DD/MM/YYYY" para "YYYY-MM-DD" para o JS conseguir comparar datas
+      const dateA = a.split('/').reverse().join('-');
+      const dateB = b.split('/').reverse().join('-');
+      
+      // ORDEM CRESCENTE: Menor para o Maior
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
+  }
+
+  // Fallback para as métricas (também em ordem crescente)
+  return [...metrics.labels]; 
+}, [filteredSales, periodMode, selectedDate]);
+
+// --- BLOCO DE PAGINAÇÃO ---
+const totalPages = Math.ceil(labelsToRender.length / itemsPerPage);
+
+const paginatedLabels = useMemo(() => {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  return labelsToRender.slice(startIndex, startIndex + itemsPerPage);
+}, [labelsToRender, currentPage]);
+
+useEffect(() => {
+  setCurrentPage(1);
+}, [monthStart, monthEnd, selectedDate, periodMode]);
+// --------------------------
 
   /* =========================
      PDF
@@ -247,13 +265,23 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </Button>
 
             {periodMode === "month" && (
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="border rounded px-2 py-1 text-sm bg-background cursor-pointer"
-              />
-            )}
+  <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-md">
+    <span className="text-xs font-medium px-1">De:</span>
+    <input
+      type="month"
+      value={monthStart}
+      onChange={(e) => setMonthStart(e.target.value)}
+      className="border rounded px-2 py-1 text-sm bg-background"
+    />
+    <span className="text-xs font-medium px-1">Até:</span>
+    <input
+      type="month"
+      value={monthEnd}
+      onChange={(e) => setMonthEnd(e.target.value)}
+      className="border rounded px-2 py-1 text-sm bg-background"
+    />
+  </div>
+)}
           </div>
 
           <div className="flex gap-2 flex-wrap items-center">
@@ -308,7 +336,7 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </thead>
 
             <tbody>
-              {labelsToRender.map((label) => {
+            {paginatedLabels.map((label) => {
                 // IMPORTANTE: Filtra as vendas que pertencem EXATAMENTE a este label DD/MM/AAAA
                 const periodSales = filteredSales.filter(
                   (s) => formatBR(getLocalDate(s.created_at)) === label
@@ -402,6 +430,33 @@ export function SalesHistory({ type, groupBy, userId }: SalesHistoryProps) {
             </tbody>
           </table>
         </div>
+
+        {/* INSERIR O BLOCO DE PAGINAÇÃO AQUI (ENTRE AS DUAS DIVS) */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-2 py-4 border-t">
+            <p className="text-xs text-muted-foreground">
+              Mostrando página {currentPage} de {totalPages} ({labelsToRender.length} dias no total)
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próximo
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* GRÁFICO INVISÍVEL PARA PDF */}
         <div

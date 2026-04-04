@@ -75,8 +75,11 @@ export function useSalesRealtime({ userId, startDate, endDate }: UseSalesProps) 
         query = query.lte("created_at", `${endDate}T23:59:59+00:00`);
       }
 
+      // Aumentamos o limite para 5.000 registros para garantir que grandes períodos 
+      // como (Jan a Abr) tragam todos os dados para o cálculo de métricas.
       const { data: salesData, error: salesError } = await query
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(0, 5000);
 
       if (salesError) {
         console.error("Erro Supabase:", salesError.message);
