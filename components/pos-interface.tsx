@@ -84,7 +84,16 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [showPayment, setShowPayment] = useState(false);
 
+  
   const router = useRouter();
+
+  // ADICIONE ESTE BLOCO AQUI:
+  useEffect(() => {
+    if (!showPayment && cart.length > 0) {
+      // Se o modal fechou (showPayment false), limpamos o carrinho para a próxima venda
+      setCart([]);
+    }
+  }, [showPayment]);
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -191,7 +200,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           .eq("id", item.id);
       }
 
-      setCart([]);
+      // setCart([]);  <--- REMOVA OU COMENTE ESTA LINHA
       router.refresh();
     } catch (err) {
       console.error("Erro na venda:", err);
