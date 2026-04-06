@@ -19,7 +19,7 @@ export default async function VendasPage() {
   // 🔹 Busca apenas produtos ATIVOS e pertencentes ao USUÁRIO
   const { data: products, error } = await supabase
     .from("products")
-    .select("id, name, value, quantity, image_url, active") // Adicionado 'active'
+    .select("id, name, value, quantity, image_url, active, is_weight") // Adicionado 'active'
     .eq("user_id", user.id) // ✅ Segurança: apenas itens do dono
     .eq("active", true)      // ✅ Filtro: esconde os "deletados"
     .order("name");

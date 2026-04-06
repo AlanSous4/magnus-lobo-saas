@@ -11,7 +11,10 @@ const RecebimentoFiscal = ({ organizationId }) => {
   const [status, setStatus] = useState("Aguardando scan...");
   const [showScanner, setShowScanner] = useState(false); // Adicione esta linha
 
-  const [modalNovoProd, setModalNovoProd] = useState({ open: false, nomeNota: "" });
+  const [modalNovoProd, setModalNovoProd] = useState({
+    open: false,
+    nomeNota: "",
+  });
   const [novoNomeEstoque, setNovoNomeEstoque] = useState("");
 
   // --- FUNÇÃO DE ARQUIVO XML ATUALIZADA E COMPLETA ---
@@ -62,11 +65,17 @@ const RecebimentoFiscal = ({ organizationId }) => {
 
           // Busca a Unidade de Medida (UN, CX, KG, etc)
           const uCom = prod.getElementsByTagName("uCom")[0].textContent;
+
+          // LÓGICA DE PESO/FATOR:
+          let multiplicadorUnid = 1;
           
-          // Extrai apenas os números da unidade (ex: CX27 -> 27, UN1 -> 1)
-          // Se não houver número (ex: "UN"), assume 1.
-          const matchUnid = uCom.match(/\d+/);
-          const multiplicadorUnid = matchUnid ? parseInt(matchUnid[0]) : 1;
+          if (uCom.toUpperCase().includes("KG")) {
+            multiplicadorUnid = 1;
+          } else {
+            const matchUnid = uCom.match(/\d+/);
+            // Se encontrar números (ex: CX12), usa o número, senão assume 1
+            multiplicadorUnid = matchUnid ? parseInt(matchUnid[0]) : 1;
+          }
 
           // Busca o CFOP do item
           const cfopItem = prod.getElementsByTagName("CFOP")[0].textContent;
@@ -74,7 +83,7 @@ const RecebimentoFiscal = ({ organizationId }) => {
           itensFormatados.push({
             nome: xProd,
             qtd: qCom,
-            unid: uCom, 
+            unid: uCom,
             fator: multiplicadorUnid, // Guardamos o fator de conversão
             cfop: cfopItem,
             valor: "R$ " + parseFloat(vUnCom).toFixed(2).replace(".", ","),
@@ -132,32 +141,47 @@ const RecebimentoFiscal = ({ organizationId }) => {
     setNovoNomeEstoque(nomeNaNota);
     setModalNovoProd({ open: true, nomeNota: nomeNaNota });
   };
-  
+
   // Esta será a função chamada pelo botão "Salvar" do modal
   const confirmarCadastroRapido = async () => {
     if (!novoNomeEstoque) return;
-    
+
+    // Verifica se o nome vindo da nota sugere peso
+    const nomeMaiusculo = novoNomeEstoque.toUpperCase();
+    const sugerirPeso =
+      nomeMaiusculo.includes("KG") ||
+      nomeMaiusculo.includes("MUSS") || // Queijos geralmente são peso
+      nomeMaiusculo.includes("PESO");
+
     setIsSaving(true); // Reaproveitando seu estado de loading
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return alert("Sessão expirada.");
-  
+
       const { data: novoProd, error } = await supabase
         .from("products")
-        .insert([{
-          name: novoNomeEstoque,
-          value: 0,
-          quantity: 0,
-          organization_id: organizationId,
-          user_id: user.id,
-          is_weight: false,
-        }])
-        .select().single();
-  
+        .insert([
+          {
+            name: novoNomeEstoque,
+            value: 0,
+            quantity: 0,
+            organization_id: organizationId,
+            user_id: user.id,
+            is_weight: sugerirPeso,
+          },
+        ])
+        .select()
+        .single();
+
       if (error) throw error;
-  
+
       setMeusProdutos((prev) => [...prev, novoProd]);
-      setVinculos((prev) => ({ ...prev, [modalNovoProd.nomeNota]: novoProd.id }));
+      setVinculos((prev) => ({
+        ...prev,
+        [modalNovoProd.nomeNota]: novoProd.id,
+      }));
       setModalNovoProd({ open: false, nomeNota: "" }); // Fecha o modal
     } catch (err) {
       alert("Erro: " + err.message);
@@ -273,50 +297,65 @@ const RecebimentoFiscal = ({ organizationId }) => {
 
       // B. Processa itens e atualiza estoque
       for (const item of notaDados.itens) {
-        const productIdVinculado = vinculos[item.nome];
+        try {
+          const productIdVinculado = vinculos[item.nome];
 
-        if (!productIdVinculado) {
-          throw new Error(
-            `O produto "${item.nome}" não está vinculado a nenhum item do seu estoque.`
-          );
-        }
-
-        // CÁLCULO DA QUANTIDADE REAL: QTD da nota * Fator da Unidade
-        // Ex: 1 (qtd) * 27 (fator de CX27) = 27 unidades para o estoque
-        const qtdNota = parseFloat(item.qtd.replace(",", "."));
-        const quantidadeFinalEstoque = qtdNota * (item.fator || 1);
-
-        // A. Salva o item vinculado na tabela de histórico
-        const { error: itemErr } = await supabase
-          .from("recebimento_itens")
-          .insert({
-            recebimento_id: rec.id,
-            product_id: productIdVinculado,
-            nome_produto_nfe: item.nome,
-            quantidade: quantidadeFinalEstoque, // Salva a quantidade convertida
-            preco_unitario: item.vUnReal,
-            cfop: item.cfop,
-            vlr_ipi: item.vIPI || 0,
-            vlr_pis: item.vPIS || 0,
-            vlr_cofins: item.vCOFINS || 0,
-            organization_id: organizationId,
+          // Log estratégico para monitorar o Queijo Mussarela no console (F12)
+          console.log("DEBUG PROCESSAMENTO:", {
+            nomeNoXml: item.nome,
+            idEncontrado: productIdVinculado,
+            vinculosDisponiveis: vinculos
           });
 
-        if (itemErr) throw itemErr;
+          if (!productIdVinculado) {
+            console.warn(`⚠️ Produto ${item.nome} sem vínculo. Pulando...`);
+            continue;
+          }
 
-        // B. Atualiza o estoque via RPC com a quantidade convertida
-        const { error: rpcErr } = await supabase.rpc("increment_stock", {
-          row_id: productIdVinculado,
-          amount: quantidadeFinalEstoque,
-        });
+          // Tratamento para Pesáveis: Converte string/vírgula e aplica o fator (ex: CX -> UN)
+          const qtdNota = parseFloat(String(item.qtd).replace(",", "."));
+          const fatorConversao = parseFloat(item.fator) || 1;
+          const quantidadeFinalEstoque = qtdNota * fatorConversao;
 
-        if (rpcErr) throw rpcErr;
+          // 1. Grava no Histórico (Tabela recebimento_itens)
+          const { error: itemErr } = await supabase
+            .from("recebimento_itens")
+            .insert({
+              recebimento_id: rec.id,
+              product_id: productIdVinculado,
+              nome_produto_nfe: item.nome,
+              quantidade: quantidadeFinalEstoque,
+              valor_unitario: item.vUnReal, 
+              organization_id: organizationId,
+              cfop: item.cfop
+            });
+
+          if (itemErr) {
+            console.error(`❌ Erro ao inserir item ${item.nome}:`, itemErr.message);
+            continue; 
+          }
+
+          // 2. Atualiza o saldo na tabela 'products' via RPC
+          const { error: rpcErr } = await supabase.rpc("increment_stock", {
+            row_id: productIdVinculado,
+            // Garante que o valor vá como número e com precisão de 3 casas decimais
+            quantity_to_add: parseFloat(quantidadeFinalEstoque.toFixed(3)),
+          });
+
+          if (rpcErr) {
+            console.error(`❌ Erro RPC no produto ${item.nome}:`, rpcErr.message);
+          } else {
+            console.log(`✅ Sucesso: ${item.nome} atualizado (+${quantidadeFinalEstoque.toFixed(3)}) no estoque.`);
+          }
+
+        } catch (itemLoopErr) {
+          console.error("Erro crítico no loop de itens:", itemLoopErr);
+        }
       }
-
       // Ativa a animação profissional
       setShowSuccess(true);
 
-      // Aguarda 3 segundos (tempo da animação) e limpa a tela
+      // Aguarda 3 segundos (tempo da animação) para limpar o estado e a tela
       setTimeout(() => {
         setShowSuccess(false);
         setScannedResult("");
@@ -329,14 +368,8 @@ const RecebimentoFiscal = ({ organizationId }) => {
         setStatus("Aguardando nova nota...");
       }, 3000);
 
-      // Limpa tudo após o sucesso
-      setScannedResult("");
-      setNotaDados({
-        fornecedor: "Aguardando leitura...",
-        itens: [],
-        fiscal: {},
-      });
-      setVinculos({});
+      // ✅ REMOVI AS LINHAS REPETIDAS QUE ESTAVAM AQUI EMBAIXO
+
     } catch (err) {
       // Tratamento amigável para nota duplicada
       if (
@@ -512,12 +545,13 @@ const RecebimentoFiscal = ({ organizationId }) => {
               <table className="items-table" style={{ tableLayout: "fixed" }}>
                 <thead>
                   <tr>
-                    <th style={{ width: "38%" }}>PRODUTO (NOTA VS ESTOQUE)</th>
+                  <th style={{ width: "35%" }}>PRODUTO (NOTA VS ESTOQUE)</th>
                     <th style={{ width: "8%", textAlign: "center" }}>CFOP</th>
                     <th style={{ width: "8%", textAlign: "center" }}>UNID</th>
-                    <th style={{ width: "10%", textAlign: "center" }}>QTD</th>
-                    <th style={{ width: "18%" }}>V. UNIT</th>
-                    <th style={{ width: "18%" }}>V. TOTAL</th>
+                    <th style={{ width: "10%", textAlign: "center" }}>QTD NOTA</th>
+                    <th style={{ width: "12%", textAlign: "center" }}>FATOR/PESO</th>
+                    <th style={{ width: "12%", textAlign: "center" }}>TOTAL ESTOQUE</th>
+                    <th style={{ width: "15%" }}>V. UNIT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -568,36 +602,51 @@ const RecebimentoFiscal = ({ organizationId }) => {
                               + CADASTRAR COMO NOVO PRODUTO
                             </option>
                             {meusProdutos.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "center", fontSize: "0.8rem" }}>
+                      {item.cfop}
+                    </td>
+                    <td style={{ textAlign: "center", fontSize: "0.8rem", fontWeight: "600" }}>
+                      {item.unid}
+                    </td>
+                    <td style={{ textAlign: "center", fontSize: "0.9rem" }}>
+                      {item.qtd}
+                    </td>
+                      
+                      {/* NOVO CAMPO EDITÁVEL PARA O FATOR/PESO */}
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="number"
+                          step="0.001"
+                          value={item.fator || 1}
+                          onChange={(e) => {
+                            const novosItens = [...notaDados.itens];
+                            novosItens[index].fator = parseFloat(e.target.value) || 0;
+                            setNotaDados({ ...notaDados, itens: novosItens });
+                          }}
+                          style={{
+                            width: "70px",
+                            textAlign: "center",
+                            border: "1px solid #ddd",
+                            borderRadius: "4px",
+                            background: "#fff9f5"
+                          }}
+                        />
                       </td>
-                      <td style={{ textAlign: "center", fontSize: "0.8rem" }}>
-                        {item.cfop}
+
+                      {/* TOTAL QUE VAI PRO BANCO (QTD NOTA * FATOR) */}
+                      <td style={{ textAlign: "center", fontWeight: "bold", color: "#FF6600" }}>
+                        {(parseFloat(item.qtd.replace(",", ".")) * (item.fator || 1)).toFixed(3)}
                       </td>
-                      <td
-                        style={{
-                          textAlign: "center",
-                          fontSize: "0.8rem",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {item.unid}
-                      </td>
-                      <td style={{ textAlign: "center", fontSize: "0.9rem" }}>
-                        {parseFloat(item.qtd)}
-                      </td>
+
                       <td style={{ fontSize: "0.9rem" }}>
                         R$ {item.vUnReal.toFixed(2).replace(".", ",")}
-                      </td>
-                      <td style={{ fontSize: "0.9rem", fontWeight: "bold" }}>
-                        R${" "}
-                        {(parseFloat(item.qtd) * item.vUnReal)
-                          .toFixed(2)
-                          .replace(".", ",")}
                       </td>
                     </tr>
                   ))}
@@ -666,41 +715,41 @@ const RecebimentoFiscal = ({ organizationId }) => {
         </div>
       )}
 
-{modalNovoProd.open && (
-  <div className="modal-overlay">
-    <div className="modal-content">
-      <h3>Novo Produto</h3>
-      <p style={{ fontSize: "0.85rem", color: "#666" }}>
-        Como deseja salvar este item no seu estoque?
-      </p>
-      
-      <input 
-        type="text" 
-        value={novoNomeEstoque}
-        onChange={(e) => setNovoNomeEstoque(e.target.value)}
-        placeholder="Nome do produto"
-        autoFocus
-      />
+      {modalNovoProd.open && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Novo Produto</h3>
+            <p style={{ fontSize: "0.85rem", color: "#666" }}>
+              Como deseja salvar este item no seu estoque?
+            </p>
 
-      <div className="modal-actions">
-        <button 
-          className="btn-voltar" 
-          onClick={() => setModalNovoProd({ open: false, nomeNota: "" })}
-          style={{ background: "#eee", color: "#333" }}
-        >
-          Cancelar
-        </button>
-        <button 
-          className="btn-confirmar" 
-          onClick={confirmarCadastroRapido}
-          disabled={isSaving}
-        >
-          {isSaving ? "Salvando..." : "Cadastrar e Vincular"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+            <input
+              type="text"
+              value={novoNomeEstoque}
+              onChange={(e) => setNovoNomeEstoque(e.target.value)}
+              placeholder="Nome do produto"
+              autoFocus
+            />
+
+            <div className="modal-actions">
+              <button
+                className="btn-voltar"
+                onClick={() => setModalNovoProd({ open: false, nomeNota: "" })}
+                style={{ background: "#eee", color: "#333" }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-confirmar"
+                onClick={confirmarCadastroRapido}
+                disabled={isSaving}
+              >
+                {isSaving ? "Salvando..." : "Cadastrar e Vincular"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

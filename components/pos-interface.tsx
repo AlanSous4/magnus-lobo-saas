@@ -21,6 +21,7 @@ interface Product {
   value: number;
   quantity: number;
   image_url?: string | null;
+  is_weight: boolean;
 }
 
 interface CartItem extends Product {
@@ -32,12 +33,6 @@ interface POSInterfaceProps {
   userId: string;
 }
 
-const WEIGHT_PRODUCT_IDS = [
-  "b8a6c2ca-623c-41a2-bfec-9fa27ce7c6cc",
-  "193b8a3a-d2a7-485d-bb31-59157002eea6",
-  "f27d497c-f0c7-4f3b-9a86-25130ec03dd4",
-  "3dc7d0cc-eb8a-42e4-828d-b62727d96cf2",
-];
 
 function getBrazilISOString() {
   const now = new Date();
@@ -84,17 +79,21 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [showPayment, setShowPayment] = useState(false);
 
-  
   const router = useRouter();
 
-  
-
+  // 1. Filtro de produtos
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const isWeightProduct = (id: string) => WEIGHT_PRODUCT_IDS.includes(id);
+  // 2. Função isWeightProduct (MELHORADA)
+  const isWeightProduct = (id: string) => {
+    const foundProduct = products.find((p) => p.id === id);
+    // Força a conversão para booleano caso o banco retorne null
+    return !!foundProduct?.is_weight; 
+  };
 
+  // 3. Função addToCart
   const addToCart = (product: Product) => {
     const existing = cart.find((i) => i.id === product.id);
     const isWeight = isWeightProduct(product.id);
@@ -170,7 +169,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       for (const item of cart) {
         const isWeight = isWeightProduct(item.id);
         const quantityToSave = isWeight
-          ? item.cartQuantity / 1000
+          ? item.cartQuantity / 1000 // Transforma 4044g em 4.044kg
           : item.cartQuantity;
         const subtotal = isWeight
           ? (item.value / 100) * item.cartQuantity
@@ -194,9 +193,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           .eq("id", item.id);
       }
 
-       setCart([]);  
+      setCart([]);
 
-       setTimeout(() => {
+      setTimeout(() => {
         router.refresh();
       }, 2000);
 
