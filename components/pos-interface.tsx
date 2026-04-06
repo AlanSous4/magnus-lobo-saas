@@ -144,7 +144,6 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     pagamentos: { metodo: string; valor: number }[]
   ) => {
     try {
-      // Gera o texto: "pix (R$ 10.00) + dinheiro (R$ 5.00)" ou apenas "pix"
       const labelPagamento =
         pagamentos.length > 1
           ? pagamentos
@@ -152,59 +151,64 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               .join(" + ")
           : pagamentos[0].metodo;
 
-      const { data: sale, error } = await supabase
-        .from("sales")
-        .insert({
-          user_id: userId,
-          total_amount: total,
-          total_value: total,
-          payment_method: labelPagamento,
-          created_at: getBrazilISOString(),
-        })
-        .select()
-        .single();
-
-      if (error || !sale) throw new Error(error?.message);
-
-      for (const item of cart) {
-        const isWeight = isWeightProduct(item.id);
-        const quantityToSave = isWeight
-          ? item.cartQuantity / 1000 // Transforma 4044g em 4.044kg
-          : item.cartQuantity;
-        const subtotal = isWeight
-          ? (item.value / 100) * item.cartQuantity
-          : item.value * item.cartQuantity;
-
-        await supabase.from("sale_items").insert({
-          sale_id: sale.id,
-          product_id: item.id,
-          quantity: quantityToSave,
-          unit_price: item.value,
-          subtotal,
-          is_weight: isWeight,
-        });
-
-        await supabase
-          .from("products")
-          .update({
-            quantity: item.quantity - quantityToSave,
-            exit_date: new Date().toISOString(),
+          const { data: sale, error } = await supabase
+          .from("sales")
+          .insert({
+            user_id: userId,
+            total_amount: total,
+            total_value: total,
+            payment_method: labelPagamento,
+            created_at: getBrazilISOString(),
           })
-          .eq("id", item.id);
-      }
+          .select()
+          .single();
 
+          if (error || !sale) throw new Error(error?.message);
+
+          for (const item of cart) {
+            const isWeight = isWeightProduct(item.id);
+            const quantityToSave = isWeight
+              ? item.cartQuantity / 1000 
+              : item.cartQuantity;
+            const subtotal = isWeight
+              ? (item.value / 100) * item.cartQuantity
+              : item.value * item.cartQuantity;
+
+              await supabase.from("sale_items").insert({
+                sale_id: sale.id,
+                product_id: item.id,
+                quantity: quantityToSave,
+                unit_price: item.value,
+                subtotal,
+                is_weight: isWeight,
+              });
+
+              await supabase
+              .from("products")
+              .update({
+                quantity: item.quantity - quantityToSave,
+                exit_date: new Date().toISOString(),
+              })
+              .eq("id", item.id);
+          }
+
+      // 1. Aguarda 2 segundos com a venda já gravada no banco
+      // Esse tempo é o que permite ao usuário ver a animação de "Sucesso" no modal
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // 2. Agora sim, limpa o carrinho
       setCart([]);
-
-      setTimeout(() => {
-        router.refresh();
-      }, 2000);
-
+      // 4. Atualiza os dados da página (estoque, etc) apenas uma vez
       router.refresh();
+      // Retornamos uma Promise resolvida para o Modal saber que acabou
+    return Promise.resolve();
+
     } catch (err) {
       console.error("Erro na venda:", err);
       throw err;
     }
   };
+  
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
