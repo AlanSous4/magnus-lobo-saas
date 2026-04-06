@@ -60,7 +60,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
         .update({
           name: formData.name,
           value: parseFloat(formData.value),
-          quantity: parseInt(formData.quantity),
+          quantity: parseFloat(formData.quantity),
           expiration_date: formData.expiration_date || null,
           updated_at: new Date().toISOString(),
         })
@@ -123,6 +123,7 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
               <Input
                 id="edit-quantity"
                 type="number"
+                step="0.001"
                 min="0"
                 placeholder="0"
                 required
