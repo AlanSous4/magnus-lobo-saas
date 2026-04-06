@@ -62,14 +62,21 @@ const RecebimentoFiscal = ({ organizationId }) => {
 
           // Busca a Unidade de Medida (UN, CX, KG, etc)
           const uCom = prod.getElementsByTagName("uCom")[0].textContent;
+          
+          // Extrai apenas os números da unidade (ex: CX27 -> 27, UN1 -> 1)
+          // Se não houver número (ex: "UN"), assume 1.
+          const matchUnid = uCom.match(/\d+/);
+          const multiplicadorUnid = matchUnid ? parseInt(matchUnid[0]) : 1;
+
           // Busca o CFOP do item
           const cfopItem = prod.getElementsByTagName("CFOP")[0].textContent;
 
           itensFormatados.push({
             nome: xProd,
             qtd: qCom,
-            unid: uCom, // Novo campo
-            cfop: cfopItem, // Novo campo
+            unid: uCom, 
+            fator: multiplicadorUnid, // Guardamos o fator de conversão
+            cfop: cfopItem,
             valor: "R$ " + parseFloat(vUnCom).toFixed(2).replace(".", ","),
             vUnReal: parseFloat(vUnCom),
           });
@@ -268,16 +275,16 @@ const RecebimentoFiscal = ({ organizationId }) => {
       for (const item of notaDados.itens) {
         const productIdVinculado = vinculos[item.nome];
 
-        // LOG DE SEGURANÇA
-        console.log(
-          `📦 Processando item: ${item.nome} | ID no Banco: ${productIdVinculado}`
-        );
-
         if (!productIdVinculado) {
           throw new Error(
-            `O produto "${item.nome}" não está vinculado a nenhum item do seu estoque. Vincule-o antes de confirmar.`
+            `O produto "${item.nome}" não está vinculado a nenhum item do seu estoque.`
           );
         }
+
+        // CÁLCULO DA QUANTIDADE REAL: QTD da nota * Fator da Unidade
+        // Ex: 1 (qtd) * 27 (fator de CX27) = 27 unidades para o estoque
+        const qtdNota = parseFloat(item.qtd.replace(",", "."));
+        const quantidadeFinalEstoque = qtdNota * (item.fator || 1);
 
         // A. Salva o item vinculado na tabela de histórico
         const { error: itemErr } = await supabase
@@ -286,27 +293,21 @@ const RecebimentoFiscal = ({ organizationId }) => {
             recebimento_id: rec.id,
             product_id: productIdVinculado,
             nome_produto_nfe: item.nome,
-            quantidade: parseFloat(item.qtd.replace(",", ".")),
+            quantidade: quantidadeFinalEstoque, // Salva a quantidade convertida
             preco_unitario: item.vUnReal,
-            // NOVAS COLUNAS ABAIXO:
             cfop: item.cfop,
             vlr_ipi: item.vIPI || 0,
             vlr_pis: item.vPIS || 0,
             vlr_cofins: item.vCOFINS || 0,
-            organization_id: organizationId, // Importante manter o vínculo com a Padaria
+            organization_id: organizationId,
           });
 
-        if (itemErr) {
-          console.error("Erro na tabela recebimento_itens:", itemErr);
-          throw new Error(
-            `Erro ao salvar item ${item.nome}: ${itemErr.message}`
-          );
-        }
+        if (itemErr) throw itemErr;
 
-        // B. Atualiza o estoque via RPC
+        // B. Atualiza o estoque via RPC com a quantidade convertida
         const { error: rpcErr } = await supabase.rpc("increment_stock", {
           row_id: productIdVinculado,
-          amount: parseFloat(item.qtd.replace(",", ".")),
+          amount: quantidadeFinalEstoque,
         });
 
         if (rpcErr) throw rpcErr;
