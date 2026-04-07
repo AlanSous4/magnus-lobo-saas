@@ -44,25 +44,17 @@ function getBrazilISOString() {
 }
 
 /* =========================
-BOTÃO VOLTAR PWA
+BOTÃO VOLTAR PWA (CORRIGIDO)
 ========================= */
 
 function BackButtonApp() {
-  const [isPWA, setIsPWA] = useState(false);
+  // ✅ Removida a verificação isPWA para garantir visibilidade no tablet
   const router = useRouter();
-
-  useEffect(() => {
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
-    setIsPWA(standalone);
-  }, []);
-
-  if (!isPWA) return null;
 
   return (
     <button
       onClick={() => router.push("/dashboard")}
+      // Mantendo o seu layout original exatamente como estava
       className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1 rounded-md hover:bg-orange-700 transition cursor-pointer"
     >
       <ArrowLeft className="h-4 w-4" />
@@ -70,7 +62,6 @@ function BackButtonApp() {
     </button>
   );
 }
-
 /* =========================
 COMPONENTE PRINCIPAL
 ========================= */
@@ -212,9 +203,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   
 
   return (
-    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
+    <div className="h-screen flex flex-col lg:flex-row overflow-hidden pt-[env(safe-area-inset-top)]">
       {/* COLUNA PRODUTOS */}
       <div className="flex-1 flex flex-col min-h-0">
+        {/* Mantivemos o padding p-4 e o border-b original */}
         <div className="p-4 border-b bg-background shrink-0 flex items-center justify-between">
           <h1 className="text-lg font-bold flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-orange-600" /> PDV - Ponto de
