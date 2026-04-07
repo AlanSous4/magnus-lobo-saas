@@ -51,24 +51,24 @@ export function PaymentModal({ isOpen, onClose, total, onConfirm, mesaInfo }: Pa
   }
 
   // Dentro do PaymentModal (payment-modal.tsx)
-const finalizar = async () => {
-  setProcessando(true)
-  try {
-    await onConfirm(pagamentos) // Aqui ele executa a gravação no banco
+  const finalizar = async () => {
+    if (pagamentos.length === 0) return;
     
-    setSucesso(true) // 👈 A animação começa EXATAMENTE aqui
-
-    // Espera o tempo da animação (2.5s) antes de fechar o modal
-    setTimeout(() => {
-      onClose() // Só fecha depois que o usuário viu o check verde
-    }, 2500)
-
-  } catch (error) {
-    console.error(error)
-  } finally {
-    setProcessando(false)
-  }
-}
+    setProcessando(true);
+    try {
+      await onConfirm(pagamentos);
+      setSucesso(true);
+      setTimeout(() => {
+        onClose();
+      }, 2500);
+    } catch (error) {
+      // Adicione um feedback visual de erro aqui se puder
+      alert("Erro ao salvar venda. Verifique a conexão.");
+      console.error(error);
+    } finally {
+      setProcessando(false);
+    }
+  };
 
   return (
     <AnimatePresence>

@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion" // Certifique-se de importar
 import { PaymentModal } from "@/components/payment-modal";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -379,6 +380,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           </Button>
         </div>
       </aside>
+
 
       {/* DIALOGS */}
       {/* ✅ COLOQUE APENAS ISSO NO LUGAR: */}
