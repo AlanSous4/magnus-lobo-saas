@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence } from "framer-motion" // Certifique-se de importar
+import { AnimatePresence } from "framer-motion"; // Certifique-se de importar
 import { PaymentModal } from "@/components/payment-modal";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,6 @@ interface POSInterfaceProps {
   products: Product[];
   userId: string;
 }
-
 
 function getBrazilISOString() {
   const now = new Date();
@@ -82,7 +81,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const isWeightProduct = (id: string) => {
     const foundProduct = products.find((p) => p.id === id);
     // Força a conversão para booleano caso o banco retorne null
-    return !!foundProduct?.is_weight; 
+    return !!foundProduct?.is_weight;
   };
 
   // 3. Função addToCart
@@ -143,46 +142,46 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               .join(" + ")
           : pagamentos[0].metodo;
 
-          const { data: sale, error } = await supabase
-          .from("sales")
-          .insert({
-            user_id: userId,
-            total_amount: total,
-            total_value: total,
-            payment_method: labelPagamento,
-            created_at: getBrazilISOString(),
+      const { data: sale, error } = await supabase
+        .from("sales")
+        .insert({
+          user_id: userId,
+          total_amount: total,
+          total_value: total,
+          payment_method: labelPagamento,
+          created_at: getBrazilISOString(),
+        })
+        .select()
+        .single();
+
+      if (error || !sale) throw new Error(error?.message);
+
+      for (const item of cart) {
+        const isWeight = isWeightProduct(item.id);
+        const quantityToSave = isWeight
+          ? item.cartQuantity / 1000
+          : item.cartQuantity;
+        const subtotal = isWeight
+          ? (item.value / 100) * item.cartQuantity
+          : item.value * item.cartQuantity;
+
+        await supabase.from("sale_items").insert({
+          sale_id: sale.id,
+          product_id: item.id,
+          quantity: quantityToSave,
+          unit_price: item.value,
+          subtotal,
+          is_weight: isWeight,
+        });
+
+        await supabase
+          .from("products")
+          .update({
+            quantity: item.quantity - quantityToSave,
+            exit_date: new Date().toISOString(),
           })
-          .select()
-          .single();
-
-          if (error || !sale) throw new Error(error?.message);
-
-          for (const item of cart) {
-            const isWeight = isWeightProduct(item.id);
-            const quantityToSave = isWeight
-              ? item.cartQuantity / 1000 
-              : item.cartQuantity;
-            const subtotal = isWeight
-              ? (item.value / 100) * item.cartQuantity
-              : item.value * item.cartQuantity;
-
-              await supabase.from("sale_items").insert({
-                sale_id: sale.id,
-                product_id: item.id,
-                quantity: quantityToSave,
-                unit_price: item.value,
-                subtotal,
-                is_weight: isWeight,
-              });
-
-              await supabase
-              .from("products")
-              .update({
-                quantity: item.quantity - quantityToSave,
-                exit_date: new Date().toISOString(),
-              })
-              .eq("id", item.id);
-          }
+          .eq("id", item.id);
+      }
 
       // 1. Aguarda 2 segundos com a venda já gravada no banco
       // Esse tempo é o que permite ao usuário ver a animação de "Sucesso" no modal
@@ -193,14 +192,12 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       // 4. Atualiza os dados da página (estoque, etc) apenas uma vez
       router.refresh();
       // Retornamos uma Promise resolvida para o Modal saber que acabou
-    return Promise.resolve();
-
+      return Promise.resolve();
     } catch (err) {
       console.error("Erro na venda:", err);
       throw err;
     }
   };
-  
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-hidden pt-[env(safe-area-inset-top)]">
@@ -373,16 +370,17 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         </div>
       </aside>
 
-
-      {/* DIALOGS */}
-      {/* ✅ COLOQUE APENAS ISSO NO LUGAR: */}
-      <PaymentModal
-        isOpen={showPayment}
-        onClose={() => setShowPayment(false)}
-        total={total}
-        onConfirm={finalizarVendaNoBanco}
-        mesaInfo="Venda Balcão"
-      />
+      <AnimatePresence mode="wait">
+        {showPayment && (
+          <PaymentModal
+            isOpen={showPayment}
+            onClose={() => setShowPayment(false)}
+            total={total}
+            onConfirm={finalizarVendaNoBanco}
+            mesaInfo="Venda Balcão"
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
