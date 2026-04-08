@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ShoppingBag } from "lucide-react"
 
+// 1. Importando a versão do seu novo arquivo de configuração
+import { APP_VERSION } from "../config/version"
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -32,9 +35,7 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      // 🔹 Opcional: pode limpar sessão antiga antes de redirecionar
       await supabase.auth.refreshSession()
-
       router.push("/dashboard")
     } catch (error: unknown) {
       setError(
@@ -50,9 +51,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center p-6 bg-linear-to-br from-orange-50 to-amber-50">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col gap-6">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center p-6 bg-linear-to-br from-orange-50 to-amber-50">
+      <div className="w-full max-w-sm flex-1 flex flex-col items-center justify-center">
+        <div className="flex flex-col gap-6 w-full">
           <div className="flex flex-col items-center gap-2 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-orange-500 to-amber-600">
               <ShoppingBag className="h-8 w-8 text-white" />
@@ -119,6 +120,13 @@ export default function LoginPage() {
           </Card>
         </div>
       </div>
+
+      {/* 2. O Rodapé com a versão implantado aqui */}
+      <footer className="mt-auto py-4 text-center">
+        <p className="text-[10px] text-stone-400 font-mono uppercase tracking-widest">
+          Padaria Magnus Lobo © 2026 | v{APP_VERSION}
+        </p>
+      </footer>
     </div>
   )
 }
