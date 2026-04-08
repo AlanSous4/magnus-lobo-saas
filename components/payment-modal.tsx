@@ -63,18 +63,19 @@ export function PaymentModal({
     setProcessando(true);
     try {
       await onConfirm(pagamentos);
+
+      // Pequena pausa para o mobile processar a transição de estado de 'processando' para 'sucesso'
+      setProcessando(false);
       setSucesso(true);
+
+      // O tempo aqui deve ser o suficiente para ver a barra de progresso e o ícone
       setTimeout(() => {
         onClose();
       }, 4000);
     } catch (error) {
-      // Adicione um feedback visual de erro aqui se puder
-      alert("Erro ao salvar venda. Verifique a conexão.");
+      alert("Erro ao salvar venda.");
+      setProcessando(false);
       console.error(error);
-    } finally {
-      // IMPORTANTE: No tablet, o setProcessando(false) pode causar re-render.
-      // Vamos deixar o estado de sucesso guiar a interface agora.
-      if (!sucesso) setProcessando(false);
     }
   };
 
@@ -243,7 +244,10 @@ export function PaymentModal({
                         delay: 0.5,
                         ease: "easeOut",
                       }}
-                      style={{ translateZ: 0 }} // Força aceleração de hardware (GPU)
+                      style={{
+                        pathLength: 0, // Valor inicial explícito
+                        willChange: "path-length, opacity", // Dica para o navegador mobile
+                      }}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="3"
