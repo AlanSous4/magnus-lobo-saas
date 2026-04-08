@@ -64,11 +64,13 @@ export function PaymentModal({
     try {
       await onConfirm(pagamentos);
 
-      // Pequena pausa para o mobile processar a transição de estado de 'processando' para 'sucesso'
       setProcessando(false);
+
+      // Delay para o mobile processar a mudança de estado antes de animar
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       setSucesso(true);
 
-      // O tempo aqui deve ser o suficiente para ver a barra de progresso e o ícone
       setTimeout(() => {
         onClose();
       }, 4000);
@@ -79,141 +81,141 @@ export function PaymentModal({
     }
   };
 
-    return (
-      <AnimatePresence>
-        {isOpen && (
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-9999 backdrop-blur-sm"
+        >
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-9999 backdrop-blur-sm"
+            initial={{ scale: 0.9, y: 20, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+            className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-hidden relative"
           >
-            <motion.div
-              initial={{ scale: 0.9, y: 20, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.9, y: 20, opacity: 0 }}
-              className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-hidden relative"
-            >
-              {!sucesso ? (
-                <>
-                  <h2 className="text-2xl font-black mb-6 text-stone-800 italic uppercase">
-                    Pagamento
-                  </h2>
+            {!sucesso ? (
+              <>
+                <h2 className="text-2xl font-black mb-6 text-stone-800 italic uppercase">
+                  Pagamento
+                </h2>
 
-                  <div className="grid grid-cols-2 gap-2 mb-6">
-                    <div
-                      className={`p-3 rounded-xl text-center bg-stone-100 transition-all ${
-                        !(pagamentos.length > 0 && saldoRestante > 0.01) &&
-                        "col-span-2"
-                      }`}
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  <div
+                    className={`p-3 rounded-xl text-center bg-stone-100 transition-all ${
+                      !(pagamentos.length > 0 && saldoRestante > 0.01) &&
+                      "col-span-2"
+                    }`}
+                  >
+                    <span className="text-[10px] font-black uppercase text-stone-500 block mb-1">
+                      Total
+                    </span>
+                    <p className="text-xl font-black text-stone-800 font-mono italic">
+                      R$ {total.toFixed(2)}
+                    </p>
+                  </div>
+
+                  {pagamentos.length > 0 && saldoRestante > 0.01 && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center"
                     >
-                      <span className="text-[10px] font-black uppercase text-stone-500 block mb-1">
-                        Total
+                      <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">
+                        Falta
                       </span>
-                      <p className="text-xl font-black text-stone-800 font-mono italic">
-                        R$ {total.toFixed(2)}
+                      <p className="text-xl font-black text-orange-700 font-mono italic">
+                        R$ {saldoRestante.toFixed(2)}
                       </p>
-                    </div>
+                    </motion.div>
+                  )}
+                </div>
 
-                    {pagamentos.length > 0 && saldoRestante > 0.01 && (
-                      <motion.div
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center"
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {["pix", "crédito", "débito", "dinheiro", "va", "vr"].map(
+                    (m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMetodoSelecionado(m)}
+                        className={`cursor-pointer py-2 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${
+                          metodoSelecionado === m
+                            ? "border-orange-500 bg-orange-50 text-orange-700"
+                            : "border-stone-100 text-stone-400"
+                        }`}
                       >
-                        <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">
-                          Falta
+                        {m}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                <div className="flex gap-2 mb-6">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={valorInput}
+                    onChange={(e) => setValorInput(e.target.value)}
+                    className="flex-1 bg-stone-100 rounded-xl p-4 font-black text-lg focus:outline-orange-500"
+                    placeholder="0.00"
+                  />
+                  <button
+                    onClick={adicionarPagamento}
+                    className="bg-stone-800 text-white px-6 rounded-xl font-black text-[10px] uppercase hover:bg-black active:scale-95 cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div className="space-y-2 mb-6 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                  <AnimatePresence mode="popLayout">
+                    {pagamentos.map((p, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        layout
+                        className="flex justify-between items-center bg-stone-50 p-3 rounded-xl border border-stone-100"
+                      >
+                        <span className="font-black text-stone-500 uppercase text-[10px]">
+                          {p.metodo}
                         </span>
-                        <p className="text-xl font-black text-orange-700 font-mono italic">
-                          R$ {saldoRestante.toFixed(2)}
-                        </p>
-                      </motion.div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    {["pix", "crédito", "débito", "dinheiro", "va", "vr"].map(
-                      (m) => (
-                        <button
-                          key={m}
-                          onClick={() => setMetodoSelecionado(m)}
-                          className={`cursor-pointer py-2 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${
-                            metodoSelecionado === m
-                              ? "border-orange-500 bg-orange-50 text-orange-700"
-                              : "border-stone-100 text-stone-400"
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      )
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 mb-6">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={valorInput}
-                      onChange={(e) => setValorInput(e.target.value)}
-                      className="flex-1 bg-stone-100 rounded-xl p-4 font-black text-lg focus:outline-orange-500"
-                      placeholder="0.00"
-                    />
-                    <button
-                      onClick={adicionarPagamento}
-                      className="bg-stone-800 text-white px-6 rounded-xl font-black text-[10px] uppercase hover:bg-black active:scale-95 cursor-pointer"
-                    >
-                      Add
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 mb-6 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
-                    <AnimatePresence mode="popLayout">
-                      {pagamentos.map((p, idx) => (
-                        <motion.div
-                          key={idx}
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          layout
-                          className="flex justify-between items-center bg-stone-50 p-3 rounded-xl border border-stone-100"
-                        >
-                          <span className="font-black text-stone-500 uppercase text-[10px]">
-                            {p.metodo}
+                        <div className="flex items-center gap-3">
+                          <span className="font-black text-stone-800 text-sm">
+                            R$ {p.valor.toFixed(2)}
                           </span>
-                          <div className="flex items-center gap-3">
-                            <span className="font-black text-stone-800 text-sm">
-                              R$ {p.valor.toFixed(2)}
-                            </span>
-                            <button
-                              onClick={() => removerPagamento(idx)}
-                              className="text-red-500 font-bold hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
+                          <button
+                            onClick={() => removerPagamento(idx)}
+                            className="text-red-500 font-bold hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
 
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={finalizar}
-                      disabled={saldoRestante > 0.01 || processando || total <= 0}
-                      className="cursor-pointer w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                      {processando ? "FINALIZANDO..." : "CONCLUIR VENDA"}
-                    </button>
-                    <button
-                      onClick={onClose}
-                      className="text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 cursor-pointer"
-                    >
-                      Voltar
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <motion.div
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={finalizar}
+                    disabled={saldoRestante > 0.01 || processando || total <= 0}
+                    className="cursor-pointer w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    {processando ? "FINALIZANDO..." : "CONCLUIR VENDA"}
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="py-12 flex flex-col items-center justify-center text-center"
@@ -243,10 +245,6 @@ export function PaymentModal({
                         duration: 0.8,
                         delay: 0.5,
                         ease: "easeOut",
-                      }}
-                      style={{
-                        pathLength: 0, // Valor inicial explícito
-                        willChange: "path-length, opacity", // Dica para o navegador mobile
                       }}
                       strokeLinecap="round"
                       strokeLinejoin="round"
