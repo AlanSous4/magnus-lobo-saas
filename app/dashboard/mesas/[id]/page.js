@@ -23,11 +23,19 @@ export default function DetalheMesaPage() {
   const [valorInput, setValorInput] = useState("");
   const [sucesso, setSucesso] = useState(false);
 
+  // Estados para controle de peso
+  const [isModalPesoAberto, setIsModalPesoAberto] = useState(false);
+  const [produtoSelecionado, setProdutoSelecionado] = useState(null);
+  const [pesoDigitado, setPesoDigitado] = useState("");
+
   // --- LÓGICA DE CÁLCULOS ---
-  const totalGeral = itensPedido.reduce(
-    (acc, i) => acc + Number(i.preco_unitario) * (Number(i.quantidade) || 1),
-    0
-  );
+  const totalGeral = itensPedido.reduce((acc, i) => {
+    const preco = Number(i.preco_unitario);
+    const qtd = Number(i.quantidade);
+  
+    const valorLinha = i.is_weight ? (qtd / 0.1) * preco : qtd * preco;
+    return acc + valorLinha;
+  }, 0);
   const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
   const saldoRestante = Math.max(0, totalGeral - totalPago);
 
@@ -129,37 +137,62 @@ export default function DetalheMesaPage() {
   }, [isModalAberto, saldoRestante]);
 
   const adicionarPagamento = () => {
-    const valor = parseFloat(valorInput.toString().replace(",", "."));
+    // 1. Limpeza total: Garante que apenas números e ponto/vírgula existam
+    // Substitui vírgula por ponto e remove tudo que não for número ou ponto
+    const valorInputClean = valorInput
+      .toString()
+      .replace(",", ".")
+      .replace(/[^0-9.]/g, "");
 
-    if (isNaN(valor) || valor <= 0) {
+    // 2. Transforma em centavos (Tratando o float com Math.round para evitar 0.3000000004)
+    const valorEmCentavos = Math.round(parseFloat(valorInputClean) * 100);
+
+    // 3. O saldo restante deve ser calculado baseando-se no estado atual da lista
+    // Isso evita que o saldo fique "desincronizado" se houver cliques rápidos
+    const totalJaPago = pagamentos.reduce(
+      (acc, p) => acc + Math.round(p.valor * 100),
+      0
+    );
+    const saldoRestanteEmCentavos = Math.round(totalGeral * 100) - totalJaPago;
+
+    if (isNaN(valorEmCentavos) || valorEmCentavos <= 0) {
       alert("Digite um valor válido.");
       return;
     }
 
-    if (valor > saldoRestante + 0.01) {
+    // Margem de erro de 1 centavo para comparação
+    if (valorEmCentavos > saldoRestanteEmCentavos + 1) {
       alert("O valor digitado é maior que o saldo restante.");
       return;
     }
 
-    const novosPagamentos = [
-      ...pagamentos,
-      { metodo: metodoSelecionado, valor },
-    ];
+    // 4. Adiciona o pagamento
+    const novoPagamento = {
+      metodo: metodoSelecionado,
+      valor: valorEmCentavos / 100,
+    };
+
+    const novosPagamentos = [...pagamentos, novoPagamento];
     setPagamentos(novosPagamentos);
 
-    // Calcula o novo saldo imediatamente para atualizar o input
-    const novoTotalPago = novosPagamentos.reduce((acc, p) => acc + p.valor, 0);
-    const novoSaldo = Math.max(0, totalGeral - novoTotalPago);
+    // 5. Calcula o novo saldo restante real baseado na soma final
+    const novoTotalPago = totalJaPago + valorEmCentavos;
+    const saldoFinalEmCentavos = Math.max(
+      0,
+      Math.round(totalGeral * 100) - novoTotalPago
+    );
 
-    setValorInput(novoSaldo > 0 ? novoSaldo.toFixed(2) : "");
+    // Atualiza o input
+    setValorInput(
+      saldoFinalEmCentavos > 0 ? (saldoFinalEmCentavos / 100).toFixed(2) : ""
+    );
   };
 
   const removerPagamento = (index) => {
     setPagamentos(pagamentos.filter((_, i) => i !== index));
   };
 
-  // 2. ADICIONAR ITEM
-  const adicionarItem = async (produto) => {
+  const adicionarItem = async (produto, quantidadeInformada = 1) => {
     try {
       const { data: pedidoExistente } = await supabase
         .from("pedidos_mesa")
@@ -191,24 +224,36 @@ export default function DetalheMesaPage() {
         setMesa((prev) => ({ ...prev, status: "ocupada" }));
       }
 
-      const { data: novoItem, error: erroI } = await supabase
+      // --- AJUSTE AQUI ---
+      // Se for produto de peso, tratamos quantidadeInformada como o valor real (decimal)
+      // Se for unitário, garantimos que seja um número inteiro
+      const qtdFinal = produto.is_weight
+        ? parseFloat(quantidadeInformada)
+        : Math.round(quantidadeInformada);
+
+        const { data: novoItem, error: erroI } = await supabase
         .from("itens_pedido_mesa")
         .insert([
           {
             pedido_id: pedidoId,
             produto_id: produto.id,
             organization_id: ORG_ID,
-            quantidade: 1,
+            quantidade: qtdFinal,
             preco_unitario: Number(produto.value) || 0,
             nome_produto: produto.name || produto.nome || "Produto",
+            is_weight: produto.is_weight || false, // ← ADICIONE ISSO
           },
         ])
         .select()
         .single();
+      
 
       if (erroI) throw erroI;
+
+      // Atualiza o estado local incluindo o produto (o 'novoItem' agora terá o peso correto)
       setItensPedido((prev) => [...prev, novoItem]);
     } catch (err) {
+      console.error("Erro detalhado:", err);
       alert("Erro ao adicionar item.");
     }
   };
@@ -244,29 +289,31 @@ export default function DetalheMesaPage() {
     }
   };
 
-  
   const finalizarPedido = async () => {
     if (itensPedido.length === 0) return;
 
     setProcessandoPagamento(true);
     try {
       const pedidoId = itensPedido[0]?.pedido_id;
-      
+
       // Transforma a lista de pagamentos (Ex: ["PIX", "DINHEIRO"]) em uma string única
       const stringMetodos = pagamentos
         .map((p) => p.metodo.toUpperCase())
         .join(", ");
 
       // --- AQUI ESTÁ A MUDANÇA PRINCIPAL ---
-      // Chamamos a função SQL (RPC) que faz 4 coisas: 
+      // Chamamos a função SQL (RPC) que faz 4 coisas:
       // 1. Cria Venda | 2. Baixa Estoque | 3. Fecha Pedido | 4. Libera Mesa
-      const { error: rpcError } = await supabase.rpc('finalizar_fechamento_mesa', {
-        p_pedido_id: pedidoId,
-        p_mesa_id: id,         // 'id' vem do useParams() da sua rota
-        p_org_id: ORG_ID,      // Sua constante de Organização
-        p_total_venda: totalGeral,
-        p_metodos_pagamento: stringMetodos
-      });
+      const { error: rpcError } = await supabase.rpc(
+        "finalizar_fechamento_mesa",
+        {
+          p_pedido_id: pedidoId,
+          p_mesa_id: id, // 'id' vem do useParams() da sua rota
+          p_org_id: ORG_ID, // Sua constante de Organização
+          p_total_venda: totalGeral,
+          p_metodos_pagamento: stringMetodos,
+        }
+      );
 
       if (rpcError) throw rpcError;
 
@@ -277,7 +324,6 @@ export default function DetalheMesaPage() {
       setTimeout(() => {
         router.push("/dashboard/mesas");
       }, 2000);
-
     } catch (err) {
       console.error("Erro ao finalizar conta:", err);
       alert(`Erro técnico: ${err.message || "Verifique o console"}`);
@@ -333,21 +379,33 @@ export default function DetalheMesaPage() {
           <div className="grid grid-cols-1 gap-2 overflow-y-auto max-h-[60vh] pr-1">
             {/* --- MUDANÇA AQUI: de 'produtos.map' para 'produtosFiltrados.map' --- */}
             {produtosFiltrados.map((prod) => (
-              <button
+              <div
                 key={prod.id}
-                onClick={() => adicionarItem(prod)}
-                className="cursor-pointer flex justify-between items-center p-4 bg-white border border-stone-100 rounded-xl hover:border-orange-400 transition-all active:scale-95 shadow-sm"
+                className="flex flex-col gap-2 p-2 bg-white border border-stone-100 rounded-xl hover:border-orange-400 transition-all shadow-sm"
               >
-                <span className="font-bold text-stone-700">
-                  {prod.name || prod.nome}
-                </span>
-                <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg font-bold text-sm">
-                  R$ {Number(prod.value).toFixed(2)}
-                </span>
-              </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (prod.is_weight) {
+                        setProdutoSelecionado(prod);
+                        setIsModalPesoAberto(true);
+                      } else {
+                        adicionarItem(prod, 1);
+                      }
+                    }}
+                    className="flex-1 flex justify-between items-center p-2 cursor-pointer"
+                  >
+                    <span className="font-bold text-stone-700">
+                      {prod.name || prod.nome}
+                    </span>
+                    <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-lg font-bold text-sm">
+                      R$ {Number(prod.value).toFixed(2)}
+                    </span>
+                  </button>
+                </div>
+              </div>
             ))}
 
-            {/* Feedback caso não encontre nada */}
             {produtosFiltrados.length === 0 && (
               <p className="text-center text-stone-400 text-sm py-4">
                 Nenhum produto encontrado.
@@ -373,7 +431,15 @@ export default function DetalheMesaPage() {
               Object.values(
                 itensPedido.reduce((acc, item) => {
                   const key = item.produto_id;
-                  if (!acc[key]) acc[key] = { ...item, ids: [] };
+                  if (!acc[key]) {
+                    acc[key] = {
+                      ...item,
+                      quantidade_total: 0,
+                      ids: [], // Guardamos os IDs para permitir a remoção individual
+                    };
+                  }
+                  // Soma a quantidade real (seja 1.000 ou 0.087)
+                  acc[key].quantidade_total += Number(item.quantidade);
                   acc[key].ids.push(item.id);
                   return acc;
                 }, {})
@@ -387,19 +453,27 @@ export default function DetalheMesaPage() {
                       {agrupado.nome_produto}
                     </span>
                     <span className="text-xs font-bold text-stone-400">
-                      {agrupado.ids.length}x de R${" "}
-                      {Number(agrupado.preco_unitario).toFixed(2)}
+                      {agrupado.quantidade_total.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 3,
+                      })}{" "}
+                      x R$ {Number(agrupado.preco_unitario).toFixed(2)}
+                      {agrupado.is_weight ? " (por 100g)" : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="font-black text-stone-900">
                       R${" "}
-                      {(
-                        agrupado.ids.length * Number(agrupado.preco_unitario)
+                      {(agrupado.is_weight
+                        ? (agrupado.quantidade_total / 0.1) *
+                          Number(agrupado.preco_unitario)
+                        : agrupado.quantidade_total *
+                          Number(agrupado.preco_unitario)
                       ).toFixed(2)}
                     </span>
                     <button
-                      onClick={() => removerItem(agrupado.ids[0])}
+                      onClick={() =>
+                        removerItem(agrupado.ids[agrupado.ids.length - 1])
+                      }
                       className="text-red-400 hover:text-red-600 p-1 cursor-pointer transition-colors rounded-full"
                     >
                       ✕
@@ -427,6 +501,48 @@ export default function DetalheMesaPage() {
         </section>
       </div>
 
+      {/* Modal de Input de Peso */}
+      {isModalPesoAberto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl">
+            <h3 className="font-black text-lg mb-4 uppercase">
+              Peso: {produtoSelecionado?.name}
+            </h3>
+            <input
+              type="number"
+              step="0.001"
+              value={pesoDigitado}
+              onChange={(e) => setPesoDigitado(e.target.value)}
+              className="w-full p-4 text-2xl font-black border-2 border-orange-400 rounded-xl mb-4 text-center"
+              placeholder="0.000"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsModalPesoAberto(false)}
+                className="flex-1 py-3 rounded-xl font-bold bg-stone-100"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const peso = parseFloat(pesoDigitado.replace(",", "."));
+                  if (peso > 0) {
+                    adicionarItem(produtoSelecionado, peso);
+                    setIsModalPesoAberto(false);
+                    setPesoDigitado("");
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl font-bold bg-green-600 text-white"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pagamento com Animações */}
       {/* Modal Pagamento com Animações */}
       <AnimatePresence>
         {isModalAberto && (
@@ -463,7 +579,6 @@ export default function DetalheMesaPage() {
                       </p>
                     </div>
 
-                    {/* Campo Falta: Aparece apenas se houver saldo restante e já houver algum pagamento iniciado */}
                     {pagamentos.length > 0 && saldoRestante > 0.01 && (
                       <motion.div
                         initial={{ opacity: 0, x: -10 }}
@@ -574,7 +689,6 @@ export default function DetalheMesaPage() {
                   </div>
                 </>
               ) : (
-                /* TELA DE SUCESSO ANIMADA PROFISSIONAL */
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -614,7 +728,6 @@ export default function DetalheMesaPage() {
                   <p className="text-stone-400 font-bold text-sm mt-2 uppercase tracking-tighter">
                     Mesa {mesa?.numero_mesa} Liberada
                   </p>
-
                   <div className="w-full h-1 bg-stone-100 mt-8 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
