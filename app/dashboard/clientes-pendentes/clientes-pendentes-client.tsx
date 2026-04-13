@@ -291,6 +291,40 @@ export default function ClientesPendentesClient() {
         throw new Error(`Erro nos itens da venda: ${itemsErr.message}`);
       }
 
+            // 4. BAIXA NO ESTOQUE
+for (const item of itens) {
+  if (!item.product_id) {
+    console.log("Item sem product_id, pulando:", item.product_name);
+    continue;
+  }
+
+  const { data: prod, error: fetchErr } = await supabase
+    .from("products")
+    .select("quantity")
+    .eq("id", item.product_id)
+    .maybeSingle();
+
+  console.log("Produto encontrado:", item.product_name, prod, "Erro:", fetchErr);
+
+  if (prod) {
+    const novaQtd = Number(prod.quantity) - Number(item.quantity);
+    console.log(`Estoque atual: ${prod.quantity}, Vendido: ${item.quantity}, Novo: ${novaQtd}`);
+    
+    const { error: updateErr } = await supabase
+      .from("products")
+      .update({ quantity: novaQtd })
+      .eq("id", item.product_id);
+
+    if (updateErr) {
+      console.error("❌ ERRO ao dar baixa no estoque:", updateErr);
+    } else {
+      console.log("✅ Estoque atualizado:", item.product_name);
+    }
+  }
+}
+
+      
+
       // 4. PERSISTÊNCIA E FINALIZAÇÃO
       const agora = Date.now();
       setPendenciasTemporarias((prev) => {
