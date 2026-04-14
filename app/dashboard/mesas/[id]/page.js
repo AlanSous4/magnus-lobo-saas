@@ -4,8 +4,6 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 
-const ORG_ID = "5e391366-d0a5-46fb-8311-f5e86833219d";
-
 export default function DetalheMesaPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -16,6 +14,7 @@ export default function DetalheMesaPage() {
   const [busca, setBusca] = useState("");
   const [itensPedido, setItensPedido] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [orgId, setOrgId] = useState(null); // <-- NOVO ESTADO PARA A ORGANIZAÇÃO
   const [isModalAberto, setIsModalAberto] = useState(false);
   const [processandoPagamento, setProcessandoPagamento] = useState(false);
   const [pagamentos, setPagamentos] = useState([]);
@@ -32,7 +31,7 @@ export default function DetalheMesaPage() {
   const totalGeral = itensPedido.reduce((acc, i) => {
     const preco = Number(i.preco_unitario);
     const qtd = Number(i.quantidade);
-  
+
     const valorLinha = i.is_weight ? (qtd / 0.1) * preco : qtd * preco;
     return acc + valorLinha;
   }, 0);
@@ -46,18 +45,45 @@ export default function DetalheMesaPage() {
       setLoading(true);
 
       try {
-        // Busca dados básicos da mesa
+        // A. BUSCAR O USUÁRIO LOGADO
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+
+        // B. BUSCAR O PROFILE PARA PEGAR O ORGANIZATION_ID
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .single();
+
+        if (!profile?.organization_id) {
+          console.error("Usuário sem organização vinculada");
+          return;
+        }
+
+        const currentOrgId = profile.organization_id;
+        console.log("DEBUG - ID da Org do Perfil:", currentOrgId);
+        setOrgId(currentOrgId); // Salva no estado para usar depois
+
+        // C. BUSCA DADOS DA MESA (Filtrando por Org)
         const { data: mesaData } = await supabase
           .from("mesas")
           .select("*")
           .eq("id", id)
+          .eq("organization_id", currentOrgId) // Segurança extra
           .single();
 
-        // Busca pedido ativo E seus itens em uma única consulta
+        // D. BUSCA PEDIDO ATIVO
         const { data: pedidoAtivo } = await supabase
           .from("pedidos_mesa")
           .select("id, itens_pedido_mesa (*)")
           .eq("mesa_id", id)
+          .eq("organization_id", currentOrgId)
           .eq("status_pagamento", "pendente")
           .maybeSingle();
 
@@ -102,14 +128,17 @@ export default function DetalheMesaPage() {
 
         setMesa({ ...mesaData, status: statusFinal });
 
-        // 2. BUSCA O CARDÁPIO JÁ ORDENADO POR NOME
+        // E. BUSCA O CARDÁPIO DA ORGANIZAÇÃO DO USUÁRIO
         const { data: produtosData } = await supabase
           .from("products")
           .select("*")
-          .eq("organization_id", ORG_ID)
-          .order("name", { ascending: true }); // <--- ADICIONADO ORDENAÇÃO
+          .eq("organization_id", currentOrgId) // <-- DINÂMICO AGORA
+          .eq("active", true)
+          .is("deleted_at", null)
+          .order("name", { ascending: true });
 
         setProdutos(produtosData || []);
+        setMesa(mesaData);
       } catch (err) {
         console.error("Erro ao carregar dados:", err);
       } finally {
@@ -193,68 +222,80 @@ export default function DetalheMesaPage() {
   };
 
   const adicionarItem = async (produto, quantidadeInformada = 1) => {
+    // 1. Verificação de segurança: não prosseguir sem o ID da organização
+    if (!orgId) {
+      console.warn("Aguardando carregamento da organização...");
+      return;
+    }
+  
     try {
-      const { data: pedidoExistente } = await supabase
+      // 2. Buscar pedido existente incluindo o organization_id no filtro
+      const { data: pedidoExistente, error: erroBusca } = await supabase
         .from("pedidos_mesa")
         .select("id")
         .eq("mesa_id", id)
+        .eq("organization_id", orgId) // ✅ Adicionado para alinhar com RLS
         .eq("status_pagamento", "pendente")
         .maybeSingle();
-
+  
+      if (erroBusca) throw erroBusca;
+  
       let pedidoId = pedidoExistente?.id;
-
+  
+      // 3. Criar pedido se não existir
       if (!pedidoId) {
         const { data: novoPedido, error: erroP } = await supabase
           .from("pedidos_mesa")
           .insert([
             {
               mesa_id: id,
-              organization_id: ORG_ID,
+              organization_id: orgId,
               status_pagamento: "pendente",
               aberto_em: new Date().toISOString(),
             },
           ])
           .select()
           .single();
-
+  
         if (erroP) throw erroP;
         pedidoId = novoPedido.id;
-
+  
+        // Atualiza status da mesa
         await supabase.from("mesas").update({ status: "ocupada" }).eq("id", id);
         setMesa((prev) => ({ ...prev, status: "ocupada" }));
       }
-
-      // --- AJUSTE AQUI ---
-      // Se for produto de peso, tratamos quantidadeInformada como o valor real (decimal)
-      // Se for unitário, garantimos que seja um número inteiro
+  
+      // 4. Preparar quantidade
       const qtdFinal = produto.is_weight
         ? parseFloat(quantidadeInformada)
         : Math.round(quantidadeInformada);
-
-        const { data: novoItem, error: erroI } = await supabase
+  
+      // 5. Inserir o item
+      const { data: novoItem, error: erroI } = await supabase
         .from("itens_pedido_mesa")
         .insert([
           {
             pedido_id: pedidoId,
             produto_id: produto.id,
-            organization_id: ORG_ID,
+            organization_id: orgId,
             quantidade: qtdFinal,
             preco_unitario: Number(produto.value) || 0,
             nome_produto: produto.name || produto.nome || "Produto",
-            is_weight: produto.is_weight || false, // ← ADICIONE ISSO
+            is_weight: produto.is_weight || false,
           },
         ])
         .select()
         .single();
-      
-
+  
       if (erroI) throw erroI;
-
-      // Atualiza o estado local incluindo o produto (o 'novoItem' agora terá o peso correto)
+  
+      // 6. Atualizar estado local
       setItensPedido((prev) => [...prev, novoItem]);
+      
     } catch (err) {
-      console.error("Erro detalhado:", err);
-      alert("Erro ao adicionar item.");
+      // Importante: olhe o console do navegador para ver o erro real do Supabase
+      console.error("Erro detalhado ao adicionar item:", err);
+      alert(`Erro: ${err.message || "Não foi possível adicionar o item"}`);
     }
   };
 
@@ -309,7 +350,7 @@ export default function DetalheMesaPage() {
         {
           p_pedido_id: pedidoId,
           p_mesa_id: id, // 'id' vem do useParams() da sua rota
-          p_org_id: ORG_ID, // Sua constante de Organização
+          p_org_id: orgId,
           p_total_venda: totalGeral,
           p_metodos_pagamento: stringMetodos,
         }
@@ -385,6 +426,7 @@ export default function DetalheMesaPage() {
               >
                 <div className="flex items-center gap-2">
                   <button
+                    disabled={!orgId} // ✅ Evita erros de inserção sem ID
                     onClick={() => {
                       if (prod.is_weight) {
                         setProdutoSelecionado(prod);
@@ -393,7 +435,11 @@ export default function DetalheMesaPage() {
                         adicionarItem(prod, 1);
                       }
                     }}
-                    className="flex-1 flex justify-between items-center p-2 cursor-pointer"
+                    className={`flex-1 flex justify-between items-center p-2 ${
+                      !orgId
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer"
+                    }`}
                   >
                     <span className="font-bold text-stone-700">
                       {prod.name || prod.nome}

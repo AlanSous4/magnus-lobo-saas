@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
-import { supabase } from "@/lib/supabase/client"; // ✅ instância única
+import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 interface AddProductDialogProps {
@@ -40,12 +40,27 @@ export function AddProductDialog({ userId }: AddProductDialogProps) {
     setError(null);
 
     try {
+      // 1. BUSCAR A ORGANIZAÇÃO DO USUÁRIO PRIMEIRO
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", userId)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        throw new Error("Não foi possível localizar sua organização.");
+      }
+
+      // 2. INSERIR O PRODUTO COM O ORGANIZATION_ID
       const { error: insertError } = await supabase.from("products").insert({
         name: formData.name,
         value: Number.parseFloat(formData.value),
         quantity: Number.parseInt(formData.quantity),
         expiration_date: formData.expiration_date || null,
         user_id: userId,
+        organization_id: profile.organization_id, // ✅ AGORA O RLS VAI PERMITIR
+        active: true,
+        deleted_at: null,
       });
 
       if (insertError) throw insertError;

@@ -32,22 +32,22 @@ function isNearExpiration(expiresAt: string | null, days = 7) {
 export default async function ProductsPage() {
   const supabase = await createClient();
 
-  // 🔹 Verifica usuário logado
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  if (authError?.message?.includes("Refresh Token Not Found") || !user) {
-    redirect("/login");
-  }
+  // 1. PRIMEIRO: Busca o perfil para saber a organização atual do usuário
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
 
-  // 🔹 Buscar produtos do usuário (FILTRANDO APENAS OS ATIVOS)
+  // 2. SEGUNDO: Busca os produtos filtrando pela ORGANIZAÇÃO, não pelo usuário
   const { data: products } = await supabase
     .from("products")
     .select("*")
-    .eq("user_id", user.id)
-    .eq("active", true) // ✅ ESTA LINHA É A CHAVE: Remove os itens "deletados" da vista
+    .eq("organization_id", profile?.organization_id) // ✅ CORRETO: Filtra por empresa
+    .eq("active", true)
     .order("created_at", { ascending: false });
 
   const safeProducts = products || [];
