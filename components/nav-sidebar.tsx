@@ -146,6 +146,7 @@ export function NavSidebar() {
                 <Link
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
+                  prefetch={true} // 👈 Adicione esta linha aqui
                 >
                   <Icon className="mr-2 h-4 w-4" />
                   {item.title}

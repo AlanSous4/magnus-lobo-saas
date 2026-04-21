@@ -1,42 +1,53 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import type React from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-import { supabase } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ShoppingBag } from "lucide-react"
-
-// 1. Importando a versão do seu novo arquivo de configuração
-import { APP_VERSION } from "../config/version"
+import { supabase } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ShoppingBag } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
-      if (error) throw error
+      if (error) throw error;
 
-      await supabase.auth.refreshSession()
-      router.push("/dashboard")
+      if (data?.session) {
+        // Força o Next.js a atualizar as rotas com a nova sessão
+        router.refresh(); 
+        
+        // Pequeno delay para garantir que o cookie foi escrito antes de mudar de tela
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 100);
+      }
+    
     } catch (error: unknown) {
       setError(
         error instanceof Error
@@ -44,28 +55,34 @@ export default function LoginPage() {
             ? "Sua sessão expirou, faça login novamente."
             : error.message
           : "Erro ao fazer login"
-      )
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center p-6 bg-linear-to-br from-orange-50 to-amber-50">
-      <div className="w-full max-w-sm flex-1 flex flex-col items-center justify-center">
-        <div className="flex flex-col gap-6 w-full">
+    <div className="flex min-h-screen w-full items-center justify-center p-6 bg-linear-to-br from-orange-50 to-amber-50">
+      <div className="w-full max-w-sm">
+        <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-orange-500 to-amber-600">
               <ShoppingBag className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-balance">Padaria Magnus Lobo</h1>
-            <p className="text-sm text-muted-foreground">Sistema de Gestão e Vendas</p>
+            <h1 className="text-3xl font-bold tracking-tight text-balance">
+              Padaria Magnus Lobo
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Sistema de Gestão e Vendas
+            </p>
           </div>
 
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">Login</CardTitle>
-              <CardDescription>Digite seu e-mail e senha para acessar</CardDescription>
+              <CardDescription>
+                Digite seu e-mail e senha para acessar
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin}>
@@ -106,7 +123,9 @@ export default function LoginPage() {
                   </Button>
 
                   <div className="text-center text-sm">
-                    <span className="text-muted-foreground">Não tem uma conta? </span>
+                    <span className="text-muted-foreground">
+                      Não tem uma conta?{" "}
+                    </span>
                     <Link
                       href="/cadastrar"
                       className="font-semibold text-orange-600 hover:text-orange-700 underline-offset-4 hover:underline"
@@ -120,13 +139,6 @@ export default function LoginPage() {
           </Card>
         </div>
       </div>
-
-      {/* 2. O Rodapé com a versão implantado aqui */}
-      <footer className="mt-auto py-4 text-center">
-        <p className="text-[10px] text-stone-400 font-mono uppercase tracking-widest">
-          Padaria Magnus Lobo © 2026 | v{APP_VERSION}
-        </p>
-      </footer>
     </div>
-  )
+  );
 }

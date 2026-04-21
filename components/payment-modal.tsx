@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import { useState, useEffect } from "react";
 
 interface Payment {
@@ -13,7 +13,7 @@ interface PaymentModalProps {
   onClose: () => void;
   total: number;
   onConfirm: (pagamentos: Payment[]) => Promise<void>;
-  mesaInfo?: string; // Opcional: "Mesa 05", "Comanda 12", etc.
+  mesaInfo?: string;
 }
 
 export function PaymentModal({
@@ -32,11 +32,11 @@ export function PaymentModal({
   const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
   const saldoRestante = Math.max(0, total - totalPago);
 
-  // Resetar modal ao abrir
   useEffect(() => {
     if (isOpen) {
       setPagamentos([]);
       setSucesso(false);
+      setProcessando(false);
       setValorInput(total.toFixed(2));
     }
   }, [isOpen, total]);
@@ -56,22 +56,21 @@ export function PaymentModal({
     setValorInput((total - novoTotalPago).toFixed(2));
   };
 
-  // Dentro do PaymentModal (payment-modal.tsx)
   const finalizar = async () => {
     if (pagamentos.length === 0) return;
 
     setProcessando(true);
     try {
       await onConfirm(pagamentos);
-
       setProcessando(false);
 
-      // Delay para o mobile processar a mudança de estado antes de animar
+      // FIX: Pequeno delay para garantir que o React processe o estado antes da animação
       await new Promise((resolve) => setTimeout(resolve, 100));
-
       setSucesso(true);
 
+      // FIX: Fecha o modal após a animação de sucesso completar
       setTimeout(() => {
+        setSucesso(false);
         onClose();
       }, 4000);
     } catch (error) {
@@ -81,200 +80,248 @@ export function PaymentModal({
     }
   };
 
+  const backdropVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+    exit: { opacity: 0 },
+  };
+
+  const modalVariants: Variants = {
+    hidden: { scale: 0.9, y: 20, opacity: 0 },
+    visible: {
+      scale: 1,
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 25,
+      },
+    },
+    exit: {
+      scale: 0.9,
+      y: 20,
+      opacity: 0,
+      transition: {
+        duration: 0.2,
+        ease: "easeIn",
+      },
+    },
+  };
+
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-9999 backdrop-blur-sm"
+          key="payment-modal-backdrop"
+          variants={backdropVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[9999] backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !processando && !sucesso) {
+              onClose();
+            }
+          }}
         >
           <motion.div
-            initial={{ scale: 0.9, y: 20, opacity: 0 }}
-            animate={{ scale: 1, y: 0, opacity: 1 }}
-            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+            key="payment-modal-content"
+            variants={modalVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-hidden relative"
+            onClick={(e) => e.stopPropagation()}
           >
-            {!sucesso ? (
-              <>
-                <h2 className="text-2xl font-black mb-6 text-stone-800 italic uppercase">
-                  Pagamento
-                </h2>
+            <AnimatePresence mode="wait">
+              {!sucesso ? (
+                <motion.div
+                  key="payment-form"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <h2 className="text-2xl font-black mb-6 text-stone-800 italic uppercase">
+                    Pagamento
+                  </h2>
 
-                <div className="grid grid-cols-2 gap-2 mb-6">
-                  <div
-                    className={`p-3 rounded-xl text-center bg-stone-100 transition-all ${
-                      !(pagamentos.length > 0 && saldoRestante > 0.01) &&
-                      "col-span-2"
-                    }`}
-                  >
-                    <span className="text-[10px] font-black uppercase text-stone-500 block mb-1">
-                      Total
-                    </span>
-                    <p className="text-xl font-black text-stone-800 font-mono italic">
-                      R$ {total.toFixed(2)}
-                    </p>
+                  <div className="grid grid-cols-2 gap-2 mb-6">
+                    <div
+                      className={`p-3 rounded-xl text-center bg-stone-100 transition-all ${
+                        !(pagamentos.length > 0 && saldoRestante > 0.01) &&
+                        "col-span-2"
+                      }`}
+                    >
+                      <span className="text-[10px] font-black uppercase text-stone-500 block mb-1">
+                        Total
+                      </span>
+                      <p className="text-xl font-black text-stone-800 font-mono italic">
+                        R$ {total.toFixed(2)}
+                      </p>
+                    </div>
+
+                    {pagamentos.length > 0 && saldoRestante > 0.01 && (
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center"
+                      >
+                        <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">
+                          Falta
+                        </span>
+                        <p className="text-xl font-black text-orange-700 font-mono italic">
+                          R$ {saldoRestante.toFixed(2)}
+                        </p>
+                      </motion.div>
+                    )}
                   </div>
 
-                  {pagamentos.length > 0 && saldoRestante > 0.01 && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center"
-                    >
-                      <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">
-                        Falta
-                      </span>
-                      <p className="text-xl font-black text-orange-700 font-mono italic">
-                        R$ {saldoRestante.toFixed(2)}
-                      </p>
-                    </motion.div>
-                  )}
-                </div>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {["pix", "crédito", "débito", "dinheiro", "va", "vr"].map(
+                      (m) => (
+                        <button
+                          key={m}
+                          onClick={() => setMetodoSelecionado(m)}
+                          className={`cursor-pointer py-2 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${
+                            metodoSelecionado === m
+                              ? "border-orange-500 bg-orange-50 text-orange-700"
+                              : "border-stone-100 text-stone-400"
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      )
+                    )}
+                  </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {["pix", "crédito", "débito", "dinheiro", "va", "vr"].map(
-                    (m) => (
-                      <button
-                        key={m}
-                        onClick={() => setMetodoSelecionado(m)}
-                        className={`cursor-pointer py-2 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${
-                          metodoSelecionado === m
-                            ? "border-orange-500 bg-orange-50 text-orange-700"
-                            : "border-stone-100 text-stone-400"
-                        }`}
-                      >
-                        {m}
-                      </button>
-                    )
-                  )}
-                </div>
-
-                <div className="flex gap-2 mb-6">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={valorInput}
-                    onChange={(e) => setValorInput(e.target.value)}
-                    className="flex-1 bg-stone-100 rounded-xl p-4 font-black text-lg focus:outline-orange-500"
-                    placeholder="0.00"
-                  />
-                  <button
-                    onClick={adicionarPagamento}
-                    className="bg-stone-800 text-white px-6 rounded-xl font-black text-[10px] uppercase hover:bg-black active:scale-95 cursor-pointer"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                <div className="space-y-2 mb-6 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
-                  <AnimatePresence mode="popLayout">
-                    {pagamentos.map((p, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        layout
-                        className="flex justify-between items-center bg-stone-50 p-3 rounded-xl border border-stone-100"
-                      >
-                        <span className="font-black text-stone-500 uppercase text-[10px]">
-                          {p.metodo}
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span className="font-black text-stone-800 text-sm">
-                            R$ {p.valor.toFixed(2)}
-                          </span>
-                          <button
-                            onClick={() => removerPagamento(idx)}
-                            className="text-red-500 font-bold hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={finalizar}
-                    disabled={saldoRestante > 0.01 || processando || total <= 0}
-                    className="cursor-pointer w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    {processando ? "FINALIZANDO..." : "CONCLUIR VENDA"}
-                  </button>
-                  <button
-                    onClick={onClose}
-                    className="text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 cursor-pointer"
-                  >
-                    Voltar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="py-12 flex flex-col items-center justify-center text-center"
-              >
-                {/* Círculo Verde com animação de escala para garantir feedback no tablet */}
-                <motion.div
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 260,
-                    damping: 20,
-                    delay: 0.1,
-                  }}
-                  className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 shadow-inner"
-                >
-                  <svg
-                    className="w-12 h-12 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <motion.path
-                      initial={{ pathLength: 0, opacity: 0 }}
-                      animate={{ pathLength: 1, opacity: 1 }}
-                      transition={{
-                        duration: 0.8,
-                        delay: 0.5,
-                        ease: "easeOut",
-                      }}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="3"
-                      d="M5 13l4 4L19 7"
+                  <div className="flex gap-2 mb-6">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={valorInput}
+                      onChange={(e) => setValorInput(e.target.value)}
+                      className="flex-1 bg-stone-100 rounded-xl p-4 font-black text-lg focus:outline-orange-500"
+                      placeholder="0.00"
                     />
-                  </svg>
+                    <button
+                      onClick={adicionarPagamento}
+                      className="bg-stone-800 text-white px-6 rounded-xl font-black text-[10px] uppercase hover:bg-black active:scale-95 cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 mb-6 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                    <AnimatePresence mode="popLayout">
+                      {pagamentos.map((p, idx) => (
+                        <motion.div
+                          key={`pagamento-${idx}-${p.metodo}`}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          layout
+                          className="flex justify-between items-center bg-stone-50 p-3 rounded-xl border border-stone-100"
+                        >
+                          <span className="font-black text-stone-500 uppercase text-[10px]">
+                            {p.metodo}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="font-black text-stone-800 text-sm">
+                              R$ {p.valor.toFixed(2)}
+                            </span>
+                            <button
+                              onClick={() => removerPagamento(idx)}
+                              className="text-red-500 font-bold hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+                            >
+                              x
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={finalizar}
+                      disabled={saldoRestante > 0.01 || processando || total <= 0}
+                      className="cursor-pointer w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      {processando ? "FINALIZANDO..." : "CONCLUIR VENDA"}
+                    </button>
+                    <button
+                      onClick={onClose}
+                      disabled={processando || sucesso}
+                      className="text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 cursor-pointer disabled:opacity-50"
+                    >
+                      Voltar
+                    </button>
+                  </div>
                 </motion.div>
-
-                <h3 className="text-2xl font-black text-stone-800 uppercase italic">
-                  Venda Concluída!
-                </h3>
-
-                {mesaInfo && (
-                  <p className="text-stone-400 font-bold text-sm mt-2 uppercase tracking-tighter">
-                    {mesaInfo} Liberada
-                  </p>
-                )}
-
-                {/* Barra de progresso visual - indica quanto tempo falta para o modal fechar */}
-                <div className="w-full h-1 bg-stone-100 mt-8 rounded-full overflow-hidden">
+              ) : (
+                <motion.div
+                  key="payment-success"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="py-12 flex flex-col items-center justify-center text-center"
+                >
                   <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 3.5, ease: "linear" }} // Sincronizado com o novo tempo do setTimeout
-                    className="h-full bg-green-500"
-                  />
-                </div>
-              </motion.div>
-            )}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 260,
+                      damping: 20,
+                      delay: 0.1,
+                    }}
+                    className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 shadow-inner"
+                  >
+                    <svg
+                      className="w-12 h-12 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <motion.path
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{
+                          duration: 0.8,
+                          delay: 0.5,
+                          ease: "easeOut",
+                        }}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="3"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </motion.div>
+
+                  <h3 className="text-2xl font-black text-stone-800 uppercase italic">
+                    Venda Concluída!
+                  </h3>
+
+                  {mesaInfo && (
+                    <p className="text-stone-400 font-bold text-sm mt-2 uppercase tracking-tighter">
+                      {mesaInfo} Liberada
+                    </p>
+                  )}
+
+                  <div className="w-full h-1 bg-stone-100 mt-8 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 3.5, ease: "linear" }}
+                      className="h-full bg-green-500"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.div>
       )}

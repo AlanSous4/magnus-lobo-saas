@@ -4,18 +4,45 @@ import { cookies } from "next/headers"
 export async function createClient() {
   const cookieStore = await cookies()
 
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-        } catch {
-          // Ignored in Server Components
-        }
-      },
-    },
-  })
+  try {
+    return createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              )
+            } catch {
+              // Ignored in Server Components
+            }
+          },
+        },
+        // MELHORIA PARA MODO OFFLINE:
+        // Configura o fetch para falhar rapidamente se estiver sem rede
+        global: {
+          fetch: (url, options) => {
+            return fetch(url, {
+              ...options,
+              // Define um timeout curto de 2 segundos para não travar o app Magnus Lobo
+              signal: AbortSignal.timeout(2000), 
+            }).catch((err) => {
+              console.warn("Supabase Fetch: Falha de conexão (provável modo offline)");
+              throw err;
+            });
+          },
+        },
+      }
+    )
+  } catch (error) {
+    console.error("Erro ao inicializar cliente Supabase no servidor:", error);
+    // Retorna o cliente mesmo com erro para evitar o crash total, 
+    // permitindo que o Service Worker tente entregar a página.
+    throw error;
+  }
 }
