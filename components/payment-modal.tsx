@@ -13,7 +13,9 @@ interface PaymentModalProps {
   onClose: () => void;
   total: number;
   onConfirm: (pagamentos: Payment[]) => Promise<void>;
+  onPrint?: (pagamentos: Payment[], items: any[]) => void; // ✅ Adicionado 'items' aqui
   mesaInfo?: string;
+  items: any[]; // ✅ Nova prop para receber os itens do carrinho
 }
 
 export function PaymentModal({
@@ -21,13 +23,16 @@ export function PaymentModal({
   onClose,
   total,
   onConfirm,
+  onPrint,
   mesaInfo,
+  items,
 }: PaymentModalProps) {
   const [pagamentos, setPagamentos] = useState<Payment[]>([]);
   const [metodoSelecionado, setMetodoSelecionado] = useState("pix");
   const [valorInput, setValorInput] = useState("");
   const [processando, setProcessando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
+  const [itensParaRecibo, setItensParaRecibo] = useState<any[]>([]); // ✅ Estado para "congelar" os itens
 
   const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
   const saldoRestante = Math.max(0, total - totalPago);
@@ -38,8 +43,9 @@ export function PaymentModal({
       setSucesso(false);
       setProcessando(false);
       setValorInput(total.toFixed(2));
+      setItensParaRecibo([...items]);
     }
-  }, [isOpen, total]);
+  }, [isOpen]); // ← só dispara quando abre/fecha
 
   const adicionarPagamento = () => {
     const valor = parseFloat(valorInput);
@@ -63,16 +69,13 @@ export function PaymentModal({
     try {
       await onConfirm(pagamentos);
       setProcessando(false);
+      setSucesso(true); // ✅ Mostra sucesso imediatamente após gravar
 
-      // FIX: Pequeno delay para garantir que o React processe o estado antes da animação
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      setSucesso(true);
-
-      // FIX: Fecha o modal após a animação de sucesso completar
+      // ✅ Auto-fecha após 10s (tempo suficiente para ver animação + imprimir)
       setTimeout(() => {
         setSucesso(false);
         onClose();
-      }, 4000);
+      }, 10000);
     } catch (error) {
       alert("Erro ao salvar venda.");
       setProcessando(false);
@@ -247,7 +250,9 @@ export function PaymentModal({
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={finalizar}
-                      disabled={saldoRestante > 0.01 || processando || total <= 0}
+                      disabled={
+                        saldoRestante > 0.01 || processando || total <= 0
+                      }
                       className="cursor-pointer w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg disabled:opacity-20 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                       {processando ? "FINALIZANDO..." : "CONCLUIR VENDA"}
@@ -305,6 +310,22 @@ export function PaymentModal({
                     Venda Concluída!
                   </h3>
 
+                  {/* ✅ NOVO BOTÃO DE IMPRESSÃO INTELIGENTE */}
+                  {onPrint && (
+                    <button
+                      onClick={() => onPrint?.(pagamentos, itensParaRecibo)} // ✅ Envia os itens congelados
+                      className="mt-6 w-full bg-stone-800 text-white py-4 rounded-xl font-black text-xs uppercase hover:bg-black active:scale-95 transition-all flex flex-col items-center justify-center gap-1"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>🖨️</span>
+                        <span>Imprimir Cupom</span>
+                      </div>
+                      <span className="text-[8px] opacity-50 font-normal italic">
+                        Detecção automática: USB / Bluetooth
+                      </span>
+                    </button>
+                  )}
+
                   {mesaInfo && (
                     <p className="text-stone-400 font-bold text-sm mt-2 uppercase tracking-tighter">
                       {mesaInfo} Liberada
@@ -315,7 +336,7 @@ export function PaymentModal({
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: "100%" }}
-                      transition={{ duration: 3.5, ease: "linear" }}
+                      transition={{ duration: 10, ease: "linear" }} // ✅ Mesmo tempo do setTimeout
                       className="h-full bg-green-500"
                     />
                   </div>

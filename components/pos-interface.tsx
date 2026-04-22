@@ -1,5 +1,6 @@
 "use client";
 
+import EscPosEncoder from "esc-pos-encoder";
 import { AnimatePresence } from "framer-motion"; // Certifique-se de importar
 import { PaymentModal } from "@/components/payment-modal";
 import { useState, useEffect } from "react";
@@ -141,7 +142,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
               .map((p) => `${p.metodo} (R$ ${p.valor.toFixed(2)})`)
               .join(" + ")
           : pagamentos[0].metodo;
-
+  
       const { data: sale, error } = await supabase
         .from("sales")
         .insert({
@@ -153,9 +154,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         })
         .select()
         .single();
-
+  
       if (error || !sale) throw new Error(error?.message);
-
+  
       for (const item of cart) {
         const isWeight = isWeightProduct(item.id);
         const quantityToSave = isWeight
@@ -164,7 +165,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         const subtotal = isWeight
           ? (item.value / 100) * item.cartQuantity
           : item.value * item.cartQuantity;
-
+  
         await supabase.from("sale_items").insert({
           sale_id: sale.id,
           product_id: item.id,
@@ -173,7 +174,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           subtotal,
           is_weight: isWeight,
         });
-
+  
         await supabase
           .from("products")
           .update({
@@ -182,22 +183,149 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           })
           .eq("id", item.id);
       }
-
-      // 1. Aguarda 2 segundos com a venda já gravada no banco
-      // Esse tempo é o que permite ao usuário ver a animação de "Sucesso" no modal
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // 2. Agora sim, limpa o carrinho
-      setCart([]);
-      // 4. Atualiza os dados da página (estoque, etc) apenas uma vez
-      router.refresh();
-      // Retornamos uma Promise resolvida para o Modal saber que acabou
+  
+      // ✅ NÃO limpa o carrinho aqui — será limpo no onClose
       return Promise.resolve();
     } catch (err) {
       console.error("Erro na venda:", err);
       throw err;
     }
   };
+  
+
+  const imprimirCupomSmart = async (pagamentos?: any[], itensRecentes?: CartItem[]) => {
+    const itensParaImprimir = itensRecentes && itensRecentes.length > 0 ? itensRecentes : cart;
+  
+    // ===== CUPOM FORMATADO NO CONSOLE =====
+    const L = '--------------------------------------------';
+  
+    const totalVenda = itensParaImprimir.reduce((sum, item) => {
+      const isWeight = item.is_weight;
+      return sum + (isWeight ? (item.value / 100) * item.cartQuantity : item.value * item.cartQuantity);
+    }, 0);
+  
+    let c = '';
+    c += 'Padaria Lanchonete Magnus Lobo\n';
+    c += 'Rua Trese de Maio, 01 – Cantinho do Céu/SP\n';
+    c += L + '\n';
+    c += 'CUPOM NÃO FISCAL\n';
+    c += L + '\n';
+    // Cabeçalho colunas
+    c += 'ITEM  DESCRIÇÃO           QTD   VL UNIT   VL TOTAL\n';
+  
+    itensParaImprimir.forEach((item, i) => {
+      const isWeight = item.is_weight;
+      const num = String(i + 1).padStart(3, '0');
+      const nome = item.name.substring(0, 18).padEnd(20);
+      const qtd = isWeight
+        ? (item.cartQuantity / 1000).toFixed(3).padStart(4)
+        : String(item.cartQuantity).padStart(4);
+      const vlUnit = item.value.toFixed(2).replace('.', ',').padStart(7);
+      const sub = (isWeight
+        ? (item.value / 100) * item.cartQuantity
+        : item.value * item.cartQuantity
+      ).toFixed(2).replace('.', ',').padStart(9);
+  
+      c += `${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}\n`;
+    });
+  
+    c += L + '\n';
+    c += '\n';
+    c += `Subtotal:                          ${totalVenda.toFixed(2).replace('.', ',').padStart(9)}\n`;
+    c += `Desconto:                          ${'0,00'.padStart(9)}\n`;
+    c += `Total:                             ${totalVenda.toFixed(2).replace('.', ',').padStart(9)}\n`;
+    c += L + '\n';
+  
+    if (pagamentos && pagamentos.length > 0) {
+      c += '\n';
+      pagamentos.forEach(p => {
+        c += `Forma de Pagamento: ${p.metodo.charAt(0).toUpperCase() + p.metodo.slice(1)}\n`;
+      });
+      c += L + '\n';
+    }
+  
+    const agora = new Date();
+    const dataHora = agora.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    c += `Data/Hora: ${dataHora}\n`;
+    c += L + '\n';
+    c += '\n';
+    c += '*** ESTE DOCUMENTO NÃO TEM VALOR FISCAL ***\n';
+    c += 'Obrigado pela preferência!\n';
+  
+    console.log('\n' + c);
+    // ===== FIM CUPOM CONSOLE =====
+  
+    // ===== IMPRESSÃO ESC/POS =====
+    const encoder = new EscPosEncoder();
+    let result = encoder.initialize().align('center')
+      .line('Padaria Magnus Lobo')
+      .line('Rua Treze de Maio, 01 - Cantinho do Céu/SP')
+      .line(L)
+      .line('CUPOM NAO FISCAL')
+      .line(L)
+      .align('left');
+  
+    itensParaImprimir.forEach((item, i) => {
+      const isWeight = item.is_weight;
+      const num = String(i + 1).padStart(3, '0');
+      const nome = item.name.substring(0, 18).padEnd(20);
+      const qtd = isWeight
+        ? (item.cartQuantity / 1000).toFixed(3).padStart(4)
+        : String(item.cartQuantity).padStart(4);
+      const vlUnit = item.value.toFixed(2).padStart(7);
+      const sub = (isWeight
+        ? (item.value / 100) * item.cartQuantity
+        : item.value * item.cartQuantity
+      ).toFixed(2).padStart(9);
+  
+      result.text(`${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}`).newline();
+    });
+  
+    result.line(L);
+    result.align('right')
+      .line(`TOTAL: R$ ${totalVenda.toFixed(2)}`)
+      .align('left');
+  
+    if (pagamentos && pagamentos.length > 0) {
+      result.newline().line('PAGAMENTO:');
+      pagamentos.forEach(p => {
+        result.line(`${p.metodo.toUpperCase()}: R$ ${p.valor.toFixed(2)}`);
+      });
+    }
+  
+    result.newline()
+      .align('center')
+      .line('*** NAO TEM VALOR FISCAL ***')
+      .line('Obrigado pela preferencia!')
+      .newline().cut();
+  
+    const data = result.encode();
+  
+    try {
+      const devices = await (navigator as any).bluetooth.getDevices();
+      let targetDevice = devices[0] || await (navigator as any).bluetooth.requestDevice({
+        filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+        optionalServices: ['00001101-0000-1000-8000-00805f9b34fb']
+      });
+      const server = await targetDevice.gatt.connect();
+      const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+      const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+      await characteristic.writeValue(data);
+    } catch (e) {
+      try {
+        const ports = await (navigator as any).serial.getPorts();
+        const port = ports[0] || await (navigator as any).serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        const writer = port.writable.getWriter();
+        await writer.write(data);
+        writer.releaseLock();
+        await port.close();
+      } catch (err) {
+        console.warn("Impressora não encontrada. Cupom exibido apenas no console.");
+      }
+    }
+  };
+  
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-hidden pt-[env(safe-area-inset-top)]">
@@ -361,7 +489,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
           <Button
             className="w-full h-12 text-lg cursor-pointer"
-            onClick={() => setShowPayment(true)} // ✅ Deve estar apenas abrindo o modal
+            onClick={() => {
+              console.log("Carrinho ao abrir o modal:", cart); // ✅ TESTE DE LOG
+              setShowPayment(true);
+            }}
             disabled={cart.length === 0}
           >
             <DollarSign className="mr-2 h-5 w-5" />
@@ -372,13 +503,20 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
       <AnimatePresence mode="wait">
         {showPayment && (
-          <PaymentModal
-            isOpen={showPayment}
-            onClose={() => setShowPayment(false)}
-            total={total}
-            onConfirm={finalizarVendaNoBanco}
-            mesaInfo="Venda Balcão"
-          />
+         <PaymentModal
+         isOpen={showPayment}
+         onClose={() => {
+           setShowPayment(false);
+           setCart([]);          // ✅ Limpa o carrinho só quando o modal fecha
+           router.refresh();
+         }}
+         total={total}
+         onConfirm={finalizarVendaNoBanco}
+         onPrint={(pagamentosDoModal, itensDoModal) => imprimirCupomSmart(pagamentosDoModal, itensDoModal)}
+         items={[...cart]}
+         mesaInfo="Venda Balcão"
+       />
+       
         )}
       </AnimatePresence>
     </div>
