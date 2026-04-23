@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface Payment {
   metodo: string;
@@ -32,7 +32,10 @@ export function PaymentModal({
   const [valorInput, setValorInput] = useState("");
   const [processando, setProcessando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
-  const [itensParaRecibo, setItensParaRecibo] = useState<any[]>([]); // ✅ Estado para "congelar" os itens
+  const [itensParaRecibo, setItensParaRecibo] = useState<any[]>([]);
+
+  // ✅ Ref para controlar o timeout de auto-fechamento
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
   const saldoRestante = Math.max(0, total - totalPago);
@@ -45,7 +48,31 @@ export function PaymentModal({
       setValorInput(total.toFixed(2));
       setItensParaRecibo([...items]);
     }
-  }, [isOpen]); // ← só dispara quando abre/fecha
+
+    // ✅ CRÍTICO: cancela qualquer timeout pendente ao fechar/desmontar
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  // ✅ Se o tablet/aba ficar em background com timeout pendente,
+  // executa o fechamento na hora (evita timer "congelado" pelo PWA)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden && timeoutRef.current && sucesso) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+        setSucesso(false);
+        onClose();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
+  }, [sucesso, onClose]);
 
   const adicionarPagamento = () => {
     const valor = parseFloat(valorInput);
@@ -69,13 +96,17 @@ export function PaymentModal({
     try {
       await onConfirm(pagamentos);
       setProcessando(false);
-      setSucesso(true); // ✅ Mostra sucesso imediatamente após gravar
+      setSucesso(true);
 
-      // ✅ Auto-fecha após 10s (tempo suficiente para ver animação + imprimir)
-      setTimeout(() => {
+      // ✅ Limpa qualquer timeout antigo antes de criar um novo
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      // ⚡ Mais rápido (1.8s) e com referência salva pra poder cancelar
+      timeoutRef.current = setTimeout(() => {
         setSucesso(false);
         onClose();
-      }, 10000);
+        timeoutRef.current = null;
+      }, 4000);
     } catch (error) {
       alert("Erro ao salvar venda.");
       setProcessando(false);
@@ -336,7 +367,7 @@ export function PaymentModal({
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: "100%" }}
-                      transition={{ duration: 10, ease: "linear" }} // ✅ Mesmo tempo do setTimeout
+                      transition={{ duration: 4, ease: "linear" }} // ✅ Sincronizado com o setTimeout
                       className="h-full bg-green-500"
                     />
                   </div>
