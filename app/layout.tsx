@@ -5,8 +5,9 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import InstallPWAButton from "@/components/InstallPWAButton";
 import { ThemeProvider } from "@/components/theme-provider";
-// 1. IMPORTAR O VIGIA AQUI
 import { SyncInitializer } from "@/components/sync-initializer"; 
+// Importação corrigida do componente de registro
+import RegisterSW from "@/app/register-sw"; 
 
 const geist = Geist({ subsets: ["latin"] });
 const geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -46,7 +47,9 @@ export default function RootLayout({
       </head>
       
       <body className="antialiased overflow-x-hidden">
-        {/* 2. ATIVAR O VIGIA AQUI (Fora do ThemeProvider para ser bem leve) */}
+        {/* O RegisterSW detecta e aplica atualizações automaticamente */}
+        <RegisterSW />
+
         <SyncInitializer />
 
         <ThemeProvider
@@ -62,20 +65,6 @@ export default function RootLayout({
           <InstallPWAButton />
           <Analytics />
         </ThemeProvider>
-
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function() { console.log('✅ SW registrado'); })
-                    .catch(function(err) { console.error('❌ Erro SW:', err); });
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );

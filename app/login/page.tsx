@@ -1,5 +1,6 @@
 "use client";
 
+import { APP_VERSION } from "app/config/version";
 import type React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -132,6 +133,12 @@ export default function LoginPage() {
                     >
                       Criar usuário
                     </Link>
+                  </div>
+                  {/* 2. ADICIONE A VERSÃO AQUI */}
+                  <div className="text-center pt-2">
+                    <span className="text-[10px] text-muted-foreground/50 font-mono">
+                      v{APP_VERSION}
+                    </span>
                   </div>
                 </div>
               </form>

@@ -1,1 +1,1 @@
-export const APP_VERSION = "1.0.3"; // Incremente aqui a cada deploy importante
+export const APP_VERSION = "1.0.6"; // Incremente aqui a cada deploy importante
