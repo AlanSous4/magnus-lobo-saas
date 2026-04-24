@@ -153,7 +153,7 @@ export function PaymentModal({
           animate="visible"
           exit="exit"
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[9999] backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-9999 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget && !processando && !sucesso) {
               onClose();
