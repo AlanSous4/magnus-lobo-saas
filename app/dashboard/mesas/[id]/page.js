@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
+import EscPosEncoder from "esc-pos-encoder";
+
 
 export default function DetalheMesaPage() {
   const { id } = useParams();
@@ -21,6 +23,8 @@ export default function DetalheMesaPage() {
   const [metodoSelecionado, setMetodoSelecionado] = useState("pix");
   const [valorInput, setValorInput] = useState("");
   const [sucesso, setSucesso] = useState(false);
+  const [itensParaRecibo, setItensParaRecibo] = useState([]);
+
 
   // Estados para controle de peso
   const [isModalPesoAberto, setIsModalPesoAberto] = useState(false);
@@ -335,12 +339,16 @@ export default function DetalheMesaPage() {
 
     setProcessandoPagamento(true);
     try {
+      // ✅ Congela os itens para o recibo (antes da venda zerar tudo)
+      setItensParaRecibo([...itensPedido]);
+
       const pedidoId = itensPedido[0]?.pedido_id;
 
       // Transforma a lista de pagamentos (Ex: ["PIX", "DINHEIRO"]) em uma string única
       const stringMetodos = pagamentos
         .map((p) => p.metodo.toUpperCase())
         .join(", ");
+
 
       // --- AQUI ESTÁ A MUDANÇA PRINCIPAL ---
       // Chamamos a função SQL (RPC) que faz 4 coisas:
@@ -361,10 +369,7 @@ export default function DetalheMesaPage() {
       // Se não deu erro, mostramos a tela de sucesso
       setSucesso(true);
 
-      // Aguarda 2 segundos para o usuário ver o check de sucesso e redireciona
-      setTimeout(() => {
-        router.push("/dashboard/mesas");
-      }, 2000);
+      
     } catch (err) {
       console.error("Erro ao finalizar conta:", err);
       alert(`Erro técnico: ${err.message || "Verifique o console"}`);
@@ -372,6 +377,160 @@ export default function DetalheMesaPage() {
       setProcessandoPagamento(false);
     }
   };
+
+  const imprimirCupomSmart = async (pagamentosImpressao, itensRecentes) => {
+    const itensParaImprimir =
+      itensRecentes && itensRecentes.length > 0 ? itensRecentes : itensPedido;
+  
+    const L = "--------------------------------------------";
+  
+    // Total recalculado a partir dos itens (mesma fórmula do totalGeral)
+    const totalVenda = itensParaImprimir.reduce((sum, item) => {
+      const preco = Number(item.preco_unitario);
+      const qtd = Number(item.quantidade);
+      return sum + (item.is_weight ? (qtd / 0.1) * preco : qtd * preco);
+    }, 0);
+  
+    // ===== CUPOM NO CONSOLE (debug) =====
+    let c = "";
+    c += "Padaria Lanchonete Magnus Lobo\n";
+    c += "Rua Treze de Maio, 01 - Cantinho do Ceu/SP\n";
+    c += L + "\n";
+    c += "CUPOM NAO FISCAL\n";
+    c += `MESA ${mesa?.numero_mesa ?? ""}\n`;
+    c += L + "\n";
+    c += "ITEM  DESCRICAO           QTD   VL UNIT   VL TOTAL\n";
+  
+    itensParaImprimir.forEach((item, i) => {
+      const isWeight = item.is_weight;
+      const preco = Number(item.preco_unitario);
+      const qtdNum = Number(item.quantidade);
+      const num = String(i + 1).padStart(3, "0");
+      const nome = (item.nome_produto || "Produto").substring(0, 18).padEnd(20);
+      const qtd = isWeight
+        ? qtdNum.toFixed(3).padStart(4)
+        : String(Math.round(qtdNum)).padStart(4);
+      const vlUnit = preco.toFixed(2).replace(".", ",").padStart(7);
+      const sub = (isWeight ? (qtdNum / 0.1) * preco : qtdNum * preco)
+        .toFixed(2)
+        .replace(".", ",")
+        .padStart(9);
+      c += `${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}\n`;
+    });
+  
+    c += L + "\n\n";
+    c += `Total:                             ${totalVenda
+      .toFixed(2)
+      .replace(".", ",")
+      .padStart(9)}\n`;
+    c += L + "\n";
+  
+    if (pagamentosImpressao && pagamentosImpressao.length > 0) {
+      c += "\n";
+      pagamentosImpressao.forEach((p) => {
+        c += `Forma de Pagamento: ${
+          p.metodo.charAt(0).toUpperCase() + p.metodo.slice(1)
+        } - R$ ${p.valor.toFixed(2)}\n`;
+      });
+      c += L + "\n";
+    }
+  
+    const dataHora = new Date().toLocaleString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+    });
+    c += `Data/Hora: ${dataHora}\n`;
+    c += L + "\n\n";
+    c += "*** ESTE DOCUMENTO NAO TEM VALOR FISCAL ***\n";
+    c += "Obrigado pela preferencia!\n";
+  
+    console.log("\n" + c);
+  
+    // ===== IMPRESSÃO ESC/POS =====
+    const encoder = new EscPosEncoder();
+    let result = encoder
+      .initialize()
+      .align("center")
+      .line("Padaria Lanchonete Magnus Lobo")
+      .line("Rua Treze de Maio, 01 - Cantinho do Céu/SP")
+      .line(L)
+      .line("CUPOM NAO FISCAL")
+      .line(`MESA ${mesa?.numero_mesa ?? ""}`)
+      .line(L)
+      .align("left");
+  
+    itensParaImprimir.forEach((item, i) => {
+      const isWeight = item.is_weight;
+      const preco = Number(item.preco_unitario);
+      const qtdNum = Number(item.quantidade);
+      const num = String(i + 1).padStart(3, "0");
+      const nome = (item.nome_produto || "Produto").substring(0, 18).padEnd(20);
+      const qtd = isWeight
+        ? qtdNum.toFixed(3).padStart(4)
+        : String(Math.round(qtdNum)).padStart(4);
+      const vlUnit = preco.toFixed(2).padStart(7);
+      const sub = (isWeight ? (qtdNum / 0.1) * preco : qtdNum * preco)
+        .toFixed(2)
+        .padStart(9);
+      result.text(`${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}`).newline();
+    });
+  
+    result.line(L);
+    result
+      .align("right")
+      .line(`TOTAL: R$ ${totalVenda.toFixed(2)}`)
+      .align("left");
+  
+    if (pagamentosImpressao && pagamentosImpressao.length > 0) {
+      result.newline().line("PAGAMENTO:");
+      pagamentosImpressao.forEach((p) => {
+        result.line(`${p.metodo.toUpperCase()}: R$ ${p.valor.toFixed(2)}`);
+      });
+    }
+  
+    result
+      .newline()
+      .align("center")
+      .line("*** NAO TEM VALOR FISCAL ***")
+      .line("Obrigado pela preferencia!")
+      .newline()
+      .cut();
+  
+    const data = result.encode();
+  
+    // Tenta Bluetooth primeiro, depois USB Serial — igual ao PDV
+    try {
+      const devices = await navigator.bluetooth.getDevices();
+      const targetDevice =
+        devices[0] ||
+        (await navigator.bluetooth.requestDevice({
+          filters: [{ services: ["000018f0-0000-1000-8000-00805f9b34fb"] }],
+          optionalServices: ["00001101-0000-1000-8000-00805f9b34fb"],
+        }));
+      const server = await targetDevice.gatt.connect();
+      const service = await server.getPrimaryService(
+        "000018f0-0000-1000-8000-00805f9b34fb"
+      );
+      const characteristic = await service.getCharacteristic(
+        "00002af1-0000-1000-8000-00805f9b34fb"
+      );
+      await characteristic.writeValue(data);
+    } catch (e) {
+      try {
+        const ports = await navigator.serial.getPorts();
+        const port = ports[0] || (await navigator.serial.requestPort());
+        await port.open({ baudRate: 9600 });
+        const writer = port.writable.getWriter();
+        await writer.write(data);
+        writer.releaseLock();
+        await port.close();
+      } catch (err) {
+        console.warn(
+          "Impressora não encontrada. Cupom exibido apenas no console."
+        );
+      }
+    }
+  };
+  
 
   if (loading)
     return (
@@ -774,14 +933,30 @@ export default function DetalheMesaPage() {
                   <p className="text-stone-400 font-bold text-sm mt-2 uppercase tracking-tighter">
                     Mesa {mesa?.numero_mesa} Liberada
                   </p>
-                  <div className="w-full h-1 bg-stone-100 mt-8 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: "100%" }}
-                      transition={{ duration: 2 }}
-                      className="h-full bg-green-500"
-                    />
-                  </div>
+
+                    {/* ✅ BOTÃO IMPRIMIR CUPOM — igual ao PDV */}
+<button
+  onClick={() => imprimirCupomSmart(pagamentos, itensParaRecibo)}
+  className="mt-6 w-full bg-stone-800 text-white py-4 rounded-xl font-black text-xs uppercase hover:bg-black active:scale-95 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
+>
+  <div className="flex items-center gap-2">
+    <span>🖨️</span>
+    <span>Imprimir Cupom</span>
+  </div>
+  <span className="text-[8px] opacity-50 font-normal italic">
+    Detecção automática: USB / Bluetooth
+  </span>
+</button>
+
+<button
+  onClick={() => router.push("/dashboard/mesas")}
+  className="mt-3 w-full text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 transition-colors cursor-pointer"
+>
+  Voltar ao Salão
+</button>
+
+
+                  
                 </motion.div>
               )}
             </motion.div>
