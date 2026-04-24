@@ -73,6 +73,25 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
   const router = useRouter();
 
+  // --- ADICIONE ESTE BLOCO AQUI ---
+  useEffect(() => {
+    // Tenta recuperar/renovar a sessão ao carregar o PDV
+    const setupSession = async () => {
+      await supabase.auth.getSession();
+    };
+    setupSession();
+
+    // Escuta mudanças (se o token expirar ou o usuário deslogar em outra aba)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        router.push("/login");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
+  // --------------------------------
+
   // 1. Filtro de produtos
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -135,14 +154,21 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const finalizarVendaNoBanco = async (
     pagamentos: { metodo: string; valor: number }[]
   ) => {
-    // Tenta renovar a sessão automaticamente antes de cada venda
+    // 1. Tenta obter a sessão. O getSession() tenta renovar o token automaticamente se possível.
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
+    // 2. Se falhar, tentamos o getUser() que é uma chamada mais rigorosa ao servidor
     if (!session || sessionError) {
-      alert("A ligação com o servidor falhou ou a sessão expirou. Por favor, faça login novamente.");
-      window.location.href = "/login";
-      return;
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert("Sua sessão expirou por segurança. O sistema irá recarregar.");
+        window.location.href = "/login";
+        return;
+      }
     }
+
+    // ... restante do seu código original (o try/catch da venda)
       // ... restante do seu código original
 
     try {

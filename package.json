@@ -6,7 +6,8 @@
     "build": "next build --webpack",
     "dev": "next dev -p 3000",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "clean": "rd /s /q .next || rm -rf .next"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
