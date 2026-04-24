@@ -30,7 +30,7 @@ export async function createClient() {
             return fetch(url, {
               ...options,
               // Define um timeout curto de 2 segundos para não travar o app Magnus Lobo
-              signal: AbortSignal.timeout(2000), 
+              signal: AbortSignal.timeout(7000), 
             }).catch((err) => {
               console.warn("Supabase Fetch: Falha de conexão (provável modo offline)");
               throw err;

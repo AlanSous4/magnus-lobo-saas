@@ -15,11 +15,18 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
+          // 1. Atualiza os cookies na requisição para o servidor não se perder
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          
+          // 2. Cria a resposta base
           supabaseResponse = NextResponse.next({
             request,
           })
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+
+          // 3. Força a gravação dos cookies no navegador para manter o login no F5
+          cookiesToSet.forEach(({ name, value, options }) => 
+            supabaseResponse.cookies.set(name, value, options)
+          )
         },
       },
     },

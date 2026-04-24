@@ -135,8 +135,19 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const finalizarVendaNoBanco = async (
     pagamentos: { metodo: string; valor: number }[]
   ) => {
+    // Tenta renovar a sessão automaticamente antes de cada venda
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (!session || sessionError) {
+      alert("A ligação com o servidor falhou ou a sessão expirou. Por favor, faça login novamente.");
+      window.location.href = "/login";
+      return;
+    }
+      // ... restante do seu código original
+
     try {
-      const labelPagamento =
+      const labelPagamento = 
+      // ... restante do código permanece igual
         pagamentos.length > 1
           ? pagamentos
               .map((p) => `${p.metodo} (R$ ${p.valor.toFixed(2)})`)
