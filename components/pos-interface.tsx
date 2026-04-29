@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShoppingCart, DollarSign, X, ArrowLeft } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { supabase, refreshSessionSafely } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 /* =========================
@@ -73,24 +73,72 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
 
   const router = useRouter();
 
-  // --- ADICIONE ESTE BLOCO AQUI ---
+  // ✅ GESTÃO DE SESSÃO ROBUSTA - Previne expiração ao mudar aba/foco
   useEffect(() => {
-    // Tenta recuperar/renovar a sessão ao carregar o PDV
+    let isProcessingLogout = false;
+    
+    // Valida e renova a sessão ao carregar o PDV
     const setupSession = async () => {
-      await supabase.auth.getSession();
+      const { valid } = await refreshSessionSafely();
+      if (!valid && !isProcessingLogout) {
+        isProcessingLogout = true;
+        router.push("/login");
+      }
     };
     setupSession();
 
-    // Escuta mudanças (se o token expirar ou o usuário deslogar em outra aba)
+    // Escuta mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT' && !isProcessingLogout) {
+        isProcessingLogout = true;
         router.push("/login");
+      }
+      if (event === 'TOKEN_REFRESHED') {
+        console.log("Magnus Lobo: Token renovado com sucesso");
       }
     });
 
-    return () => subscription.unsubscribe();
+    // ✅ CRÍTICO: Renova a sessão quando a página recupera o foco
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        console.log("Magnus Lobo: Página em foco - verificando sessão...");
+        const { valid } = await refreshSessionSafely();
+        if (!valid && !isProcessingLogout) {
+          isProcessingLogout = true;
+          console.warn("Magnus Lobo: Sessão inválida após retorno do foco");
+          router.push("/login");
+        }
+      }
+    };
+
+    // ✅ CRÍTICO: Renova quando a janela recupera foco (além de visibility)
+    const handleFocus = async () => {
+      console.log("Magnus Lobo: Janela em foco - verificando sessão...");
+      const { valid } = await refreshSessionSafely();
+      if (!valid && !isProcessingLogout) {
+        isProcessingLogout = true;
+        router.push("/login");
+      }
+    };
+
+    // ✅ Renova a sessão periodicamente (a cada 10 minutos) para evitar expiração
+    const refreshInterval = setInterval(async () => {
+      if (document.visibilityState === 'visible') {
+        console.log("Magnus Lobo: Renovação periódica da sessão...");
+        await refreshSessionSafely();
+      }
+    }, 10 * 60 * 1000); // 10 minutos
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(refreshInterval);
+    };
   }, [router]);
-  // --------------------------------
 
   // 1. Filtro de produtos
   const filteredProducts = products.filter((p) =>
@@ -150,26 +198,18 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     return sum + subtotal;
   }, 0);
 
-  // ✅ COLOQUE ESTA NOVA FUNÇÃO NO LUGAR DA "processSale"
+  // ✅ Função de venda com validação robusta de sessão
   const finalizarVendaNoBanco = async (
     pagamentos: { metodo: string; valor: number }[]
   ) => {
-    // 1. Tenta obter a sessão. O getSession() tenta renovar o token automaticamente se possível.
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // ✅ VALIDAÇÃO ROBUSTA: Usa getUser() que sempre valida no servidor
+    const { valid, user } = await refreshSessionSafely();
     
-    // 2. Se falhar, tentamos o getUser() que é uma chamada mais rigorosa ao servidor
-    if (!session || sessionError) {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        alert("Sua sessão expirou por segurança. O sistema irá recarregar.");
-        window.location.href = "/login";
-        return;
-      }
+    if (!valid || !user) {
+      alert("Sua sessão expirou. Por favor, faça login novamente para continuar.");
+      window.location.href = "/login";
+      return;
     }
-
-    // ... restante do seu código original (o try/catch da venda)
-      // ... restante do seu código original
 
     try {
       const labelPagamento = 

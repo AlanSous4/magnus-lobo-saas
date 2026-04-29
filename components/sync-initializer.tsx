@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { SyncQueue } from "@/lib/sync-queue";
-import { supabase } from "@/lib/supabase/client";
+import { supabase, refreshSessionSafely } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 export function SyncInitializer() {
@@ -73,19 +73,39 @@ export function SyncInitializer() {
     });
 
     const handleOnline = async () => {
-      console.log("🌐 Magnus Lobo: Conexão restabelecida. Validando e sincronizando...");
+      console.log("Magnus Lobo: Conexao restabelecida. Validando e sincronizando...");
       
-      const { data } = await supabase.auth.refreshSession();
+      const { valid } = await refreshSessionSafely();
       
-      if (data.session) {
-        // Usa o método correto da sua lib (sync ou processQueue)
+      if (valid) {
         SyncQueue.sync(); 
       } else {
         router.push("/login");
       }
     };
 
+    // ✅ CRÍTICO: Renova a sessão quando a página/aba recupera o foco
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        console.log("Magnus Lobo: Aba em foco - renovando sessao...");
+        const { valid } = await refreshSessionSafely();
+        if (!valid) {
+          console.warn("Magnus Lobo: Sessao invalida apos retorno do foco");
+          router.push("/login");
+        }
+      }
+    };
+
+    // ✅ Renovação periódica da sessão (a cada 5 minutos)
+    const refreshInterval = setInterval(async () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        console.log("Magnus Lobo: Renovacao periodica da sessao...");
+        await refreshSessionSafely();
+      }
+    }, 5 * 60 * 1000); // 5 minutos
+
     window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     if (navigator.onLine) {
       SyncQueue.sync();
@@ -94,6 +114,8 @@ export function SyncInitializer() {
     return () => {
       subscription.unsubscribe();
       window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(refreshInterval);
     };
   }, [router]);
 
