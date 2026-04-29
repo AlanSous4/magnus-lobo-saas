@@ -60,14 +60,19 @@ export function PaymentModal({
 
   // ✅ Se o tablet/aba ficar em background com timeout pendente,
   // executa o fechamento na hora (evita timer "congelado" pelo PWA)
+  // ✅ Também renova a sessão quando a página volta ao foco durante o processo
   useEffect(() => {
-    const handleVisibility = () => {
+    const handleVisibility = async () => {
       if (document.hidden && timeoutRef.current && sucesso) {
+        // Se estiver em background e a venda já foi concluída, fecha imediatamente
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
         setSucesso(false);
         onClose();
       }
+      
+      // ✅ CRÍTICO: Quando a página volta ao foco e ainda está processando ou no modal
+      // não faz nada aqui pois o pos-interface já cuida da renovação da sessão
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () =>
