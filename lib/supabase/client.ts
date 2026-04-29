@@ -9,9 +9,6 @@ export const supabase = createBrowserClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      flowType: 'pkce',
-      // Mantém a sessão ativa por mais tempo (1 hora antes de renovar)
-      storageKey: 'magnus-lobo-auth-token',
     },
   }
 );
