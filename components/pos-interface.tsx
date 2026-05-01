@@ -94,22 +94,26 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   // --------------------------------
 
   // 1. Filtro de produtos
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return products.filter((p) => p.name.toLowerCase().includes(term));
+  }, [products, searchTerm]);
 
   const productMap = useMemo(() => {
     return new Map(products.map((p) => [p.id, p]));
   }, [products]);
   
-  const isWeightProduct = (id: string) => {
-    return !!productMap.get(id)?.is_weight;
-  };
+  const isWeightProduct = useCallback(
+    (id: string) => {
+      return !!productMap.get(id)?.is_weight;
+    },
+    [productMap]
+  );
 
   const addToCart = useCallback((product: Product) => {
     setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id);
       const isWeight = !!productMap.get(product.id)?.is_weight;
+      const existing = prev.find((i) => i.id === product.id);
   
       if (existing) {
         return prev.map((i) =>
@@ -133,20 +137,29 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     const isWeight = !!productMap.get(id)?.is_weight;
   
     setCart((prev) => {
-      return prev.map((item) => {
-        if (item.id !== id) return item;
+      return prev
+        .map((item) => {
+          if (item.id !== id) return item;
   
-        if (q <= 0) return item;
+          // remove automaticamente se <= 0
+          if (q <= 0) return null;
   
-        if (isWeight) {
-          const estoque = item.quantity * 1000;
-          if (q > estoque) return item;
-        } else {
-          if (q > item.quantity) return item;
-        }
+          let nextQty = q;
   
-        return { ...item, cartQuantity: q };
-      });
+          // limitações aplicadas SEM bloquear UX
+          if (isWeight) {
+            const estoque = item.quantity * 1000;
+            nextQty = Math.min(q, estoque);
+          } else {
+            nextQty = Math.min(q, item.quantity);
+          }
+  
+          return {
+            ...item,
+            cartQuantity: nextQty,
+          };
+        })
+        .filter(Boolean) as CartItem[];
     });
   }, [productMap]);
 
@@ -154,13 +167,17 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     setCart((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
-  const total = cart.reduce((sum, item) => {
-    const isWeight = isWeightProduct(item.id);
-    const subtotal = isWeight
-      ? (item.value / 100) * item.cartQuantity
-      : item.value * item.cartQuantity;
-    return sum + subtotal;
-  }, 0);
+  const total = useMemo(() => {
+    return cart.reduce((sum, item) => {
+      const isWeight = !!productMap.get(item.id)?.is_weight;
+  
+      const subtotal = isWeight
+        ? (item.value / 100) * item.cartQuantity
+        : item.value * item.cartQuantity;
+  
+      return sum + subtotal;
+    }, 0);
+  }, [cart, productMap]);
 
   // ✅ COLOQUE ESTA NOVA FUNÇÃO NO LUGAR DA "processSale"
   const finalizarVendaNoBanco = async (
@@ -405,7 +422,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
                 return (
                   <Card
                     key={p.id}
-                    onClick={() => addToCart(p)}
+                    onClick={addToCart.bind(null, p)}
                     className="cursor-pointer active:scale-95 transition-transform"
                   >
                     <div className="h-20 bg-muted flex items-center justify-center relative">
