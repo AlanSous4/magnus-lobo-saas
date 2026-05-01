@@ -1,16 +1,17 @@
-import { Badge } from "@/components/ui/badge"
-import { formatDistanceToNow } from "date-fns"
-import { ptBR } from "date-fns/locale"
+"use client";
+
+import { Badge } from "@/components/ui/badge";
 
 interface Sale {
-  id: string
-  total_amount: number
-  payment_method: string
-  created_at: string
+  id: string;
+  total_amount: number;
+  payment_method: string;
+  created_at: string;
+  timeLabel: string; // ✅ vem pronto do server
 }
 
 interface RecentSalesProps {
-  sales: Sale[]
+  sales: Sale[];
 }
 
 const paymentMethodLabels: Record<string, string> = {
@@ -20,7 +21,7 @@ const paymentMethodLabels: Record<string, string> = {
   va: "VA",
   cash: "Dinheiro",
   pix: "Pix",
-}
+};
 
 /* --------------------------------------------------
  * Função Utilitária de Formatação BRL
@@ -38,7 +39,7 @@ export function RecentSales({ sales }: RecentSalesProps) {
       <p className="text-sm text-muted-foreground">
         Nenhuma venda recente
       </p>
-    )
+    );
   }
 
   return (
@@ -50,23 +51,18 @@ export function RecentSales({ sales }: RecentSalesProps) {
             className="flex items-center justify-between gap-4"
           >
             <div className="space-y-1">
-              {/* 🛠️ Valor formatado em Reais */}
+              {/* 💰 Valor formatado */}
               <p className="text-sm font-bold whitespace-nowrap">
                 {formatCurrency(Number(sale.total_amount))}
               </p>
-              
+
+              {/* 🕒 Tempo vindo do server (sem recalcular) */}
               <p className="text-xs text-muted-foreground whitespace-nowrap italic">
-                {formatDistanceToNow(new Date(sale.created_at), {
-                  addSuffix: true,
-                  locale: ptBR,
-                })}
+                {sale.timeLabel}
               </p>
             </div>
 
-            <Badge
-              variant="secondary"
-              className="whitespace-nowrap"
-            >
+            <Badge variant="secondary" className="whitespace-nowrap">
               {paymentMethodLabels[sale.payment_method] ||
                 sale.payment_method}
             </Badge>
@@ -74,5 +70,5 @@ export function RecentSales({ sales }: RecentSalesProps) {
         ))}
       </div>
     </div>
-  )
+  );
 }

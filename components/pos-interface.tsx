@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useCallback } from "react";
 import EscPosEncoder from "esc-pos-encoder";
 import { AnimatePresence } from "framer-motion"; // Certifique-se de importar
 import { PaymentModal } from "@/components/payment-modal";
@@ -97,50 +98,61 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 2. Função isWeightProduct (MELHORADA)
+  const productMap = useMemo(() => {
+    return new Map(products.map((p) => [p.id, p]));
+  }, [products]);
+  
   const isWeightProduct = (id: string) => {
-    const foundProduct = products.find((p) => p.id === id);
-    // Força a conversão para booleano caso o banco retorne null
-    return !!foundProduct?.is_weight;
+    return !!productMap.get(id)?.is_weight;
   };
 
-  // 3. Função addToCart
-  const addToCart = (product: Product) => {
-    const existing = cart.find((i) => i.id === product.id);
-    const isWeight = isWeightProduct(product.id);
+  const addToCart = useCallback((product: Product) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === product.id);
+      const isWeight = !!productMap.get(product.id)?.is_weight;
+  
+      if (existing) {
+        return prev.map((i) =>
+          i.id === product.id
+            ? {
+                ...i,
+                cartQuantity: i.cartQuantity + (isWeight ? 100 : 1),
+              }
+            : i
+        );
+      }
+  
+      return [
+        ...prev,
+        { ...product, cartQuantity: isWeight ? 100 : 1 },
+      ];
+    });
+  }, [productMap]);
 
-    if (existing) {
-      updateQuantity(product.id, existing.cartQuantity + (isWeight ? 100 : 1));
-    } else {
-      setCart([...cart, { ...product, cartQuantity: isWeight ? 100 : 1 }]);
-    }
-  };
+  const updateQuantity = useCallback((id: string, q: number) => {
+    const isWeight = !!productMap.get(id)?.is_weight;
+  
+    setCart((prev) => {
+      return prev.map((item) => {
+        if (item.id !== id) return item;
+  
+        if (q <= 0) return item;
+  
+        if (isWeight) {
+          const estoque = item.quantity * 1000;
+          if (q > estoque) return item;
+        } else {
+          if (q > item.quantity) return item;
+        }
+  
+        return { ...item, cartQuantity: q };
+      });
+    });
+  }, [productMap]);
 
-  // LOCAL: Função updateQuantity
-  const updateQuantity = (id: string, q: number) => {
-    const item = cart.find((i) => i.id === id);
-    if (!item) return;
-
-    const isWeight = isWeightProduct(id);
-
-    if (q <= 0) {
-      setCart(cart.filter((i) => i.id !== id));
-      return;
-    }
-
-    if (isWeight) {
-      const estoqueEmGramas = item.quantity * 1000;
-      if (q > estoqueEmGramas) return;
-    } else {
-      if (q > item.quantity) return;
-    }
-
-    setCart(cart.map((i) => (i.id === id ? { ...i, cartQuantity: q } : i)));
-  };
-
-  const removeFromCart = (id: string) => {
-    setCart(cart.filter((i) => i.id !== id));
-  };
+  const removeFromCart = useCallback((id: string) => {
+    setCart((prev) => prev.filter((i) => i.id !== id));
+  }, []);
 
   const total = cart.reduce((sum, item) => {
     const isWeight = isWeightProduct(item.id);
