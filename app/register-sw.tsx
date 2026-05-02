@@ -4,7 +4,6 @@ import { useEffect } from "react";
 
 export default function RegisterSW() {
   useEffect(() => {
-    // ❌ NÃO registra em desenvolvimento
     if (process.env.NODE_ENV !== "production") return;
 
     if ("serviceWorker" in navigator) {
@@ -15,16 +14,14 @@ export default function RegisterSW() {
 
           registration.addEventListener("updatefound", () => {
             const newWorker = registration.installing;
-
             if (!newWorker) return;
 
             newWorker.addEventListener("statechange", () => {
-              if (
-                newWorker.state === "activated" &&
-                navigator.serviceWorker.controller
-              ) {
-                console.log("🚀 Nova versão detectada! Atualizando interface...");
-                window.location.reload();
+              if (newWorker.state === "installed") {
+                console.log("🆕 Nova versão disponível");
+
+                // 👇 NÃO força reload automático
+                // você pode mostrar um toast depois se quiser
               }
             });
           });
