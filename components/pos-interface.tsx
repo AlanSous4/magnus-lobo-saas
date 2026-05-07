@@ -572,13 +572,25 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
          <PaymentModal
          isOpen={showPayment}
          onClose={() => {
-           setShowPayment(false);
-           setCart([]);          // ✅ Limpa o carrinho só quando o modal fecha
-           router.refresh();
+           // ✅ Agora apenas fecha o modal. 
+           // Os itens continuam no 'cart' se o cliente quiser adicionar mais.
+           setShowPayment(false); 
          }}
          total={total}
-         onConfirm={finalizarVendaNoBanco}
-         onPrint={(pagamentosDoModal, itensDoModal) => imprimirCupomSmart(pagamentosDoModal, itensDoModal)}
+         onConfirm={async (pagamentos) => {
+           try {
+             await finalizarVendaNoBanco(pagamentos);
+             // ✅ O carrinho só é limpo após o sucesso da gravação no banco
+             setCart([]); 
+             setShowPayment(false);
+             router.refresh();
+           } catch (err) {
+             console.error("Erro ao finalizar:", err);
+           }
+         }}
+         onPrint={(pagamentosDoModal, itensDoModal) => 
+           imprimirCupomSmart(pagamentosDoModal, itensDoModal)
+         }
          items={[...cart]}
          mesaInfo="Venda Balcão"
        />
