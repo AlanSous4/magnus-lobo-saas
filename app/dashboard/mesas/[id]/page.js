@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import EscPosEncoder from "esc-pos-encoder";
 
-
 export default function DetalheMesaPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -24,7 +23,6 @@ export default function DetalheMesaPage() {
   const [valorInput, setValorInput] = useState("");
   const [sucesso, setSucesso] = useState(false);
   const [itensParaRecibo, setItensParaRecibo] = useState([]);
-
 
   // Estados para controle de peso
   const [isModalPesoAberto, setIsModalPesoAberto] = useState(false);
@@ -231,21 +229,22 @@ export default function DetalheMesaPage() {
       console.warn("Aguardando carregamento da organização...");
       return;
     }
-  
+
     try {
-      // 2. Buscar pedido existente incluindo o organization_id no filtro
-      const { data: pedidoExistente, error: erroBusca } = await supabase
+      // 2. Buscar pedido existente usando limit(1) para evitar erro de duplicidade
+      const { data: pedidos, error: erroBusca } = await supabase
         .from("pedidos_mesa")
         .select("id")
         .eq("mesa_id", id)
-        .eq("organization_id", orgId) // ✅ Adicionado para alinhar com RLS
+        .eq("organization_id", orgId)
         .eq("status_pagamento", "pendente")
-        .maybeSingle();
-  
+        .limit(1); // Retorna um array de 0 ou 1 posição
+
       if (erroBusca) throw erroBusca;
-  
-      let pedidoId = pedidoExistente?.id;
-  
+
+      // Verifica se existe algum pedido no array
+      let pedidoId = pedidos.length > 0 ? pedidos[0].id : null;
+
       // 3. Criar pedido se não existir
       if (!pedidoId) {
         const { data: novoPedido, error: erroP } = await supabase
@@ -258,22 +257,27 @@ export default function DetalheMesaPage() {
               aberto_em: new Date().toISOString(),
             },
           ])
-          .select()
-          .single();
-  
+          .select(); // Removi o .single() aqui
+
         if (erroP) throw erroP;
-        pedidoId = novoPedido.id;
-  
+
+        // Pegamos o primeiro item do array retornado pelo select()
+        if (novoPedido && novoPedido.length > 0) {
+          pedidoId = novoPedido[0].id;
+        } else {
+          throw new Error("Falha ao criar pedido: Nenhum dado retornado.");
+        }
+
         // Atualiza status da mesa
         await supabase.from("mesas").update({ status: "ocupada" }).eq("id", id);
         setMesa((prev) => ({ ...prev, status: "ocupada" }));
       }
-  
+
       // 4. Preparar quantidade
       const qtdFinal = produto.is_weight
         ? parseFloat(quantidadeInformada)
         : Math.round(quantidadeInformada);
-  
+
       // 5. Inserir o item
       const { data: novoItem, error: erroI } = await supabase
         .from("itens_pedido_mesa")
@@ -290,12 +294,11 @@ export default function DetalheMesaPage() {
         ])
         .select()
         .single();
-  
+
       if (erroI) throw erroI;
-  
+
       // 6. Atualizar estado local
       setItensPedido((prev) => [...prev, novoItem]);
-      
     } catch (err) {
       // Importante: olhe o console do navegador para ver o erro real do Supabase
       console.error("Erro detalhado ao adicionar item:", err);
@@ -349,7 +352,6 @@ export default function DetalheMesaPage() {
         .map((p) => p.metodo.toUpperCase())
         .join(", ");
 
-
       // --- AQUI ESTÁ A MUDANÇA PRINCIPAL ---
       // Chamamos a função SQL (RPC) que faz 4 coisas:
       // 1. Cria Venda | 2. Baixa Estoque | 3. Fecha Pedido | 4. Libera Mesa
@@ -368,8 +370,6 @@ export default function DetalheMesaPage() {
 
       // Se não deu erro, mostramos a tela de sucesso
       setSucesso(true);
-
-      
     } catch (err) {
       console.error("Erro ao finalizar conta:", err);
       alert(`Erro técnico: ${err.message || "Verifique o console"}`);
@@ -381,16 +381,16 @@ export default function DetalheMesaPage() {
   const imprimirCupomSmart = async (pagamentosImpressao, itensRecentes) => {
     const itensParaImprimir =
       itensRecentes && itensRecentes.length > 0 ? itensRecentes : itensPedido;
-  
+
     const L = "--------------------------------------------";
-  
+
     // Total recalculado a partir dos itens (mesma fórmula do totalGeral)
     const totalVenda = itensParaImprimir.reduce((sum, item) => {
       const preco = Number(item.preco_unitario);
       const qtd = Number(item.quantidade);
       return sum + (item.is_weight ? (qtd / 0.1) * preco : qtd * preco);
     }, 0);
-  
+
     // ===== CUPOM NO CONSOLE (debug) =====
     let c = "";
     c += "Padaria Lanchonete Magnus Lobo\n";
@@ -400,7 +400,7 @@ export default function DetalheMesaPage() {
     c += `MESA ${mesa?.numero_mesa ?? ""}\n`;
     c += L + "\n";
     c += "ITEM  DESCRICAO           QTD   VL UNIT   VL TOTAL\n";
-  
+
     itensParaImprimir.forEach((item, i) => {
       const isWeight = item.is_weight;
       const preco = Number(item.preco_unitario);
@@ -417,14 +417,14 @@ export default function DetalheMesaPage() {
         .padStart(9);
       c += `${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}\n`;
     });
-  
+
     c += L + "\n\n";
     c += `Total:                             ${totalVenda
       .toFixed(2)
       .replace(".", ",")
       .padStart(9)}\n`;
     c += L + "\n";
-  
+
     if (pagamentosImpressao && pagamentosImpressao.length > 0) {
       c += "\n";
       pagamentosImpressao.forEach((p) => {
@@ -434,7 +434,7 @@ export default function DetalheMesaPage() {
       });
       c += L + "\n";
     }
-  
+
     const dataHora = new Date().toLocaleString("pt-BR", {
       timeZone: "America/Sao_Paulo",
     });
@@ -442,9 +442,9 @@ export default function DetalheMesaPage() {
     c += L + "\n\n";
     c += "*** ESTE DOCUMENTO NAO TEM VALOR FISCAL ***\n";
     c += "Obrigado pela preferencia!\n";
-  
+
     console.log("\n" + c);
-  
+
     // ===== IMPRESSÃO ESC/POS =====
     const encoder = new EscPosEncoder();
     let result = encoder
@@ -457,7 +457,7 @@ export default function DetalheMesaPage() {
       .line(`MESA ${mesa?.numero_mesa ?? ""}`)
       .line(L)
       .align("left");
-  
+
     itensParaImprimir.forEach((item, i) => {
       const isWeight = item.is_weight;
       const preco = Number(item.preco_unitario);
@@ -473,20 +473,20 @@ export default function DetalheMesaPage() {
         .padStart(9);
       result.text(`${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}`).newline();
     });
-  
+
     result.line(L);
     result
       .align("right")
       .line(`TOTAL: R$ ${totalVenda.toFixed(2)}`)
       .align("left");
-  
+
     if (pagamentosImpressao && pagamentosImpressao.length > 0) {
       result.newline().line("PAGAMENTO:");
       pagamentosImpressao.forEach((p) => {
         result.line(`${p.metodo.toUpperCase()}: R$ ${p.valor.toFixed(2)}`);
       });
     }
-  
+
     result
       .newline()
       .align("center")
@@ -494,9 +494,9 @@ export default function DetalheMesaPage() {
       .line("Obrigado pela preferencia!")
       .newline()
       .cut();
-  
+
     const data = result.encode();
-  
+
     // Tenta Bluetooth primeiro, depois USB Serial — igual ao PDV
     try {
       const devices = await navigator.bluetooth.getDevices();
@@ -530,7 +530,6 @@ export default function DetalheMesaPage() {
       }
     }
   };
-  
 
   if (loading)
     return (
@@ -934,29 +933,28 @@ export default function DetalheMesaPage() {
                     Mesa {mesa?.numero_mesa} Liberada
                   </p>
 
-                    {/* ✅ BOTÃO IMPRIMIR CUPOM — igual ao PDV */}
-<button
-  onClick={() => imprimirCupomSmart(pagamentos, itensParaRecibo)}
-  className="mt-6 w-full bg-stone-800 text-white py-4 rounded-xl font-black text-xs uppercase hover:bg-black active:scale-95 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
->
-  <div className="flex items-center gap-2">
-    <span>🖨️</span>
-    <span>Imprimir Cupom</span>
-  </div>
-  <span className="text-[8px] opacity-50 font-normal italic">
-    Detecção automática: USB / Bluetooth
-  </span>
-</button>
+                  {/* ✅ BOTÃO IMPRIMIR CUPOM — igual ao PDV */}
+                  <button
+                    onClick={() =>
+                      imprimirCupomSmart(pagamentos, itensParaRecibo)
+                    }
+                    className="mt-6 w-full bg-stone-800 text-white py-4 rounded-xl font-black text-xs uppercase hover:bg-black active:scale-95 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>🖨️</span>
+                      <span>Imprimir Cupom</span>
+                    </div>
+                    <span className="text-[8px] opacity-50 font-normal italic">
+                      Detecção automática: USB / Bluetooth
+                    </span>
+                  </button>
 
-<button
-  onClick={() => router.push("/dashboard/mesas")}
-  className="mt-3 w-full text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 transition-colors cursor-pointer"
->
-  Voltar ao Salão
-</button>
-
-
-                  
+                  <button
+                    onClick={() => router.push("/dashboard/mesas")}
+                    className="mt-3 w-full text-stone-400 font-black py-2 uppercase text-[10px] tracking-widest hover:text-stone-600 transition-colors cursor-pointer"
+                  >
+                    Voltar ao Salão
+                  </button>
                 </motion.div>
               )}
             </motion.div>
