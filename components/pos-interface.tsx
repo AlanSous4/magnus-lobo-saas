@@ -83,8 +83,10 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     setupSession();
 
     // Escuta mudanças (se o token expirar ou o usuário deslogar em outra aba)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
         router.push("/login");
       }
     });
@@ -102,7 +104,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const productMap = useMemo(() => {
     return new Map(products.map((p) => [p.id, p]));
   }, [products]);
-  
+
   const isWeightProduct = useCallback(
     (id: string) => {
       return !!productMap.get(id)?.is_weight;
@@ -110,58 +112,61 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     [productMap]
   );
 
-  const addToCart = useCallback((product: Product) => {
-    setCart((prev) => {
-      const isWeight = !!productMap.get(product.id)?.is_weight;
-      const existing = prev.find((i) => i.id === product.id);
-  
-      if (existing) {
-        return prev.map((i) =>
-          i.id === product.id
-            ? {
-                ...i,
-                cartQuantity: i.cartQuantity + (isWeight ? 100 : 1),
-              }
-            : i
-        );
-      }
-  
-      return [
-        ...prev,
-        { ...product, cartQuantity: isWeight ? 100 : 1 },
-      ];
-    });
-  }, [productMap]);
+  const addToCart = useCallback(
+    (product: Product) => {
+      setCart((prev) => {
+        const isWeight = !!productMap.get(product.id)?.is_weight;
+        const existing = prev.find((i) => i.id === product.id);
 
-  const updateQuantity = useCallback((id: string, q: number) => {
-    const isWeight = !!productMap.get(id)?.is_weight;
-  
-    setCart((prev) => {
-      return prev
-        .map((item) => {
-          if (item.id !== id) return item;
-  
-          // remove automaticamente se <= 0
-          if (q <= 0) return null;
-  
-          let nextQty = q;
-  
-          // limitações aplicadas SEM bloquear UX
-          if (isWeight) {
-            const estoque = item.quantity * 1000;
-            nextQty = Math.min(q, estoque);
-          } else {
-            nextQty = Math.min(q, item.quantity);
-          }
-  
-          return {
-            ...item,
-            cartQuantity: nextQty,
-          };
-        })
-        .filter(Boolean) as CartItem[];
-    });
-  }, [productMap]);
+        if (existing) {
+          return prev.map((i) =>
+            i.id === product.id
+              ? {
+                  ...i,
+                  cartQuantity: i.cartQuantity + (isWeight ? 100 : 1),
+                }
+              : i
+          );
+        }
+
+        return [...prev, { ...product, cartQuantity: isWeight ? 100 : 1 }];
+      });
+    },
+    [productMap]
+  );
+
+  const updateQuantity = useCallback(
+    (id: string, q: number) => {
+      const isWeight = !!productMap.get(id)?.is_weight;
+
+      setCart((prev) => {
+        return prev
+          .map((item) => {
+            if (item.id !== id) return item;
+
+            // remove automaticamente se <= 0
+            if (q <= 0) return null;
+
+            let nextQty = q;
+
+            // limitações aplicadas SEM bloquear UX
+            if (isWeight) {
+              const estoque = item.quantity * 1000;
+              nextQty = Math.min(q, estoque);
+            } else {
+              nextQty = Math.min(q, item.quantity);
+            }
+
+            return {
+              ...item,
+              cartQuantity: nextQty,
+            };
+          })
+          .filter(Boolean) as CartItem[];
+      });
+    },
+    [productMap]
+  );
 
   const removeFromCart = useCallback((id: string) => {
     setCart((prev) => prev.filter((i) => i.id !== id));
@@ -170,11 +175,11 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
   const total = useMemo(() => {
     return cart.reduce((sum, item) => {
       const isWeight = !!productMap.get(item.id)?.is_weight;
-  
+
       const subtotal = isWeight
         ? (item.value / 100) * item.cartQuantity
         : item.value * item.cartQuantity;
-  
+
       return sum + subtotal;
     }, 0);
   }, [cart, productMap]);
@@ -184,12 +189,17 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     pagamentos: { metodo: string; valor: number }[]
   ) => {
     // 1. Tenta obter a sessão. O getSession() tenta renovar o token automaticamente se possível.
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
     // 2. Se falhar, tentamos o getUser() que é uma chamada mais rigorosa ao servidor
     if (!session || sessionError) {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) {
         alert("Sua sessão expirou por segurança. O sistema irá recarregar.");
         window.location.href = "/login";
@@ -198,17 +208,17 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
     }
 
     // ... restante do seu código original (o try/catch da venda)
-      // ... restante do seu código original
+    // ... restante do seu código original
 
     try {
-      const labelPagamento = 
-      // ... restante do código permanece igual
+      const labelPagamento =
+        // ... restante do código permanece igual
         pagamentos.length > 1
           ? pagamentos
               .map((p) => `${p.metodo} (R$ ${p.valor.toFixed(2)})`)
               .join(" + ")
           : pagamentos[0].metodo;
-  
+
       const { data: sale, error } = await supabase
         .from("sales")
         .insert({
@@ -220,9 +230,9 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         })
         .select()
         .single();
-  
+
       if (error || !sale) throw new Error(error?.message);
-  
+
       for (const item of cart) {
         const isWeight = isWeightProduct(item.id);
         const quantityToSave = isWeight
@@ -231,7 +241,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         const subtotal = isWeight
           ? (item.value / 100) * item.cartQuantity
           : item.value * item.cartQuantity;
-  
+
         await supabase.from("sale_items").insert({
           sale_id: sale.id,
           product_id: item.id,
@@ -240,7 +250,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           subtotal,
           is_weight: isWeight,
         });
-  
+
         await supabase
           .from("products")
           .update({
@@ -249,7 +259,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           })
           .eq("id", item.id);
       }
-  
+
       // ✅ NÃO limpa o carrinho aqui — será limpo no onClose
       return Promise.resolve();
     } catch (err) {
@@ -257,141 +267,179 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       throw err;
     }
   };
-  
 
-  const imprimirCupomSmart = async (pagamentos?: any[], itensRecentes?: CartItem[]) => {
-    const itensParaImprimir = itensRecentes && itensRecentes.length > 0 ? itensRecentes : cart;
-  
+  const imprimirCupomSmart = async (
+    pagamentos?: any[],
+    itensRecentes?: CartItem[]
+  ) => {
+    const itensParaImprimir =
+      itensRecentes && itensRecentes.length > 0 ? itensRecentes : cart;
+
     // ===== CUPOM FORMATADO NO CONSOLE =====
-    const L = '--------------------------------------------';
-  
+    const L = "--------------------------------------------";
+
     const totalVenda = itensParaImprimir.reduce((sum, item) => {
       const isWeight = item.is_weight;
-      return sum + (isWeight ? (item.value / 100) * item.cartQuantity : item.value * item.cartQuantity);
+      return (
+        sum +
+        (isWeight
+          ? (item.value / 100) * item.cartQuantity
+          : item.value * item.cartQuantity)
+      );
     }, 0);
-  
-    let c = '';
-    c += 'Padaria Lanchonete Magnus Lobo\n';
-    c += 'Rua Trese de Maio, 01 – Cantinho do Céu/SP\n';
-    c += L + '\n';
-    c += 'CUPOM NÃO FISCAL\n';
-    c += L + '\n';
+
+    let c = "";
+    c += "Padaria Lanchonete Magnus Lobo\n";
+    c += "Rua Trese de Maio, 01 – Cantinho do Céu/SP\n";
+    c += L + "\n";
+    c += "CUPOM NÃO FISCAL\n";
+    c += L + "\n";
     // Cabeçalho colunas
-    c += 'ITEM  DESCRIÇÃO           QTD   VL UNIT   VL TOTAL\n';
-  
+    c += "ITEM  DESCRIÇÃO           QTD   VL UNIT   VL TOTAL\n";
+
     itensParaImprimir.forEach((item, i) => {
       const isWeight = item.is_weight;
-      const num = String(i + 1).padStart(3, '0');
+      const num = String(i + 1).padStart(3, "0");
       const nome = item.name.substring(0, 18).padEnd(20);
       const qtd = isWeight
         ? (item.cartQuantity / 1000).toFixed(3).padStart(4)
         : String(item.cartQuantity).padStart(4);
-      const vlUnit = item.value.toFixed(2).replace('.', ',').padStart(7);
-      const sub = (isWeight
-        ? (item.value / 100) * item.cartQuantity
-        : item.value * item.cartQuantity
-      ).toFixed(2).replace('.', ',').padStart(9);
-  
+      const vlUnit = item.value.toFixed(2).replace(".", ",").padStart(7);
+      const sub = (
+        isWeight
+          ? (item.value / 100) * item.cartQuantity
+          : item.value * item.cartQuantity
+      )
+        .toFixed(2)
+        .replace(".", ",")
+        .padStart(9);
+
       c += `${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}\n`;
     });
-  
-    c += L + '\n';
-    c += '\n';
-    c += `Subtotal:                          ${totalVenda.toFixed(2).replace('.', ',').padStart(9)}\n`;
-    c += `Desconto:                          ${'0,00'.padStart(9)}\n`;
-    c += `Total:                             ${totalVenda.toFixed(2).replace('.', ',').padStart(9)}\n`;
-    c += L + '\n';
-  
+
+    c += L + "\n";
+    c += "\n";
+    c += `Subtotal:                          ${totalVenda
+      .toFixed(2)
+      .replace(".", ",")
+      .padStart(9)}\n`;
+    c += `Desconto:                          ${"0,00".padStart(9)}\n`;
+    c += `Total:                             ${totalVenda
+      .toFixed(2)
+      .replace(".", ",")
+      .padStart(9)}\n`;
+    c += L + "\n";
+
     if (pagamentos && pagamentos.length > 0) {
-      c += '\n';
-      pagamentos.forEach(p => {
-        c += `Forma de Pagamento: ${p.metodo.charAt(0).toUpperCase() + p.metodo.slice(1)}\n`;
+      c += "\n";
+      pagamentos.forEach((p) => {
+        c += `Forma de Pagamento: ${
+          p.metodo.charAt(0).toUpperCase() + p.metodo.slice(1)
+        }\n`;
       });
-      c += L + '\n';
+      c += L + "\n";
     }
-  
+
     const agora = new Date();
-    const dataHora = agora.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const dataHora = agora.toLocaleString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+    });
     c += `Data/Hora: ${dataHora}\n`;
-    c += L + '\n';
-    c += '\n';
-    c += '*** ESTE DOCUMENTO NÃO TEM VALOR FISCAL ***\n';
-    c += 'Obrigado pela preferência!\n';
-  
-    console.log('\n' + c);
+    c += L + "\n";
+    c += "\n";
+    c += "*** ESTE DOCUMENTO NÃO TEM VALOR FISCAL ***\n";
+    c += "Obrigado pela preferência!\n";
+
+    console.log("\n" + c);
     // ===== FIM CUPOM CONSOLE =====
-  
+
     // ===== IMPRESSÃO ESC/POS =====
     const encoder = new EscPosEncoder();
-    let result = encoder.initialize().align('center')
-      .line('Padaria Magnus Lobo')
-      .line('Rua Treze de Maio, 01 - Cantinho do Céu/SP')
+    let result = encoder
+      .initialize()
+      .align("center")
+      .line("Padaria Magnus Lobo")
+      .line("Rua Treze de Maio, 01 - Cantinho do Céu/SP")
       .line(L)
-      .line('CUPOM NAO FISCAL')
+      .line("CUPOM NAO FISCAL")
       .line(L)
-      .align('left');
-  
+      .align("left");
+
     itensParaImprimir.forEach((item, i) => {
       const isWeight = item.is_weight;
-      const num = String(i + 1).padStart(3, '0');
+      const num = String(i + 1).padStart(3, "0");
       const nome = item.name.substring(0, 18).padEnd(20);
       const qtd = isWeight
         ? (item.cartQuantity / 1000).toFixed(3).padStart(4)
         : String(item.cartQuantity).padStart(4);
       const vlUnit = item.value.toFixed(2).padStart(7);
-      const sub = (isWeight
-        ? (item.value / 100) * item.cartQuantity
-        : item.value * item.cartQuantity
-      ).toFixed(2).padStart(9);
-  
+      const sub = (
+        isWeight
+          ? (item.value / 100) * item.cartQuantity
+          : item.value * item.cartQuantity
+      )
+        .toFixed(2)
+        .padStart(9);
+
       result.text(`${num}   ${nome} ${qtd}  ${vlUnit}  ${sub}`).newline();
     });
-  
+
     result.line(L);
-    result.align('right')
+    result
+      .align("right")
       .line(`TOTAL: R$ ${totalVenda.toFixed(2)}`)
-      .align('left');
-  
+      .align("left");
+
     if (pagamentos && pagamentos.length > 0) {
-      result.newline().line('PAGAMENTO:');
-      pagamentos.forEach(p => {
+      result.newline().line("PAGAMENTO:");
+      pagamentos.forEach((p) => {
         result.line(`${p.metodo.toUpperCase()}: R$ ${p.valor.toFixed(2)}`);
       });
     }
-  
-    result.newline()
-      .align('center')
-      .line('*** NAO TEM VALOR FISCAL ***')
-      .line('Obrigado pela preferencia!')
-      .newline().cut();
-  
+
+    result
+      .newline()
+      .align("center")
+      .line("*** NAO TEM VALOR FISCAL ***")
+      .line("Obrigado pela preferencia!")
+      .newline()
+      .cut();
+
     const data = result.encode();
-  
+
     try {
       const devices = await (navigator as any).bluetooth.getDevices();
-      let targetDevice = devices[0] || await (navigator as any).bluetooth.requestDevice({
-        filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
-        optionalServices: ['00001101-0000-1000-8000-00805f9b34fb']
-      });
+      let targetDevice =
+        devices[0] ||
+        (await (navigator as any).bluetooth.requestDevice({
+          filters: [{ services: ["000018f0-0000-1000-8000-00805f9b34fb"] }],
+          optionalServices: ["00001101-0000-1000-8000-00805f9b34fb"],
+        }));
       const server = await targetDevice.gatt.connect();
-      const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-      const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+      const service = await server.getPrimaryService(
+        "000018f0-0000-1000-8000-00805f9b34fb"
+      );
+      const characteristic = await service.getCharacteristic(
+        "00002af1-0000-1000-8000-00805f9b34fb"
+      );
       await characteristic.writeValue(data);
     } catch (e) {
       try {
         const ports = await (navigator as any).serial.getPorts();
-        const port = ports[0] || await (navigator as any).serial.requestPort();
+        const port =
+          ports[0] || (await (navigator as any).serial.requestPort());
         await port.open({ baudRate: 9600 });
         const writer = port.writable.getWriter();
         await writer.write(data);
         writer.releaseLock();
         await port.close();
       } catch (err) {
-        console.warn("Impressora não encontrada. Cupom exibido apenas no console.");
+        console.warn(
+          "Impressora não encontrada. Cupom exibido apenas no console."
+        );
       }
     }
   };
-  
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-hidden pt-[env(safe-area-inset-top)]">
@@ -567,34 +615,29 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         </div>
       </aside>
 
+      {/* Substitua o bloco final do arquivo por este */}
       <AnimatePresence mode="wait">
         {showPayment && (
-         <PaymentModal
-         isOpen={showPayment}
-         onClose={() => {
-           // ✅ Agora apenas fecha o modal. 
-           // Os itens continuam no 'cart' se o cliente quiser adicionar mais.
-           setShowPayment(false); 
-         }}
-         total={total}
-         onConfirm={async (pagamentos) => {
-           try {
-             await finalizarVendaNoBanco(pagamentos);
-             // ✅ O carrinho só é limpo após o sucesso da gravação no banco
-             setCart([]); 
-             setShowPayment(false);
-             router.refresh();
-           } catch (err) {
-             console.error("Erro ao finalizar:", err);
-           }
-         }}
-         onPrint={(pagamentosDoModal, itensDoModal) => 
-           imprimirCupomSmart(pagamentosDoModal, itensDoModal)
-         }
-         items={[...cart]}
-         mesaInfo="Venda Balcão"
-       />
-       
+          <PaymentModal
+            key="payment-modal-component" // KEY OBRIGATÓRIA PARA ANIMAR A SAÍDA
+            isOpen={showPayment}
+            onClose={() => setShowPayment(false)}
+            total={total}
+            onConfirm={async (pagamentos) => {
+              try {
+                await finalizarVendaNoBanco(pagamentos);
+                setCart([]); // Só limpa se o banco confirmar
+                // Não fechamos o modal aqui imediatamente para o usuário ver o "Sucesso"
+              } catch (err) {
+                console.error("Erro:", err);
+              }
+            }}
+            onPrint={(pagamentos, itens) =>
+              imprimirCupomSmart(pagamentos, itens)
+            }
+            items={[...cart]}
+            mesaInfo="Venda Balcão"
+          />
         )}
       </AnimatePresence>
     </div>
