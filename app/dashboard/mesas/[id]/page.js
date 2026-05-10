@@ -94,20 +94,8 @@ export default function DetalheMesaPage() {
           pedidoAtivo.itens_pedido_mesa.length > 0;
         let statusFinal = mesaData?.status;
 
-        // --- LÓGICA DE SINCRONIZAÇÃO RIGOROSA ---
-        if (pedidoAtivo && !temItensReais) {
-          // Caso 1: Existe pedido mas está vazio (limpa o "fantasma")
-          await supabase.from("pedidos_mesa").delete().eq("id", pedidoAtivo.id);
-          if (mesaData?.status !== "livre") {
-            await supabase
-              .from("mesas")
-              .update({ status: "livre" })
-              .eq("id", id);
-          }
-          statusFinal = "livre";
-          setItensPedido([]);
-        } else if (temItensReais) {
-          // Caso 2: Tem itens, garante que a mesa está ocupada
+        if (temItensReais) {
+          // Se encontrou itens, garante que o estado local e o banco refletem "ocupada"
           if (mesaData?.status !== "ocupada") {
             await supabase
               .from("mesas")
@@ -117,17 +105,11 @@ export default function DetalheMesaPage() {
           statusFinal = "ocupada";
           setItensPedido(pedidoAtivo.itens_pedido_mesa);
         } else {
-          // Caso 3: Não tem pedido nenhum
-          if (mesaData?.status !== "livre") {
-            await supabase
-              .from("mesas")
-              .update({ status: "livre" })
-              .eq("id", id);
-          }
+          // Se não encontrou itens, APENAS define como livre localmente.
+          // JAMAIS use .delete() aqui. O pedido deve ser mantido ou limpo manualmente no fechamento.
           statusFinal = "livre";
           setItensPedido([]);
         }
-
         setMesa({ ...mesaData, status: statusFinal });
 
         // E. BUSCA O CARDÁPIO DA ORGANIZAÇÃO DO USUÁRIO
@@ -296,6 +278,12 @@ export default function DetalheMesaPage() {
         .single();
 
       if (erroI) throw erroI;
+
+      // Somente após confirmar que o item foi gravado, atualizamos a mesa para ocupada
+      if (mesa?.status !== "ocupada") {
+        await supabase.from("mesas").update({ status: "ocupada" }).eq("id", id);
+        setMesa((prev) => ({ ...prev, status: "ocupada" }));
+      }
 
       // 6. Atualizar estado local
       setItensPedido((prev) => [...prev, novoItem]);
