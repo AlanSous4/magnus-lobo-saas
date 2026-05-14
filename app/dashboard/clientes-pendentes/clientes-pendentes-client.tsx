@@ -103,10 +103,24 @@ export default function ClientesPendentesClient() {
 
   useEffect(() => {
     const fetchProducts = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      // Busca o organization_id do usuário
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.organization_id) return;
+
       const { data } = await supabase
         .from("products")
-        .select("id, name, value, is_weight, active") // Adicionado active
-        .eq("active", true) // ✅ FILTRO: Apenas produtos ativos aparecem na busca
+        .select("id, name, value, is_weight, active")
+        .eq("active", true)
+        .eq("organization_id", profile.organization_id) // 🔒 FILTRO POR ORGANIZAÇÃO
         .order("name");
 
       if (data) setProducts(data);
@@ -116,11 +130,26 @@ export default function ClientesPendentesClient() {
   }, []);
 
   const fetchPendencias = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) return;
+
+    // Busca o organization_id do usuário
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.organization_id) return;
+
     // Buscamos apenas o que não está pago OU o que foi pago recentemente
+    // E SEMPRE FILTRAMOS POR ORGANIZAÇÃO 🔒
     const { data, error } = await supabase
       .from("clientes_pendentes")
       .select(`*, clientes_pendentes_itens (*)`)
-      .or(`pago.eq.false, pago.eq.true`) // Buscamos ambos para o useMemo filtrar localmente
+      .eq("organization_id", profile.organization_id) // 🔒 FILTRO CRÍTICO POR ORGANIZAÇÃO
+      .or(`pago.eq.false, pago.eq.true`)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -233,6 +262,18 @@ export default function ClientesPendentesClient() {
         return;
       }
 
+      // 🔒 BUSCAR O ORGANIZATION_ID DO USUÁRIO
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.organization_id) {
+        alert("Erro: Usuário sem organização vinculada");
+        return;
+      }
+
       // 🔹 Lógica do Label de Pagamento
       let labelPagamento = payment;
       if (isSplit) {
@@ -262,6 +303,7 @@ export default function ClientesPendentesClient() {
           total_value: p.total,
           payment_method: labelPagamento,
           user_id: user.id,
+          organization_id: profile.organization_id, // 🔒 CAMPO OBRIGATÓRIO PARA RLS
         })
         .select()
         .single();
@@ -280,6 +322,7 @@ export default function ClientesPendentesClient() {
         quantity: i.quantity,
         unit_price: i.unit_price,
         subtotal: i.subtotal,
+        organization_id: profile.organization_id, // 🔒 CAMPO OBRIGATÓRIO PARA RLS
       }));
 
       const { error: itemsErr } = await supabase
@@ -415,13 +458,31 @@ for (const item of itens) {
       data: { user },
     } = await supabase.auth.getUser();
 
+    if (!user) {
+      alert("Usuário não autenticado");
+      return;
+    }
+
+    // 🔒 BUSCA O ORGANIZATION_ID DO USUÁRIO
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.organization_id) {
+      alert("Usuário sem organização vinculada");
+      return;
+    }
+
     const { data: pendente, error: pErr } = await supabase
       .from("clientes_pendentes")
       .insert({
         cliente_nome: cliente,
         total,
         data_retirada: data,
-        user_id: user?.id, // Garante que pegamos o ID do usuário logado
+        user_id: user.id,
+        organization_id: profile.organization_id, // 🔒 GARANTE O FILTRO POR ORGANIZAÇÃO
       })
       .select()
       .single();
@@ -438,7 +499,8 @@ for (const item of itens) {
       quantity: i.is_weight ? i.quantity / 1000 : i.quantity,
       unit_price: i.unit_price,
       subtotal: i.subtotal,
-      is_weight: i.is_weight, // ADICIONE ESTA LINHA
+      is_weight: i.is_weight,
+      organization_id: profile.organization_id, // 🔒 GARANTE O FILTRO POR ORGANIZAÇÃO
     }));
 
     await supabase.from("clientes_pendentes_itens").insert(itens);
@@ -457,6 +519,19 @@ for (const item of itens) {
     if (!editingId) return;
 
     const total = calcularTotalItens(items);
+
+    // 🔒 BUSCA O ORGANIZATION_ID DO USUÁRIO
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.organization_id) return;
 
     await supabase
       .from("clientes_pendentes")
@@ -479,7 +554,8 @@ for (const item of itens) {
       quantity: i.is_weight ? i.quantity / 1000 : i.quantity,
       unit_price: i.unit_price,
       subtotal: i.subtotal,
-      is_weight: i.is_weight, // ADICIONE ESTA LINHA
+      is_weight: i.is_weight,
+      organization_id: profile.organization_id, // 🔒 GARANTE O FILTRO POR ORGANIZAÇÃO
     }));
 
     await supabase.from("clientes_pendentes_itens").insert(novosItens);

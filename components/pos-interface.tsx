@@ -207,6 +207,18 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       }
     }
 
+    // 🔒 3. BUSCAR O ORGANIZATION_ID DO USUÁRIO ANTES DE INSERIR
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", userId)
+      .single();
+
+    if (!profile?.organization_id) {
+      alert("Erro: Usuário sem organização vinculada. Contate o suporte.");
+      return;
+    }
+
     // ... restante do seu código original (o try/catch da venda)
     // ... restante do seu código original
 
@@ -227,6 +239,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           total_value: total,
           payment_method: labelPagamento,
           created_at: getBrazilISOString(),
+          organization_id: profile.organization_id, // 🔒 CAMPO OBRIGATÓRIO PARA RLS
         })
         .select()
         .single();
@@ -249,6 +262,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           unit_price: item.value,
           subtotal,
           is_weight: isWeight,
+          organization_id: profile.organization_id, // 🔒 CAMPO OBRIGATÓRIO PARA RLS
         });
 
         await supabase
