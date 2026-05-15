@@ -1,8 +1,14 @@
 import type React from "react"
+import { SupabaseSessionProvider } from "@/components/supabase-session-provider"
+
 export default function SalesLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return <main className="h-screen">{children}</main>
+  return (
+    <SupabaseSessionProvider>
+      <main className="h-screen">{children}</main>
+    </SupabaseSessionProvider>
+  )
 }

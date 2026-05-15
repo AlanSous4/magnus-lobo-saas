@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { supabase, refreshSupabaseSession } from '@/lib/supabase/client';
 
 export function useMesas() {
   const [mesas, setMesas] = useState([]);
@@ -11,6 +11,14 @@ export function useMesas() {
 
   const fetchMesas = useCallback(async (idDaOrganizacao) => {
     if (!idDaOrganizacao) return;
+
+    // Verifica se a sessão ainda é válida antes de buscar dados
+    const isSessionValid = await refreshSupabaseSession();
+    if (!isSessionValid) {
+      console.warn("[useMesas] Sessão inválida, abortando busca");
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -32,6 +40,13 @@ export function useMesas() {
     let active = true; // Controle para evitar atualizações em componentes desmontados
 
     async function inicializar() {
+      // Verifica se a sessão ainda é válida antes de buscar dados
+      const isSessionValid = await refreshSupabaseSession();
+      if (!isSessionValid || !active) {
+        setLoading(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !active) return;
 

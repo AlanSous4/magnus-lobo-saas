@@ -12,3 +12,16 @@ export const supabase = createBrowserClient(
     },
   }
 );
+
+// 🔄 Função para forçar a sincronização da sessão quando o usuário volta à página
+export async function refreshSupabaseSession() {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  if (error || !session) {
+    // Se não há sessão válida, tenta recuperar via getUser (mais rigoroso)
+    const { data: { user } } = await supabase.auth.getUser();
+    return !!user;
+  }
+  
+  return !!session;
+}
