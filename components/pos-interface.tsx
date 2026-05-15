@@ -247,6 +247,12 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
       if (error || !sale) throw new Error(error?.message);
 
       for (const item of cart) {
+        // 🛡️ TRAVA DE SEGURANÇA OBIGATÓRIA: Evita update na tabela toda se o ID sumir
+        if (!item.id) {
+          console.error("Erro grave: Item no carrinho sem ID válido!", item);
+          throw new Error("Falha catastrófica: Produto sem identificação no carrinho.");
+        }
+      
         const isWeight = isWeightProduct(item.id);
         const quantityToSave = isWeight
           ? item.cartQuantity / 1000
@@ -254,7 +260,7 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
         const subtotal = isWeight
           ? (item.value / 100) * item.cartQuantity
           : item.value * item.cartQuantity;
-
+      
         await supabase.from("sale_items").insert({
           sale_id: sale.id,
           product_id: item.id,
@@ -262,16 +268,17 @@ export function POSInterface({ products, userId }: POSInterfaceProps) {
           unit_price: item.value,
           subtotal,
           is_weight: isWeight,
-          organization_id: profile.organization_id, // 🔒 CAMPO OBRIGATÓRIO PARA RLS
+          organization_id: profile.organization_id,
         });
-
+      
+        // Só executa o update se passou pela trava de segurança acima
         await supabase
           .from("products")
           .update({
             quantity: item.quantity - quantityToSave,
             exit_date: new Date().toISOString(),
           })
-          .eq("id", item.id);
+          .eq("id", item.id); // Agora garantido que tem um valor aqui
       }
 
       // ✅ NÃO limpa o carrinho aqui — será limpo no onClose
