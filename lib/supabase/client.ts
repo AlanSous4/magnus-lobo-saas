@@ -9,9 +9,6 @@ export const supabase = createBrowserClient(
       persistSession: true,       // Garante que a sessão fique salva no navegador
       autoRefreshToken: true,     // Tenta renovar o token sozinho antes de expirar
       detectSessionInUrl: true,   // Ajuda na detecção do login após redirecionamentos
-      flowType: "pkce",           // Usa PKCE para maior segurança na renovação de tokens
-      storage: typeof window !== "undefined" ? window.localStorage : undefined,
-      storageKey: "magnus-lobo-auth", // Chave consistente para evitar conflitos
     },
   }
 );

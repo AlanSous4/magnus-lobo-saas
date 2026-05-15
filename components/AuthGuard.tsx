@@ -11,14 +11,12 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
-  // Função para verificar e renovar a sessão
-  const refreshSession = useCallback(async () => {
+  // Função para verificar a sessão
+  const checkSession = useCallback(async () => {
     try {
-      // Usa getUser() que valida o token com o servidor (mais seguro que getSession)
-      const { data: { user }, error } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (error || !user) {
-        console.warn("[AuthGuard] Sessão inválida ou expirada, redirecionando para login");
+      if (!session) {
         router.push("/login");
         return false;
       }
@@ -37,48 +35,35 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         setLoading(false);
       }
       
-      if (event === "TOKEN_REFRESHED") {
-        console.log("[AuthGuard] Token renovado automaticamente");
-      }
-      
-      if (!session && (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED")) {
+      if (event === "SIGNED_OUT" || (!session && event === "TOKEN_REFRESHED")) {
         router.push("/login");
       }
     });
 
-    // Verificação inicial usando getUser (validação server-side)
-    const checkSession = async () => {
-      const isValid = await refreshSession();
+    // Verificação inicial
+    const initSession = async () => {
+      const isValid = await checkSession();
       if (isValid) {
         setLoading(false);
       }
     };
 
-    checkSession();
+    initSession();
 
     // Renova a sessão quando o usuário volta para a aba/janela
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        console.log("[AuthGuard] Aba ativa - verificando sessão");
-        refreshSession();
+        checkSession();
       }
     };
 
-    // Renova a sessão quando o usuário volta de outra página (popstate)
-    const handleFocus = () => {
-      console.log("[AuthGuard] Janela em foco - verificando sessão");
-      refreshSession();
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
 
     return () => {
       subscription.unsubscribe();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
     };
-  }, [router, refreshSession]);
+  }, [router, checkSession]);
 
   // Se estiver carregando a sessão, não mostra nada (ou um spinner) para evitar flashes
   if (loading) return null;
