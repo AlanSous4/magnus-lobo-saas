@@ -2,7 +2,8 @@ import { updateSession } from "@/lib/supabase/proxy"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-export async function proxy(request: NextRequest) {
+// Next.js 16 suporta tanto `proxy` quanto `middleware` - usando middleware para compatibilidade
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 🔓 LIBERA preview para bots e usuários (NÃO passa pelo Supabase)

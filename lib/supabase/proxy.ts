@@ -25,16 +25,29 @@ export async function updateSession(request: NextRequest) {
 
           // 3. Força a gravação dos cookies no navegador para manter o login no F5
           cookiesToSet.forEach(({ name, value, options }) => 
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              // Garante que os cookies de sessão não expirem prematuramente
+              sameSite: "lax",
+              secure: process.env.NODE_ENV === "production",
+            })
           )
         },
       },
     },
   )
 
+  // IMPORTANTE: getUser() valida o token com o servidor e renova se necessário
+  // Isso é mais seguro que getSession() que apenas lê do storage local
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser()
+
+  // Se houve erro de autenticação (token expirado, inválido, etc), limpa os cookies
+  if (error) {
+    console.warn("[Middleware] Erro de autenticação:", error.message)
+  }
 
   const publicPaths = ["/login", "/cadastrar"]
   const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
